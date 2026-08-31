@@ -4,7 +4,7 @@ import type { MealSlotId, Recipe } from "@/types";
 import { useAppStore } from "@/store/useAppStore";
 import { formatQty } from "@/utils/grocery";
 import { fromDateKey } from "@/utils/date";
-import { householdMultiplierFor } from "@/utils/household";
+import { formatHouseholdServingSplit, householdMultiplierFor } from "@/utils/household";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { scaledIngredientsForMeal } from "@/utils/recipeDisplay";
 import {
@@ -126,8 +126,8 @@ export function MealPrepSheet({
         <div className="overflow-y-auto px-5 py-5">
           <p className="mb-1 text-sm font-semibold text-slate-900">{recipe.name}</p>
           <p className="mb-5 text-xs text-slate-500">
-            Cook once, eat across selected days. Grocery list counts one batch (portions ×
-            household).
+            Cook once, eat across selected days. Grocery counts one batch (portions × adult and
+            child servings).
           </p>
 
           <section className="mb-5 space-y-3 rounded-2xl border border-slate-200 bg-white p-4">
@@ -232,8 +232,8 @@ export function MealPrepSheet({
           <section className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
             <p className="text-sm font-semibold text-emerald-950">Batch ingredients</p>
             <p className="mt-1 text-xs text-emerald-900/80">
-              {portionsCooked} portions × {householdMult === 1 ? "1×" : `${householdMult}×`}{" "}
-              household
+              {portionsCooked} portion-days · {formatHouseholdServingSplit(userProfile)} each
+              {householdMult !== 1 ? ` (${householdMult.toFixed(2)}× recipe)` : ""}
             </p>
             <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-emerald-950">
               {batchIngredients.map((ing) => (

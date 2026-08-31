@@ -145,7 +145,7 @@ export function MealActionsMenu({
           {onDetails && (
             <MenuAction
               icon={<Utensils className="h-5 w-5" />}
-              label="View details"
+              label="Recipe/Prep details"
               hint="Ingredients, macros, and variations"
               onClick={() => run(onDetails)}
             />

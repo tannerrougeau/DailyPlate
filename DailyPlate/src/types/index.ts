@@ -42,6 +42,8 @@ export interface Recipe {
   protein: number;
   carbs: number;
   fat: number;
+  /** Optional authored fiber (g). When omitted, meal cards estimate from carbs. */
+  fiber?: number;
   prepMinutes: number;
   cookMinutes: number;
   ingredients: RecipeIngredient[];

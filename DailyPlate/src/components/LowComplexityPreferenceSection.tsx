@@ -11,6 +11,7 @@ export function LowComplexityPreferenceSection({
       <p className="text-sm text-slate-600">
         Fewer cooking days. Leftovers and simpler whole-food meals preferred.
       </p>
+      {/* Future: a dedicated low-complexity vs detailed generate mode. This flag is the interim setting. */}
       <button
         type="button"
         onClick={() => onChange(!enabled)}

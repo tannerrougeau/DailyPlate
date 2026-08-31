@@ -9,6 +9,7 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
+import { MealMacroLine } from "@/components/MealMacroLine";
 import { MealCard } from "@/components/MealCard";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import { RecipeImage } from "@/components/RecipeImage";
@@ -34,7 +35,7 @@ import {
 } from "@/utils/date";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
 import { formatHouseholdPlanningLine } from "@/utils/household";
-import { effectiveCarbVariationId, effectiveVariationId, mealDisplayName, resolveRecipeMacros, variationLabels } from "@/utils/recipeDisplay";
+import { effectiveCarbVariationId, effectiveVariationId, mealDisplayName, recipeFiberGrams, resolveRecipeMacros, variationLabels } from "@/utils/recipeDisplay";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { isLowComplexityLeftover, isMealPrepBatchBadge } from "@/utils/mealPrepDisplay";
 import type { MealSlotId } from "@/types";
@@ -701,6 +702,10 @@ function DayMealPreview({
   const protein = Math.round(macros.protein * meal.scale);
   const carbs = Math.round(macros.carbs * meal.scale);
   const fat = Math.round(macros.fat * meal.scale);
+  const fiber = Math.round(
+    recipeFiberGrams(meal.recipe, effectiveVariationId(meal), effectiveCarbVariationId(meal)) *
+      meal.scale,
+  );
   const variations = variationLabels(meal.recipe);
   const selectedId = effectiveVariationId(meal);
 
@@ -719,12 +724,19 @@ function DayMealPreview({
           <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
             {SLOT_LABELS[meal.slot]}
           </p>
-          <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-slate-900">
+          <p className="mt-0.5 line-clamp-2 break-words text-sm font-semibold leading-snug text-slate-900 [overflow-wrap:anywhere]">
             {mealDisplayName(meal)}
           </p>
-          <p className="mt-1 text-xs tabular-nums text-slate-400">
-            {kcal} kcal · P {protein}g · C {carbs}g · F {fat}g
-          </p>
+          <div className="mt-1">
+            <MealMacroLine
+              kcal={kcal}
+              protein={protein}
+              carbs={carbs}
+              fat={fat}
+              fiber={fiber}
+              compact
+            />
+          </div>
         </div>
         <ChevronDown
           className={`mt-2 h-4 w-4 shrink-0 text-slate-400 transition-transform ${

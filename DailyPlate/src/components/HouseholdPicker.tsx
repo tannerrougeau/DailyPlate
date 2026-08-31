@@ -63,8 +63,8 @@ export function HouseholdPicker({
     <div className="space-y-3">
       {!compact && (
         <p className="text-sm leading-relaxed text-slate-600">
-          We scale grocery lists, servings, and prep amounts. Your calorie target stays
-          personalized to you. Children count as about 0.6 of an adult portion.
+          We scale grocery, servings, and prep for the household. Adult plates are full servings;
+          child plates default smaller. Your calorie target stays yours.
         </p>
       )}
       <Stepper
@@ -83,7 +83,7 @@ export function HouseholdPicker({
       />
       {compact && (
         <p className="text-xs text-slate-500">
-          Children (0–6) count as about 0.6 of an adult portion.
+          Child plates default smaller than adult. Set sizes below if you like.
         </p>
       )}
     </div>

@@ -9,6 +9,10 @@ import type {
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import {
+  formatHouseholdServingSplit,
+  resolveHouseholdCounts,
+} from "@/utils/household";
+import {
   applyCarbSwapToIngredients,
   applyCarbSwapToInstructions,
   applyCarbSwapToMacros,
@@ -108,6 +112,20 @@ export function variationLabels(recipe: Recipe): { id: string; label: string }[]
     id: label.toLowerCase().replace(/\s+/g, "-"),
     label,
   }));
+}
+
+/** Fiber per recipe serving. Uses authored grams when present; otherwise a light estimate from carbs so Fiber is never hidden. */
+export function recipeFiberGrams(
+  recipe: Recipe,
+  variationId?: string,
+  carbVariationId?: CarbVariationId,
+): number {
+  if (typeof recipe.fiber === "number" && Number.isFinite(recipe.fiber)) {
+    return Math.max(0, Math.round(recipe.fiber));
+  }
+  const macros = resolveRecipeMacros(recipe, variationId, carbVariationId);
+  const estimated = Math.round(macros.carbs * 0.12);
+  return macros.carbs >= 6 ? Math.max(1, estimated) : estimated;
 }
 
 export function resolveRecipeMacros(
@@ -280,4 +298,22 @@ export function shouldShowProteinAdjustNote(
 ): boolean {
   if (!profile?.prioritizeMinProtein) return false;
   return clampMealScaleForRecipe(meal.scale) > 1.05;
+}
+
+export function platingNoteForHousehold(profile: UserProfile | null | undefined): string | null {
+  const { children } = resolveHouseholdCounts(profile);
+  if (children <= 0) return null;
+  return `Cook the full batch, then plate larger adult portions and smaller child portions (${formatHouseholdServingSplit(profile)}).`;
+}
+
+export function perPersonIngredientQty(
+  baseQuantity: number,
+  mealScale: number,
+  personMult: number,
+  ing: RecipeIngredient,
+  prioritizeProtein: boolean,
+): number {
+  return (
+    baseQuantity * proteinAwareIngredientMultiplier(ing, mealScale * personMult, prioritizeProtein)
+  );
 }

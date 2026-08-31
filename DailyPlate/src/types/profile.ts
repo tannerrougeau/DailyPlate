@@ -7,6 +7,19 @@ export type WeeklyMealPrepRepeatCount = 2 | 3 | 4;
 
 export type BiologicalSex = "male" | "female" | "unspecified";
 
+/** Relative plate size. Children default smaller than adults. */
+export type PersonSize = "small" | "medium" | "large";
+
+export type HouseholdMemberKind = "adult" | "child";
+
+/** Optional per-person details for household portioning. */
+export interface HouseholdMember {
+  kind: HouseholdMemberKind;
+  size?: PersonSize | null;
+  age?: number | null;
+  sex?: BiologicalSex | null;
+}
+
 export type MainGoal = "lose" | "maintain" | "gain" | "health";
 
 export type MealsPerDay = "two" | "three" | "three_snack" | "flexible";
@@ -45,8 +58,10 @@ export interface UserProfile {
   householdCustomCount?: number | null;
   /** Adult count for grocery / serving scale (default 2). Prefer over legacy preset. */
   householdAdults?: number;
-  /** Child count 0–6 for grocery / serving scale (children ≈ 0.6 adult portion). */
+  /** Child count 0–6 for grocery / serving scale (children default smaller than adults). */
   householdChildren?: number;
+  /** Optional per-person size/age/gender. Length should match adults + children. */
+  householdMembers?: HouseholdMember[];
   /** How to allocate calories after protein (default balanced). */
   macroSplitPreference?: MacroSplitPreference | null;
   /** User-provided maintenance TDEE (kcal); overrides formula when set. */

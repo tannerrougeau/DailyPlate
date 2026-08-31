@@ -11,6 +11,7 @@ import type { MealSlotId } from "@/types";
 import type {
   ActivityLevel,
   BiologicalSex,
+  HouseholdMember,
   MacroSplitPreference,
   MainGoal,
   MealTimingPreference,
@@ -24,8 +25,12 @@ import {
   clampChildren,
   householdPresetFromCounts,
   HOUSEHOLD_ADULTS_DEFAULT,
+  defaultSizeForKind,
+  sizeToBodyDefaults,
+  syncHouseholdMembers,
 } from "@/utils/household";
 import { HouseholdPicker } from "@/components/HouseholdPicker";
+import { HouseholdMembersEditor } from "@/components/HouseholdMembersEditor";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import {
   HEIGHT_CM_MAX,
@@ -42,13 +47,9 @@ import {
 
 type Step =
   | "welcome"
-  | "age"
-  | "sex"
-  | "height"
-  | "weight"
+  | "household"
   | "goal"
   | "meals"
-  | "household"
   | "macro_split"
   | "basic_cta"
   | "optional";
@@ -83,13 +84,9 @@ const ACTIVITY_OPTIONS: { id: ActivityLevel; label: string }[] = [
 function stepIndex(step: Step): number {
   const order: Step[] = [
     "welcome",
-    "age",
-    "sex",
-    "height",
-    "weight",
+    "household",
     "goal",
     "meals",
-    "household",
     "macro_split",
     "basic_cta",
     "optional",
@@ -123,6 +120,9 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
   const [mealsPerDay, setMealsPerDay] = useState<MealsPerDay | null>(null);
   const [householdAdults, setHouseholdAdults] = useState(HOUSEHOLD_ADULTS_DEFAULT);
   const [householdChildren, setHouseholdChildren] = useState(0);
+  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>(() =>
+    syncHouseholdMembers(HOUSEHOLD_ADULTS_DEFAULT, 0),
+  );
   const [macroSplitPreference, setMacroSplitPreference] =
     useState<MacroSplitPreference>("balanced");
   const [goalHint, setGoalHint] = useState<string | null>(null);
@@ -153,7 +153,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
   const [lowComplexityEnabled, setLowComplexityEnabled] = useState(false);
   const [preferredCuisines, setPreferredCuisines] = useState<string[]>([]);
 
-  const total = 9;
+  const total = 5;
   const progress = Math.min(1, (stepIndex(step) + (step === "optional" ? 1 : 0)) / total);
 
   const resolvedHeightCm = heightCmFromFeetInches(heightFeet, heightInches);
@@ -166,12 +166,35 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
     return Math.round(n);
   })();
 
-  function buildDraftProfile(goalId: MainGoal): UserProfile {
+  function resolvedBodyStats() {
+    const you = householdMembers.find((m) => m.kind === "adult");
+    const size = you?.size ?? defaultSizeForKind("adult");
+    const body = sizeToBodyDefaults(size);
+    const parsedAge = Number(age);
     return {
-      age: Math.min(120, Math.max(13, Number(age) || 30)),
-      sex: sex ?? "unspecified",
-      heightCm: Math.min(HEIGHT_CM_MAX, Math.max(HEIGHT_CM_MIN, resolvedHeightCm ?? 170)),
-      weightKg: Math.min(WEIGHT_KG_MAX, Math.max(WEIGHT_KG_MIN, resolvedWeightKg ?? 70)),
+      age: Math.min(
+        120,
+        Math.max(13, Number.isFinite(parsedAge) && parsedAge >= 13 ? parsedAge : (you?.age ?? 30)),
+      ),
+      sex: sex ?? you?.sex ?? "unspecified",
+      heightCm: Math.min(
+        HEIGHT_CM_MAX,
+        Math.max(HEIGHT_CM_MIN, resolvedHeightCm ?? body.heightCm),
+      ),
+      weightKg: Math.min(
+        WEIGHT_KG_MAX,
+        Math.max(WEIGHT_KG_MIN, resolvedWeightKg ?? body.weightKg),
+      ),
+    };
+  }
+
+  function buildDraftProfile(goalId: MainGoal): UserProfile {
+    const body = resolvedBodyStats();
+    return {
+      age: body.age,
+      sex: body.sex,
+      heightCm: body.heightCm,
+      weightKg: body.weightKg,
       goal: goalId,
       mealsPerDay: mealsPerDay ?? "three",
       mealTiming: null,
@@ -189,27 +212,25 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       householdCustomCount: null,
       householdAdults: clampAdults(householdAdults),
       householdChildren: clampChildren(householdChildren),
+      householdMembers: syncHouseholdMembers(
+        householdAdults,
+        householdChildren,
+        householdMembers,
+      ),
       macroSplitPreference: macroSplitPreference ?? "balanced",
       knownTdeeKcal: parsedKnownTdee,
     };
   }
 
-  const canContinueBasic =
-    Number(age) >= 13 &&
-    Number(age) <= 120 &&
-    sex &&
-    resolvedHeightCm !== null &&
-    resolvedWeightKg !== null &&
-    goal &&
-    mealsPerDay &&
-    householdAdults >= 1;
+  const canContinueBasic = Boolean(goal && mealsPerDay && householdAdults >= 1);
 
   function buildBaseProfile(): UserProfile {
+    const body = resolvedBodyStats();
     return {
-      age: Number(age),
-      sex: sex!,
-      heightCm: resolvedHeightCm!,
-      weightKg: resolvedWeightKg!,
+      age: body.age,
+      sex: body.sex,
+      heightCm: body.heightCm,
+      weightKg: body.weightKg,
       goal: goal!,
       mealsPerDay: mealsPerDay!,
       mealTiming: null,
@@ -227,6 +248,11 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       householdCustomCount: null,
       householdAdults: clampAdults(householdAdults),
       householdChildren: clampChildren(householdChildren),
+      householdMembers: syncHouseholdMembers(
+        householdAdults,
+        householdChildren,
+        householdMembers,
+      ),
       macroSplitPreference,
       knownTdeeKcal: parsedKnownTdee,
     };
@@ -272,8 +298,18 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
     const profile = useAppStore.getState().userProfile;
     if (!profile) return;
     const parsedProtein = Number(minProteinGrams);
+    const body = resolvedBodyStats();
     const next: UserProfile = {
       ...profile,
+      age: body.age,
+      sex: body.sex,
+      heightCm: body.heightCm,
+      weightKg: body.weightKg,
+      householdMembers: syncHouseholdMembers(
+        profile.householdAdults ?? householdAdults,
+        profile.householdChildren ?? householdChildren,
+        householdMembers,
+      ),
       mealTiming,
       favoriteFoodChips: favChips,
       dislikedFoodChips: disChips,
@@ -322,62 +358,29 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
         </p>
 
         {step === "welcome" && (
-          <WelcomeStep onNext={() => setStep("age")} onLogin={onLogin} />
+          <WelcomeStep onNext={() => setStep("household")} onLogin={onLogin} />
         )}
 
-        {step === "age" && (
-          <NumberStep
-            title="How old are you?"
-            hint="We use this to estimate energy needs."
-            value={age}
-            onChange={setAge}
-            min={13}
-            max={120}
-            suffix="years"
-            onBack={() => setStep("welcome")}
-            onNext={() => setStep("sex")}
-          />
-        )}
-
-        {step === "sex" && (
-          <ChoiceStep
-            title="Biological sex"
-            hint="Used in the standard energy equation. Choose what fits best."
-            options={[
-              { id: "male" as const, label: "Male" },
-              { id: "female" as const, label: "Female" },
-              { id: "unspecified" as const, label: "Prefer not to say" },
-            ]}
-            value={sex}
-            onChange={(v) => {
-              setSex(v);
-              setGoalHint(null);
-            }}
-            onBack={() => setStep("age")}
-            onNext={() => setStep("height")}
-          />
-        )}
-
-        {step === "height" && (
-          <HeightStep
-            feet={heightFeet}
-            inches={heightInches}
-            onFeetChange={setHeightFeet}
-            onInchesChange={setHeightInches}
-            onBack={() => setStep("sex")}
-            onNext={() => setStep("weight")}
-          />
-        )}
-
-        {step === "weight" && (
-          <WeightStep
-            value={weightValue}
-            unit={weightUnit}
-            onValueChange={setWeightValue}
-            onUnitChange={setWeightUnit}
-            onBack={() => setStep("height")}
-            onNext={() => setStep("goal")}
-          />
+        {step === "household" && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-slate-900">Who is this food for?</h2>
+            <HouseholdPicker
+              adults={householdAdults}
+              childrenCount={householdChildren}
+              onAdultsChange={(n) => {
+                setHouseholdAdults(n);
+                setHouseholdMembers(syncHouseholdMembers(n, householdChildren, householdMembers));
+              }}
+              onChildrenChange={(n) => {
+                setHouseholdChildren(n);
+                setHouseholdMembers(syncHouseholdMembers(householdAdults, n, householdMembers));
+              }}
+            />
+            <NavRow
+              onBack={() => setStep("welcome")}
+              onNext={() => setStep("goal")}
+            />
+          </div>
         )}
 
         {step === "goal" && (
@@ -478,7 +481,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
               </p>
             )}
             <NavRow
-              onBack={() => setStep("weight")}
+              onBack={() => setStep("household")}
               onNext={() => setStep("meals")}
               nextDisabled={!goal || (knownTdeeInput.trim() !== "" && parsedKnownTdee == null)}
             />
@@ -516,24 +519,8 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
             )}
             <NavRow
               onBack={() => setStep("goal")}
-              onNext={() => setStep("household")}
-              nextDisabled={!mealsPerDay}
-            />
-          </div>
-        )}
-
-        {step === "household" && (
-          <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-slate-900">How many people are you cooking for?</h2>
-            <HouseholdPicker
-              adults={householdAdults}
-              childrenCount={householdChildren}
-              onAdultsChange={setHouseholdAdults}
-              onChildrenChange={setHouseholdChildren}
-            />
-            <NavRow
-              onBack={() => setStep("meals")}
               onNext={() => setStep("macro_split")}
+              nextDisabled={!mealsPerDay}
             />
           </div>
         )}
@@ -567,7 +554,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
               ))}
             </div>
             <NavRow
-              onBack={() => setStep("household")}
+              onBack={() => setStep("meals")}
               onNext={() => setStep("basic_cta")}
             />
           </div>
@@ -613,6 +600,64 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
                 {basicMotivation}
               </p>
             )}
+
+            <section className="space-y-3">
+              <h3 className="text-lg font-semibold text-slate-900">
+                People you’re cooking for{" "}
+                <span className="font-normal text-slate-500">(optional)</span>
+              </h3>
+              <HouseholdMembersEditor
+                members={householdMembers}
+                onChange={setHouseholdMembers}
+              />
+            </section>
+
+            <section className="space-y-3">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Your stats for calorie targets{" "}
+                <span className="font-normal text-slate-500">(optional)</span>
+              </h3>
+              <p className="text-sm text-slate-500">
+                Age, gender, and size are enough. Height and weight refine the estimate if you
+                have them.
+              </p>
+              <NumberStep
+                title="Age"
+                hint="Used only for your calorie target."
+                value={age}
+                onChange={setAge}
+                min={13}
+                max={120}
+                suffix="years"
+                embedded
+              />
+              <ChoiceStep
+                title="Gender"
+                hint="Used in the energy equation if you share it."
+                options={[
+                  { id: "male" as const, label: "Male" },
+                  { id: "female" as const, label: "Female" },
+                  { id: "unspecified" as const, label: "Prefer not to say" },
+                ]}
+                value={sex}
+                onChange={setSex}
+                embedded
+              />
+              <HeightStep
+                feet={heightFeet}
+                inches={heightInches}
+                onFeetChange={setHeightFeet}
+                onInchesChange={setHeightInches}
+                embedded
+              />
+              <WeightStep
+                value={weightValue}
+                unit={weightUnit}
+                onValueChange={setWeightValue}
+                onUnitChange={setWeightUnit}
+                embedded
+              />
+            </section>
 
             <section className="space-y-3">
               <h3 className="text-lg font-semibold text-slate-900">Meal timing</h3>
@@ -778,8 +823,7 @@ function WelcomeStep({ onNext, onLogin }: { onNext: () => void; onLogin?: () => 
       <div className="rounded-3xl border border-slate-200/80 bg-white px-6 py-12 shadow-sm">
         <h1 className="text-3xl font-bold text-slate-900">Welcome to DailyPlate</h1>
         <p className="mt-4 text-lg leading-relaxed text-slate-600">
-          A few quick questions, then we’ll shape calories and macros around you. No stress — you can
-          skip optional steps.
+          First, who you’re cooking for. Then goals. Personal details are optional.
         </p>
       </div>
       <button
@@ -812,19 +856,23 @@ function HeightStep({
   onInchesChange,
   onBack,
   onNext,
+  embedded = false,
 }: {
   feet: string;
   inches: string;
   onFeetChange: (v: string) => void;
   onInchesChange: (v: string) => void;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  embedded?: boolean;
 }) {
   const ok = isValidHeightFeetInches(feet, inches);
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-slate-900">Your height</h2>
-      <p className="text-slate-600">Feet and inches (e.g. 5 ft 10 in)</p>
+    <div className="space-y-3">
+      <h2 className={embedded ? "text-base font-semibold text-slate-900" : "text-2xl font-bold text-slate-900"}>
+        Height
+      </h2>
+      {!embedded && <p className="text-slate-600">Feet and inches (e.g. 5 ft 10 in)</p>}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-2 block text-center text-sm font-semibold text-slate-600">
@@ -861,7 +909,9 @@ function HeightStep({
           <p className="mt-2 text-center text-sm font-medium text-slate-500">in</p>
         </div>
       </div>
-      <NavRow onBack={onBack} onNext={onNext} nextDisabled={!ok} />
+      {!embedded && onBack && onNext && (
+        <NavRow onBack={onBack} onNext={onNext} nextDisabled={!ok} />
+      )}
     </div>
   );
 }
@@ -873,13 +923,15 @@ function WeightStep({
   onUnitChange,
   onBack,
   onNext,
+  embedded = false,
 }: {
   value: string;
   unit: WeightUnit;
   onValueChange: (v: string) => void;
   onUnitChange: (u: WeightUnit) => void;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  embedded?: boolean;
 }) {
   const ok = isValidWeightInput(value, unit);
   const hint =
@@ -895,9 +947,11 @@ function WeightStep({
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-slate-900">Current weight</h2>
-      <p className="text-slate-600">{hint}</p>
+    <div className="space-y-3">
+      <h2 className={embedded ? "text-base font-semibold text-slate-900" : "text-2xl font-bold text-slate-900"}>
+        Weight
+      </h2>
+      {!embedded && <p className="text-slate-600">{hint}</p>}
       <div
         className="flex rounded-2xl border-2 border-slate-200 bg-slate-100 p-1"
         role="group"
@@ -908,7 +962,7 @@ function WeightStep({
             key={u}
             type="button"
             onClick={() => handleUnitChange(u)}
-            className={`min-h-[52px] flex-1 rounded-xl text-base font-semibold transition-colors ${
+            className={`min-h-[44px] flex-1 rounded-xl text-sm font-semibold transition-colors ${
               unit === u
                 ? "bg-white text-blue-900 shadow-sm"
                 : "text-slate-600 hover:text-slate-800"
@@ -932,7 +986,9 @@ function WeightStep({
           {unit}
         </span>
       </div>
-      <NavRow onBack={onBack} onNext={onNext} nextDisabled={!ok} />
+      {!embedded && onBack && onNext && (
+        <NavRow onBack={onBack} onNext={onNext} nextDisabled={!ok} />
+      )}
     </div>
   );
 }
@@ -947,6 +1003,7 @@ function NumberStep({
   suffix,
   onBack,
   onNext,
+  embedded = false,
 }: {
   title: string;
   hint: string;
@@ -955,15 +1012,18 @@ function NumberStep({
   min: number;
   max: number;
   suffix: string;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  embedded?: boolean;
 }) {
   const n = Number(value);
   const ok = n >= min && n <= max;
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
-      <p className="text-slate-600">{hint}</p>
+    <div className="space-y-3">
+      <h2 className={embedded ? "text-base font-semibold text-slate-900" : "text-2xl font-bold text-slate-900"}>
+        {title}
+      </h2>
+      {!embedded && <p className="text-slate-600">{hint}</p>}
       <div className="relative">
         <input
           type="number"
@@ -977,7 +1037,9 @@ function NumberStep({
           {suffix}
         </span>
       </div>
-      <NavRow onBack={onBack} onNext={onNext} nextDisabled={!ok} />
+      {!embedded && onBack && onNext && (
+        <NavRow onBack={onBack} onNext={onNext} nextDisabled={!ok} />
+      )}
     </div>
   );
 }
@@ -990,26 +1052,30 @@ function ChoiceStep<T extends string>({
   onChange,
   onBack,
   onNext,
+  embedded = false,
 }: {
   title: string;
   hint: string;
   options: { id: T; label: string }[];
   value: T | null;
   onChange: (v: T) => void;
-  onBack: () => void;
-  onNext: () => void;
+  onBack?: () => void;
+  onNext?: () => void;
+  embedded?: boolean;
 }) {
   return (
-    <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-slate-900">{title}</h2>
-      <p className="text-slate-600">{hint}</p>
-      <div className="flex flex-col gap-3">
+    <div className="space-y-3">
+      <h2 className={embedded ? "text-base font-semibold text-slate-900" : "text-2xl font-bold text-slate-900"}>
+        {title}
+      </h2>
+      {!embedded && <p className="text-slate-600">{hint}</p>}
+      <div className="flex flex-col gap-2">
         {options.map((o) => (
           <button
             key={o.id}
             type="button"
             onClick={() => onChange(o.id)}
-            className={`min-h-[56px] rounded-2xl border-2 px-4 py-3 text-left text-base font-semibold ${
+            className={`min-h-[48px] rounded-2xl border-2 px-4 py-2.5 text-left text-sm font-semibold ${
               value === o.id
                 ? "border-[#2563EB] bg-blue-50 text-blue-900"
                 : "border-slate-200 bg-white text-slate-800"
@@ -1019,7 +1085,9 @@ function ChoiceStep<T extends string>({
           </button>
         ))}
       </div>
-      <NavRow onBack={onBack} onNext={onNext} nextDisabled={value === null} />
+      {!embedded && onBack && onNext && (
+        <NavRow onBack={onBack} onNext={onNext} nextDisabled={value === null} />
+      )}
     </div>
   );
 }

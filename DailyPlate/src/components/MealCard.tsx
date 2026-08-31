@@ -19,10 +19,12 @@ import { useAppStore } from "@/store/useAppStore";
 import { isMealLocked } from "@/utils/mealLocks";
 import { householdMultiplierFor } from "@/utils/household";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
+import { MealMacroLine } from "@/components/MealMacroLine";
 import {
   effectiveCarbVariationId,
   effectiveVariationId,
   mealDisplayName,
+  recipeFiberGrams,
   resolveRecipeMacros,
 } from "@/utils/recipeDisplay";
 import { trackingBadgeClass, trackingLabel } from "@/utils/mealTracking";
@@ -56,6 +58,9 @@ export function MealCard({
   onAddNote,
   dayMeals,
   inlineDetailsDropdown = false,
+  showEatenSkip = false,
+  onEaten,
+  onSkip,
 }: {
   meal: PlannedMeal;
   dateKey?: string;
@@ -72,6 +77,9 @@ export function MealCard({
   onAddNote?: () => void;
   dayMeals?: PlannedMeal[];
   inlineDetailsDropdown?: boolean;
+  showEatenSkip?: boolean;
+  onEaten?: () => void;
+  onSkip?: () => void;
 }) {
   const { recipe, scale, slot } = meal;
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -127,6 +135,7 @@ export function MealCard({
   const p = Math.round(macros.protein * scale);
   const c = Math.round(macros.carbs * scale);
   const f = Math.round(macros.fat * scale);
+  const fiber = Math.round(recipeFiberGrams(recipe, displayVariationId, displayCarbId) * scale);
 
   function handleVariationChange(nextVariationId: string) {
     setVariationId(nextVariationId);
@@ -145,7 +154,7 @@ export function MealCard({
 
   const mainContent = (
     <>
-      <div className="relative h-[108px] w-[108px] shrink-0 overflow-hidden bg-slate-100">
+      <div className="relative h-[72px] w-[72px] shrink-0 overflow-hidden bg-slate-100 sm:h-[96px] sm:w-[96px]">
         <RecipeImage recipe={recipe} fill priority />
       </div>
       <MealCardMainContent
@@ -157,13 +166,16 @@ export function MealCard({
         p={p}
         c={c}
         f={f}
-        scale={scale}
+        fiber={fiber}
         trackingEntry={trackingEntry}
+        showEatenSkip={showEatenSkip}
+        onEaten={onEaten}
+        onSkip={onSkip}
       />
     </>
   );
 
-  const swipeableMain = onTrackTap ? (
+  const swipeableMain = onTrackTap && !showEatenSkip ? (
     <button
       type="button"
       onClick={onTrackTap}
@@ -177,7 +189,7 @@ export function MealCard({
   );
 
   const actionButtons = (
-    <div className="relative z-10 flex shrink-0 items-start gap-0.5 px-2 py-3.5">
+    <div className="relative z-10 flex shrink-0 flex-col items-center gap-0 px-1 py-2.5">
       <QuickAction
         label={fav ? "Remove from favorites" : "Favorite"}
         onClick={() => toggleFavorite(recipe.id)}
@@ -207,7 +219,7 @@ export function MealCard({
   );
 
   const cardBody = (
-    <div className="flex gap-0 overflow-hidden rounded-2xl">
+    <div className="flex gap-0 rounded-2xl">
       {canDrag && (
         <button
           type="button"
@@ -218,7 +230,7 @@ export function MealCard({
             onDragStart?.(event);
           }}
           onDragEnd={onDragEnd}
-          className="relative z-10 flex w-8 shrink-0 cursor-grab items-center justify-center border-r border-slate-100 bg-slate-50/80 text-slate-400 active:cursor-grabbing"
+          className="relative z-10 flex w-6 shrink-0 cursor-grab items-center justify-center border-r border-slate-100 bg-slate-50/80 text-slate-400 active:cursor-grabbing"
         >
           <GripVertical className="h-4 w-4" />
         </button>
@@ -275,7 +287,7 @@ export function MealCard({
             onClick={() => setDetailsOpen((open) => !open)}
             className="flex min-h-[44px] w-full items-center justify-between border-t border-slate-100 px-4 py-2.5 text-left text-sm font-semibold text-primary transition-colors hover:bg-slate-50/80"
           >
-            <span>Recipe details</span>
+            <span>Recipe/Prep details</span>
             <ChevronDown
               className={`h-4 w-4 shrink-0 text-primary transition-transform duration-200 ${
                 detailsOpen ? "rotate-180" : ""
@@ -363,8 +375,11 @@ function MealCardMainContent({
   p,
   c,
   f,
-  scale,
+  fiber,
   trackingEntry,
+  showEatenSkip,
+  onEaten,
+  onSkip,
 }: {
   meal: PlannedMeal;
   recipe: PlannedMeal["recipe"];
@@ -374,11 +389,14 @@ function MealCardMainContent({
   p: number;
   c: number;
   f: number;
-  scale: number;
+  fiber: number;
   trackingEntry?: MealTrackingEntry;
+  showEatenSkip?: boolean;
+  onEaten?: () => void;
+  onSkip?: () => void;
 }) {
   return (
-    <div className="min-w-0 flex-1 px-4 py-3.5">
+    <div className="min-w-0 flex-1 px-3 py-3">
       <p className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
         {slotLabel[slot]}
         {mealLocked && (
@@ -398,7 +416,7 @@ function MealCardMainContent({
             Prep {meal.mealPrep.portionIndex}/{meal.mealPrep.portionsCooked}
           </span>
         )}
-        {trackingEntry && (
+        {trackingEntry && !showEatenSkip && (
           <span
             className={`inline-flex max-w-full items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal ring-1 ${trackingBadgeClass(trackingEntry.status)}`}
           >
@@ -407,20 +425,48 @@ function MealCardMainContent({
         )}
       </p>
       <h3
-        className={`mt-1 line-clamp-2 text-base font-bold leading-snug transition-colors duration-300 ${
+        className={`mt-1 line-clamp-2 break-words text-[15px] font-bold leading-snug [overflow-wrap:anywhere] transition-colors duration-300 ${
           trackingEntry?.status === "skipped" ? "text-slate-400 line-through" : "text-slate-900"
         }`}
       >
         {mealDisplayName(meal)}
       </h3>
-      <p className="mt-0.5 truncate text-xs capitalize text-slate-400">{tagLine(recipe)}</p>
-      <p className="mt-2.5 text-xs tabular-nums text-slate-500">
-        <span className="font-semibold text-slate-800">{kcal} kcal</span>
-        <span className="mx-1.5 text-slate-300">·</span>
-        P {p}g · C {c}g · F {f}g
-        <span className="mx-1.5 text-slate-300">·</span>
-        <span className="text-slate-400">×{scale.toFixed(1)}</span>
-      </p>
+      <p className="mt-0.5 line-clamp-1 text-xs capitalize text-slate-400">{tagLine(recipe)}</p>
+      <div className="mt-2">
+        <MealMacroLine kcal={kcal} protein={p} carbs={c} fat={f} fiber={fiber} compact />
+      </div>
+      {showEatenSkip && (
+        <div className="mt-2.5 flex gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEaten?.();
+            }}
+            className={`min-h-[36px] flex-1 rounded-lg border text-xs font-semibold ${
+              trackingEntry?.status === "all"
+                ? "border-emerald-500 bg-emerald-50 text-emerald-900"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+          >
+            Eaten
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSkip?.();
+            }}
+            className={`min-h-[36px] flex-1 rounded-lg border text-xs font-semibold ${
+              trackingEntry?.status === "skipped"
+                ? "border-slate-400 bg-slate-100 text-slate-700"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+          >
+            Skip
+          </button>
+        </div>
+      )}
     </div>
   );
 }

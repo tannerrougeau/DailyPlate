@@ -1,15 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { GenerateDayButton } from "@/components/GenerateDayButton";
-import { LowComplexityGenerateToggle } from "@/components/LowComplexityGenerateToggle";
-import {
-  MealCard,
-  mealDragPayload,
-  parseMealDragPayload,
-} from "@/components/MealCard";
+import { MealCard } from "@/components/MealCard";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
-import { MealTrackingSheet } from "@/components/MealTrackingSheet";
-import type { MealSlotId, PlannedMeal, Recipe } from "@/types";
+import type { Recipe } from "@/types";
 import { NutritionDashboard } from "@/components/NutritionDashboard";
 import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
@@ -22,7 +16,6 @@ import { MacroRedistributionNotice } from "@/components/MacroRedistributionNotic
 import { useAppStore } from "@/store/useAppStore";
 import { slotsForMealsPerDay } from "@/utils/generateDayPlan";
 import { sumTrackedMacros } from "@/utils/mealTracking";
-import { toDateKey } from "@/utils/date";
 
 const fallbackOrder = ["breakfast", "lunch", "dinner", "snack"] as const;
 
@@ -34,12 +27,9 @@ function isRecentCheckIn(iso?: string | null, days = 14): boolean {
 }
 
 export function TodayScreen() {
-  const [dayOffset, setDayOffset] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [mealPrepRecipe, setMealPrepRecipe] = useState<Recipe | null>(null);
-  const [dragOverSlot, setDragOverSlot] = useState<MealSlotId | null>(null);
-  const [trackingMeal, setTrackingMeal] = useState<PlannedMeal | null>(null);
   const [generateNotice, setGenerateNotice] = useState<string | null>(null);
 
   const targets = useAppStore((s) => s.targets);
@@ -48,10 +38,7 @@ export function TodayScreen() {
   const mealTracking = useAppStore((s) => s.mealTracking);
   const todayDateKey = useAppStore((s) => s.todayDateKey);
   const userProfile = useAppStore((s) => s.userProfile);
-  const [lowComplexityForGen, setLowComplexityForGen] = useState(false);
   const generateDay = useAppStore((s) => s.generateDay);
-  const generateDays = useAppStore((s) => s.generateDays);
-  const moveMealToSlot = useAppStore((s) => s.moveMealToSlot);
   const setMealTracking = useAppStore((s) => s.setMealTracking);
   const todayNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.today);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
@@ -66,15 +53,9 @@ export function TodayScreen() {
     ? slotsForMealsPerDay(userProfile.mealsPerDay)
     : [...fallbackOrder];
 
-  const viewDate = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + dayOffset);
-    return d;
-  }, [dayOffset]);
-
-  const viewDateKey = toDateKey(viewDate);
-  const mealsForViewDate = dailyPlans[viewDateKey] ?? (dayOffset === 0 ? plannedMeals : []);
-  const dayTracking = mealTracking[viewDateKey];
+  const viewDate = new Date();
+  const mealsForViewDate = dailyPlans[todayDateKey] ?? plannedMeals;
+  const dayTracking = mealTracking[todayDateKey];
   const { eaten, planned, hasTracking, loggedCount } = sumTrackedMacros(
     mealsForViewDate,
     dayTracking,
@@ -91,28 +72,19 @@ export function TodayScreen() {
     return () => window.clearTimeout(timer);
   }, [generateNotice]);
 
-  useEffect(() => {
-    setLowComplexityForGen(userProfile?.lowComplexityEnabled === true);
-  }, [userProfile?.lowComplexityEnabled]);
-
-  function handleGenerateDay() {
-    const result = generateDay(viewDateKey, { lowComplexity: lowComplexityForGen });
+  function handleRegenerateToday() {
+    // Future: dedicated low-complexity vs detailed generate mode. Honor profile flag until then.
+    const result = generateDay(todayDateKey, {
+      lowComplexity: userProfile?.lowComplexityEnabled === true,
+    });
     if (!result.ok) return;
-    const dayLabel =
-      viewDateKey === todayDateKey
-        ? "Today's"
-        : viewDate.toLocaleDateString("en-US", { weekday: "long" }) + "'s";
-    setGenerateNotice(
-      `${dayLabel} plan has been replaced with a new generated plan. Grocery list updated.`,
-    );
+    setGenerateNotice("Today’s plan has been replaced. Grocery list updated.");
   }
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-32 pt-3">
       <TodayHeader
         viewDate={viewDate}
-        onPrevDay={() => setDayOffset((o) => o - 1)}
-        onNextDay={() => setDayOffset((o) => o + 1)}
         onSettings={() => setSettingsOpen(true)}
         trailing={<FeedbackCheckInButton onOpen={() => setFeedbackOpen(true)} />}
       />
@@ -120,7 +92,7 @@ export function TodayScreen() {
       {!todayNoteDismissed && (
         <div className="section-gap">
           <UsageNote
-            text="Tap a meal to log what you ate. Expand Recipe details on any meal for ingredients and variations — use ⋯ for replace, regenerate, or remove."
+            text="Mark Eaten or Skip on each meal. Open Recipe/Prep details for ingredients and variations — use ⋯ to replace or remove."
             onDismiss={() => dismissUsageNote("today")}
           />
         </div>
@@ -134,9 +106,9 @@ export function TodayScreen() {
         </div>
       )}
 
-      {macroRedistributionNotices.includes(viewDateKey) && (
+      {macroRedistributionNotices.includes(todayDateKey) && (
         <MacroRedistributionNotice
-          onDismiss={() => dismissMacroRedistributionNotice(viewDateKey)}
+          onDismiss={() => dismissMacroRedistributionNotice(todayDateKey)}
         />
       )}
 
@@ -155,9 +127,9 @@ export function TodayScreen() {
           hasTracking={hasTracking}
           loggedCount={loggedCount}
           mealCount={sortedMeals.length}
-          anchorDateKey={viewDateKey}
+          anchorDateKey={todayDateKey}
           storeTodayDateKey={todayDateKey}
-          isViewingToday={viewDateKey === todayDateKey}
+          isViewingToday
           dailyPlans={dailyPlans}
           plannedMeals={plannedMeals}
           mealTracking={mealTracking}
@@ -165,36 +137,10 @@ export function TodayScreen() {
       </div>
 
       <div className="section-gap space-y-3">
-        <LowComplexityGenerateToggle
-          enabled={lowComplexityForGen}
-          onChange={setLowComplexityForGen}
-        />
-        <GenerateDayButton onClick={handleGenerateDay} />
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              generateDays(viewDate, 2, { lowComplexity: lowComplexityForGen });
-              setGenerateNotice("2-day plan generated from this date. Grocery list updated.");
-            }}
-            className="min-h-[44px] rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800"
-          >
-            Generate 2 days
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              generateDays(viewDate, 3, { lowComplexity: lowComplexityForGen });
-              setGenerateNotice("3-day plan generated from this date. Grocery list updated.");
-            }}
-            className="min-h-[44px] rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800"
-          >
-            Generate 3 days
-          </button>
-        </div>
+        <GenerateDayButton label="Regenerate today" onClick={handleRegenerateToday} />
         {generateNotice && (
           <div
-            className="mt-3 flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+            className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
             role="status"
           >
             <p className="flex-1 text-sm leading-relaxed text-emerald-900">{generateNotice}</p>
@@ -208,9 +154,6 @@ export function TodayScreen() {
             </button>
           </div>
         )}
-        <p className="mt-3 text-center text-sm text-slate-400">
-          We aim for your day within about ±50 kcal of your goal.
-        </p>
       </div>
 
       <section aria-label="Today's meals" className="space-y-5">
@@ -219,8 +162,8 @@ export function TodayScreen() {
           {sortedMeals.length > 0 && (
             <p className="text-xs text-slate-400">
               {loggedCountDisplay > 0
-                ? `${loggedCountDisplay}/${sortedMeals.length} logged · tap to update`
-                : "Tap a meal to log"}
+                ? `${loggedCountDisplay}/${sortedMeals.length} logged`
+                : "Mark eaten or skip"}
             </p>
           )}
         </div>
@@ -229,7 +172,7 @@ export function TodayScreen() {
           <div className="card-surface px-6 py-14 text-center">
             <p className="text-base leading-relaxed text-slate-500">
               No meals yet — tap{" "}
-              <span className="font-semibold text-primary">Generate Day Plan</span> to fill your
+              <span className="font-semibold text-primary">Regenerate today</span> to fill your
               day.
             </p>
           </div>
@@ -239,38 +182,32 @@ export function TodayScreen() {
               <li key={meal.slot}>
                 <MealCard
                   meal={meal}
-                  dateKey={viewDateKey}
+                  dateKey={todayDateKey}
                   dayMeals={sortedMeals}
                   inlineDetailsDropdown
-                  draggable
-                  isDragOver={dragOverSlot === meal.slot}
                   onMealPrep={setMealPrepRecipe}
                   trackingEntry={dayTracking?.[meal.slot]}
-                  onTrackTap={() => setTrackingMeal(meal)}
-                  onAddNote={() => setTrackingMeal(meal)}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData(
-                      "application/json",
-                      mealDragPayload(viewDateKey, meal.slot),
+                  showEatenSkip
+                  onEaten={() => {
+                    const current = dayTracking?.[meal.slot];
+                    setMealTracking(
+                      todayDateKey,
+                      meal.slot,
+                      current?.status === "all"
+                        ? null
+                        : { status: "all", loggedAt: new Date().toISOString() },
                     );
-                    event.dataTransfer.effectAllowed = "move";
                   }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragOverSlot(meal.slot);
-                  }}
-                  onDragLeave={() => setDragOverSlot(null)}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const payload = parseMealDragPayload(
-                      event.dataTransfer.getData("application/json"),
+                  onSkip={() => {
+                    const current = dayTracking?.[meal.slot];
+                    setMealTracking(
+                      todayDateKey,
+                      meal.slot,
+                      current?.status === "skipped"
+                        ? null
+                        : { status: "skipped", loggedAt: new Date().toISOString() },
                     );
-                    if (payload) {
-                      moveMealToSlot(payload.dateKey, payload.slot, viewDateKey, meal.slot);
-                    }
-                    setDragOverSlot(null);
                   }}
-                  onDragEnd={() => setDragOverSlot(null)}
                 />
               </li>
             ))}
@@ -278,22 +215,12 @@ export function TodayScreen() {
         )}
       </section>
 
-      {trackingMeal && (
-        <MealTrackingSheet
-          meal={trackingMeal}
-          existing={dayTracking?.[trackingMeal.slot]}
-          onClose={() => setTrackingMeal(null)}
-          onSave={(entry) => setMealTracking(viewDateKey, trackingMeal.slot, entry)}
-          onClear={() => setMealTracking(viewDateKey, trackingMeal.slot, null)}
-        />
-      )}
-
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {feedbackOpen && <CheckInSheet onClose={() => setFeedbackOpen(false)} />}
       {mealPrepRecipe && (
         <MealPrepSheet
           recipe={mealPrepRecipe}
-          defaultStartDateKey={viewDateKey}
+          defaultStartDateKey={todayDateKey}
           onClose={() => setMealPrepRecipe(null)}
         />
       )}

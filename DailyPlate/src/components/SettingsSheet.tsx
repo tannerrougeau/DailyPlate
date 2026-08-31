@@ -4,13 +4,16 @@ import { X } from "lucide-react";
 import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { HouseholdPicker } from "@/components/HouseholdPicker";
+import { HouseholdMembersEditor } from "@/components/HouseholdMembersEditor";
 import { applyProfileToTargets, useAppStore } from "@/store/useAppStore";
-import type { MacroSplitPreference, MealTimingPreference, UserProfile } from "@/types/profile";
+import type { HouseholdMember, MacroSplitPreference, MealTimingPreference, UserProfile } from "@/types/profile";
 import {
   clampAdults,
   clampChildren,
   householdPresetFromCounts,
   resolveHouseholdCounts,
+  resolveHouseholdMembers,
+  syncHouseholdMembers,
 } from "@/utils/household";
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { proteinGramsFromPreset } from "@/utils/proteinMinimum";
@@ -33,6 +36,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
 
   const [adults, setAdults] = useState(2);
   const [childrenCount, setChildrenCount] = useState(0);
+  const [members, setMembers] = useState<HouseholdMember[]>([]);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const lastFeedbackSubmittedAt = useAppStore((s) => s.lastFeedbackSubmittedAt);
   const adaptiveTdeeEstimate = useAppStore((s) => s.adaptiveTdeeEstimate);
@@ -54,6 +58,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
     const counts = resolveHouseholdCounts(userProfile);
     setAdults(counts.adults);
     setChildrenCount(counts.children);
+    setMembers(resolveHouseholdMembers(userProfile));
     setPrioritizeProtein(userProfile.prioritizeMinProtein === true);
     setMinProteinGrams(
       userProfile.minimumProteinGrams != null
@@ -80,6 +85,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       ...userProfile,
       householdAdults: nextAdults,
       householdChildren: nextChildren,
+      householdMembers: syncHouseholdMembers(nextAdults, nextChildren, members),
       householdPreset: householdPresetFromCounts(nextAdults, nextChildren),
       householdCustomCount: null,
       prioritizeMinProtein: prioritizeProtein,
@@ -245,10 +251,17 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <HouseholdPicker
             adults={adults}
             childrenCount={childrenCount}
-            onAdultsChange={setAdults}
-            onChildrenChange={setChildrenCount}
+            onAdultsChange={(n) => {
+              setAdults(n);
+              setMembers(syncHouseholdMembers(n, childrenCount, members));
+            }}
+            onChildrenChange={(n) => {
+              setChildrenCount(n);
+              setMembers(syncHouseholdMembers(adults, n, members));
+            }}
             compact
           />
+          <HouseholdMembersEditor members={members} onChange={setMembers} />
         </section>
 
         <div className="mt-6 flex gap-3">

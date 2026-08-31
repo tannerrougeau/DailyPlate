@@ -1,16 +1,27 @@
 import { formatQty } from "@/utils/grocery";
 import {
+  adultPortionMultiplier,
+  childPortionMultiplier,
+  formatHouseholdServingSplit,
+  resolveHouseholdCounts,
+} from "@/utils/household";
+import {
   batchWeightLabel,
   carbVariationLabels,
   estimateServingWeightGrams,
   getVariationDetail,
+  perPersonIngredientQty,
+  platingNoteForHousehold,
+  recipeFiberGrams,
   resolveRecipeInstructions,
   resolveRecipeMacros,
+  resolveRecipeIngredients,
   scaledIngredientsForMeal,
   servingWeightForMeal,
   shouldShowProteinAdjustNote,
   variationLabels,
 } from "@/utils/recipeDisplay";
+import { MealMacroLine } from "@/components/MealMacroLine";
 import type { CarbVariationId, PlannedMeal, Recipe } from "@/types";
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
@@ -57,6 +68,13 @@ export function RecipeDetailsBody({
     selectedCarbId,
   );
   const instructions = resolveRecipeInstructions(recipe, selectedId, selectedCarbId);
+  const baseIngredients = resolveRecipeIngredients(recipe, selectedId, selectedCarbId);
+  const prioritizeProtein = userProfile?.prioritizeMinProtein === true;
+  const { children: childCount } = resolveHouseholdCounts(userProfile);
+  const adultMult = adultPortionMultiplier(userProfile);
+  const childMult = childPortionMultiplier(userProfile);
+  const platingNote = platingNoteForHousehold(userProfile);
+  const fiber = Math.round(recipeFiberGrams(recipe, selectedId, selectedCarbId) * mealScale);
   const weightGrams = meal
     ? servingWeightForMeal(meal, householdMult, targets)
     : (() => {
@@ -135,12 +153,16 @@ export function RecipeDetailsBody({
 
       {weightGrams != null && weightGrams > 0 && (
         <p className="mt-3 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">Serving weight:</span> ~{weightGrams} g
+          <span className="font-medium text-slate-800">Batch weight:</span> ~{weightGrams} g
           {batchLabel && (
             <span className="mt-1 block text-xs text-slate-500">{batchLabel}</span>
           )}
         </p>
       )}
+
+      <p className="mt-3 text-sm font-medium text-slate-800">
+        {formatHouseholdServingSplit(userProfile)}
+      </p>
 
       {proteinNote && (
         <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900">
@@ -149,26 +171,46 @@ export function RecipeDetailsBody({
         </p>
       )}
 
-      <p className="mt-3 text-sm text-slate-700">
-        <span className="font-semibold text-slate-900">
-          {Math.round(macros.calories * mealScale)} kcal
-        </span>
-        <span className="mx-2 text-slate-300">·</span>
-        <span className="tabular-nums">
-          P {Math.round(macros.protein * mealScale)}g C {Math.round(macros.carbs * mealScale)}g F{" "}
-          {Math.round(macros.fat * mealScale)}g
-        </span>
-      </p>
+      <div className="mt-3">
+        <MealMacroLine
+          kcal={Math.round(macros.calories * mealScale)}
+          protein={Math.round(macros.protein * mealScale)}
+          carbs={Math.round(macros.carbs * mealScale)}
+          fat={Math.round(macros.fat * mealScale)}
+          fiber={fiber}
+        />
+      </div>
 
-      <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-700">
-        {ingredients.map((ing) => (
-          <li key={`${ing.name}-${ing.unit}`}>
-            {formatQty(ing.quantity)} {ing.unit} {ing.name}
-          </li>
-        ))}
+      <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
+        {ingredients.map((ing) => {
+          const base = baseIngredients.find(
+            (b) => b.name === ing.name && b.unit === ing.unit,
+          );
+          const perAdult =
+            base != null
+              ? perPersonIngredientQty(base.quantity, mealScale, adultMult, ing, prioritizeProtein)
+              : null;
+          const perChild =
+            base != null
+              ? perPersonIngredientQty(base.quantity, mealScale, childMult, ing, prioritizeProtein)
+              : null;
+          return (
+            <li key={`${ing.name}-${ing.unit}`}>
+              <span>
+                {formatQty(ing.quantity)} {ing.unit} {ing.name}
+              </span>
+              {childCount > 0 && perAdult != null && perChild != null && (
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  {formatQty(perAdult)} / adult · {formatQty(perChild)} / child
+                </span>
+              )}
+            </li>
+          );
+        })}
       </ul>
 
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
+        {platingNote && <li>{platingNote}</li>}
         {instructions.map((step, idx) => (
           <li key={idx}>{step}</li>
         ))}
