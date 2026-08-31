@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { X } from "lucide-react";
 import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
+import { HouseholdPicker } from "@/components/HouseholdPicker";
 import { applyProfileToTargets, useAppStore } from "@/store/useAppStore";
-import type { HouseholdPreset, MacroSplitPreference, MealTimingPreference, UserProfile } from "@/types/profile";
-import { HOUSEHOLD_OPTIONS } from "@/utils/household";
+import type { MacroSplitPreference, MealTimingPreference, UserProfile } from "@/types/profile";
+import {
+  clampAdults,
+  clampChildren,
+  householdPresetFromCounts,
+  resolveHouseholdCounts,
+} from "@/utils/household";
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { proteinGramsFromPreset } from "@/utils/proteinMinimum";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
@@ -24,8 +31,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const logout = useAppStore((s) => s.logout);
   const syncAccountSnapshot = useAppStore((s) => s.syncAccountSnapshot);
 
-  const [preset, setPreset] = useState<HouseholdPreset>("single");
-  const [custom, setCustom] = useState("");
+  const [adults, setAdults] = useState(2);
+  const [childrenCount, setChildrenCount] = useState(0);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const lastFeedbackSubmittedAt = useAppStore((s) => s.lastFeedbackSubmittedAt);
   const adaptiveTdeeEstimate = useAppStore((s) => s.adaptiveTdeeEstimate);
@@ -40,13 +47,13 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const [weeklyPrepEnabled, setWeeklyPrepEnabled] = useState(false);
   const [weeklyPrepSlot, setWeeklyPrepSlot] = useState<MealSlotId>("dinner");
   const [weeklyPrepRepeat, setWeeklyPrepRepeat] = useState<WeeklyMealPrepRepeatCount>(3);
+  useOverlayBack(userProfile != null, onClose);
 
   useEffect(() => {
     if (!userProfile) return;
-    setPreset(userProfile.householdPreset ?? "single");
-    setCustom(
-      userProfile.householdCustomCount != null ? String(userProfile.householdCustomCount) : "",
-    );
+    const counts = resolveHouseholdCounts(userProfile);
+    setAdults(counts.adults);
+    setChildrenCount(counts.children);
     setPrioritizeProtein(userProfile.prioritizeMinProtein === true);
     setMinProteinGrams(
       userProfile.minimumProteinGrams != null
@@ -65,18 +72,16 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
 
   if (!userProfile) return null;
 
-  const customOk =
-    preset !== "other" || (Number(custom) >= 1 && Number(custom) <= 20 && Number.isInteger(Number(custom)));
-
   const handleSave = () => {
-    if (!customOk) return;
-    const householdCustomCount =
-      preset === "other" ? Math.round(Number(custom)) : null;
+    const nextAdults = clampAdults(adults);
+    const nextChildren = clampChildren(childrenCount);
     const parsedProtein = Number(minProteinGrams);
     const next: UserProfile = {
       ...userProfile,
-      householdPreset: preset,
-      householdCustomCount,
+      householdAdults: nextAdults,
+      householdChildren: nextChildren,
+      householdPreset: householdPresetFromCounts(nextAdults, nextChildren),
+      householdCustomCount: null,
       prioritizeMinProtein: prioritizeProtein,
       minimumProteinGrams:
         prioritizeProtein && Number.isFinite(parsedProtein) && parsedProtein > 0
@@ -237,42 +242,13 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
 
         <section className="space-y-3 pt-5">
           <h3 className="text-base font-semibold text-slate-900">Household size</h3>
-          <p className="text-sm text-slate-600">
-            We scale grocery amounts and recipe prep quantities. Your daily calorie target stays
-            personalized to you.
-          </p>
-          <div className="flex flex-col gap-2">
-            {HOUSEHOLD_OPTIONS.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                onClick={() => setPreset(o.id)}
-                className={`min-h-[52px] rounded-2xl border-2 px-4 py-3 text-left text-sm font-semibold transition-colors ${
-                  preset === o.id
-                    ? "border-[#2563EB] bg-blue-50 text-blue-900"
-                    : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          {preset === "other" && (
-            <div className="pt-1">
-              <label className="mb-1 block text-xs font-medium text-slate-500">
-                Number of people (1–20)
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={20}
-                value={custom}
-                onChange={(e) => setCustom(e.target.value)}
-                className="min-h-[48px] w-full rounded-2xl border-2 border-slate-200 bg-white px-4 text-lg font-semibold text-slate-900 outline-none focus:border-[#2563EB]"
-              />
-            </div>
-          )}
+          <HouseholdPicker
+            adults={adults}
+            childrenCount={childrenCount}
+            onAdultsChange={setAdults}
+            onChildrenChange={setChildrenCount}
+            compact
+          />
         </section>
 
         <div className="mt-6 flex gap-3">
@@ -285,9 +261,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="button"
-            disabled={!customOk}
             onClick={handleSave}
-            className="min-h-[52px] flex-1 rounded-2xl bg-[#2563EB] py-3 text-base font-semibold text-white disabled:opacity-40"
+            className="min-h-[52px] flex-1 rounded-2xl bg-[#2563EB] py-3 text-base font-semibold text-white"
           >
             Save
           </button>

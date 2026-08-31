@@ -4,14 +4,23 @@ import {
   ChevronDown,
   Package,
   RotateCcw,
-  ShoppingBag,
 } from "lucide-react";
 import { UsageNote } from "@/components/UsageNote";
 import { useAppStore } from "@/store/useAppStore";
 import { groceriesFromMeals, formatQty } from "@/utils/grocery";
-import { monthGridDates, toDateKey, weekDateKeys, isDateKeyBefore, isDateKeyOnOrAfter } from "@/utils/date";
-import { formatHouseholdCookingLine, householdPortionMultiplier } from "@/utils/household";
+import {
+  isDateKeyBefore,
+  isDateKeyOnOrAfter,
+  isPreviousCalendarWeek,
+  isWeekOlderThanPrevious,
+  monthGridDates,
+  monthHasVisibleWeeks,
+  toDateKey,
+  weekDateKeys,
+} from "@/utils/date";
+import { formatHouseholdCookingLine, householdMultiplierFor } from "@/utils/household";
 import { mealsForDateKey } from "@/utils/mealTracking";
+import { PantrySheet } from "@/components/PantrySheet";
 import type { GroceryItem, IngredientCategory } from "@/types";
 
 const CATEGORY_ORDER: IngredientCategory[] = [
@@ -64,13 +73,14 @@ export function GroceryScreen() {
   const setGrocerySelectedDateKeys = useAppStore((s) => s.setGrocerySelectedDateKeys);
   const togglePurchased = useAppStore((s) => s.toggleGroceryItemChecked);
   const toggleOwned = useAppStore((s) => s.toggleGroceryItemOwned);
+  const pantryCheckedKeys = useAppStore((s) => s.pantryCheckedKeys);
+  const togglePantryChecked = useAppStore((s) => s.togglePantryItemChecked);
   const clearGroceryAll = useAppStore((s) => s.clearGroceryAll);
   const [anchorDate, setAnchorDate] = useState(new Date());
-  const [pantrySectionOpen, setPantrySectionOpen] = useState(false);
-  const [purchasedSectionOpen, setPurchasedSectionOpen] = useState(true);
+  const [pantrySheetOpen, setPantrySheetOpen] = useState(false);
+  const [pantrySectionOpen, setPantrySectionOpen] = useState(true);
   const initialMonthDefaultApplied = useRef(false);
   const prevOwnedCount = useRef(0);
-  const prevPurchasedCount = useRef(0);
 
   const gridDates = useMemo(() => monthGridDates(anchorDate), [anchorDate]);
   const calendarWeeks = useMemo(() => chunkWeeks(gridDates), [gridDates]);
@@ -101,9 +111,8 @@ export function GroceryScreen() {
   const selectedDateSet = useMemo(() => new Set(selectedDateKeys), [selectedDateKeys]);
 
   const householdMult = useMemo(
-    () =>
-      householdPortionMultiplier(userProfile?.householdPreset, userProfile?.householdCustomCount),
-    [userProfile?.householdCustomCount, userProfile?.householdPreset],
+    () => householdMultiplierFor(userProfile),
+    [userProfile],
   );
 
   const groceryDateKeys = useMemo(
@@ -131,27 +140,15 @@ export function GroceryScreen() {
 
   const purchasedSet = useMemo(() => new Set(purchasedKeys), [purchasedKeys]);
   const ownedSet = useMemo(() => new Set(ownedKeys), [ownedKeys]);
+  const pantryCheckedSet = useMemo(() => new Set(pantryCheckedKeys), [pantryCheckedKeys]);
 
-  const shoppingItems = useMemo(
-    () => items.filter((item) => !ownedSet.has(item.key)),
-    [items, ownedSet],
-  );
   const pantryItems = useMemo(
     () => sortByName(items.filter((item) => ownedSet.has(item.key))),
     [items, ownedSet],
   );
 
-  const toBuyItems = useMemo(
-    () => shoppingItems.filter((item) => !purchasedSet.has(item.key)),
-    [shoppingItems, purchasedSet],
-  );
-  const purchasedItems = useMemo(
-    () => sortByName(shoppingItems.filter((item) => purchasedSet.has(item.key))),
-    [shoppingItems, purchasedSet],
-  );
-
-  const toBuyGrouped = useMemo(() => {
-    const grouped = toBuyItems.reduce<Record<string, GroceryItem[]>>((acc, item) => {
+  const groupedItems = useMemo(() => {
+    const grouped = items.reduce<Record<string, GroceryItem[]>>((acc, item) => {
       if (!acc[item.category]) acc[item.category] = [];
       acc[item.category]!.push(item);
       return acc;
@@ -160,18 +157,18 @@ export function GroceryScreen() {
       grouped[category] = sortByName(grouped[category]!);
     }
     return grouped;
-  }, [toBuyItems]);
+  }, [items]);
 
   const sortedCategories = useMemo(() => {
-    const present = Object.keys(toBuyGrouped);
+    const present = Object.keys(groupedItems);
     return [
       ...CATEGORY_ORDER.filter((c) => present.includes(c)),
       ...present.filter((c) => !CATEGORY_ORDER.includes(c as IngredientCategory)).sort(),
     ];
-  }, [toBuyGrouped]);
+  }, [groupedItems]);
 
-  const shoppingTotal = shoppingItems.length;
-  const purchasedCount = purchasedItems.length;
+  const shoppingTotal = items.length;
+  const purchasedCount = items.filter((item) => purchasedSet.has(item.key)).length;
   const progressPct = shoppingTotal > 0 ? (purchasedCount / shoppingTotal) * 100 : 0;
 
   useEffect(() => {
@@ -180,13 +177,6 @@ export function GroceryScreen() {
     }
     prevOwnedCount.current = pantryItems.length;
   }, [pantryItems.length]);
-
-  useEffect(() => {
-    if (purchasedItems.length > prevPurchasedCount.current) {
-      setPurchasedSectionOpen(true);
-    }
-    prevPurchasedCount.current = purchasedItems.length;
-  }, [purchasedItems.length]);
 
   function toggleWeek(week: Date[]) {
     const keys = weekKeys(week).filter((key) => isDateKeyOnOrAfter(key, todayDateKey));
@@ -215,7 +205,7 @@ export function GroceryScreen() {
       <h1 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">Grocery List</h1>
       {!groceryNoteDismissed && (
         <UsageNote
-          text="Check items as you shop — they move to Purchased but stay on the list. Use Pantry for staples you already have at home."
+          text="Check items as you shop — they stay on the list. Pantry is always one tap away."
           onDismiss={() => dismissUsageNote("grocery")}
         />
       )}
@@ -238,11 +228,18 @@ export function GroceryScreen() {
         </button>
         <button
           type="button"
+          onClick={() => setPantrySheetOpen(true)}
+          className="min-h-[44px] rounded-full border-2 border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900"
+        >
+          Pantry
+        </button>
+        <button
+          type="button"
           onClick={clearGroceryAll}
           disabled={!hasSelection}
           className="min-h-[40px] rounded-full border-2 border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 disabled:opacity-40"
         >
-          Clear all
+          Clear dates
         </button>
       </div>
 
@@ -250,8 +247,9 @@ export function GroceryScreen() {
         <div className="mb-3 flex items-center justify-between">
           <button
             type="button"
+            disabled={!monthHasVisibleWeeks(new Date(anchorDate.getFullYear(), anchorDate.getMonth() - 1, 1))}
             onClick={() => setAnchorDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-            className="text-sm text-slate-500"
+            className="text-sm text-slate-500 disabled:opacity-30"
           >
             Previous
           </button>
@@ -274,6 +272,9 @@ export function GroceryScreen() {
         </div>
         <div className="space-y-2">
           {calendarWeeks.map((week, weekIndex) => {
+            const weekStart = week[0]!;
+            if (isWeekOlderThanPrevious(weekStart)) return null;
+            const isPrevWeek = isPreviousCalendarWeek(weekStart);
             const keys = weekKeys(week);
             const eligibleKeys = keys.filter((key) => isDateKeyOnOrAfter(key, todayDateKey));
             const weekSelected =
@@ -284,19 +285,21 @@ export function GroceryScreen() {
               <div
                 key={weekIndex}
                 className={`rounded-xl transition-all ${
-                  weekSelected
-                    ? "bg-blue-50 ring-2 ring-primary/50 shadow-sm"
-                    : weekPartial
-                      ? "bg-blue-50/40 ring-1 ring-primary/25"
-                      : "border border-dashed border-slate-200 bg-slate-50/50"
+                  isPrevWeek
+                    ? "bg-slate-50 opacity-60"
+                    : weekSelected
+                      ? "bg-blue-50 ring-2 ring-primary/50 shadow-sm"
+                      : weekPartial
+                        ? "bg-blue-50/40 ring-1 ring-primary/25"
+                        : "border border-dashed border-slate-200 bg-slate-50/50"
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => toggleWeek(week)}
-                  disabled={eligibleKeys.length === 0}
+                  disabled={isPrevWeek || eligibleKeys.length === 0}
                   className={`mb-1 flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                    eligibleKeys.length === 0
+                    isPrevWeek || eligibleKeys.length === 0
                       ? "cursor-not-allowed opacity-50"
                       : weekSelected || weekPartial
                         ? "bg-primary/10"
@@ -307,10 +310,15 @@ export function GroceryScreen() {
                 >
                   <span
                     className={`text-xs font-semibold ${
-                      weekSelected || weekPartial ? "text-primary" : "text-slate-700"
+                      isPrevWeek
+                        ? "text-slate-400"
+                        : weekSelected || weekPartial
+                          ? "text-primary"
+                          : "text-slate-700"
                     }`}
                   >
-                    Week · {weekLabel(week)}
+                    {isPrevWeek ? "Previous · " : "Week · "}
+                    {weekLabel(week)}
                   </span>
                   <span
                     className={`mt-0.5 h-4 w-4 shrink-0 rounded border ${
@@ -383,10 +391,6 @@ export function GroceryScreen() {
           No grocery items for the selected days. Choose more days or generate plans for those
           dates.
         </div>
-      ) : toBuyItems.length === 0 && purchasedItems.length === 0 && pantryItems.length > 0 ? (
-        <div className="card-surface px-4 py-5 text-center text-sm text-slate-500">
-          Everything is in your pantry — expand below to add items back to your shopping list.
-        </div>
       ) : (
         <div className="space-y-4">
           {shoppingTotal > 0 && (
@@ -394,7 +398,7 @@ export function GroceryScreen() {
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-800">Shopping progress</p>
                 <p className="text-sm tabular-nums text-slate-500">
-                  {purchasedCount} / {shoppingTotal} purchased
+                  {purchasedCount} / {shoppingTotal} checked
                 </p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
@@ -406,93 +410,94 @@ export function GroceryScreen() {
             </div>
           )}
 
-          {toBuyItems.length === 0 && purchasedItems.length > 0 ? (
+          {purchasedCount === shoppingTotal && shoppingTotal > 0 && (
             <div className="card-surface px-4 py-5 text-center">
               <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
                 <Check className="h-5 w-5 text-emerald-600" aria-hidden />
               </div>
-              <p className="text-sm font-semibold text-slate-800">All items purchased</p>
+              <p className="text-sm font-semibold text-slate-800">All items checked</p>
               <p className="mt-1 text-xs text-slate-500">
-                Uncheck anything below if you need to grab it after all.
+                Checked items stay on the list until you generate a new plan.
               </p>
             </div>
-          ) : (
-            sortedCategories.map((category) => {
-              const rows = toBuyGrouped[category] ?? [];
-              if (rows.length === 0) return null;
-              return (
-                <section key={category} className="card-surface p-4">
-                  <div className="mb-3 flex items-baseline justify-between gap-2">
-                    <h2 className="text-base font-semibold text-slate-900">{category}</h2>
-                    <span className="text-xs tabular-nums text-slate-400">
-                      {rows.length} to buy
-                    </span>
-                  </div>
-                  <ul className="space-y-2">
-                    {rows.map((item) => (
-                      <li key={item.key}>
-                        <GroceryItemRow
-                          item={item}
-                          checked={false}
-                          onToggleChecked={() => togglePurchased(item.key)}
-                          onMoveToPantry={() => toggleOwned(item.key)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              );
-            })
           )}
 
-          {purchasedItems.length > 0 && (
-            <CollapsibleGrocerySection
-              title="Purchased"
-              subtitle={`${purchasedItems.length} item${purchasedItems.length === 1 ? "" : "s"} checked off this trip`}
-              icon={<ShoppingBag className="h-4 w-4 text-emerald-600" aria-hidden />}
-              iconWrapClassName="bg-emerald-50"
-              open={purchasedSectionOpen}
-              onToggleOpen={() => setPurchasedSectionOpen((o) => !o)}
-              tone="purchased"
-            >
-              <ul className="space-y-2">
-                {purchasedItems.map((item) => (
-                  <li key={item.key}>
-                    <GroceryItemRow
-                      item={item}
-                      checked
-                      onToggleChecked={() => togglePurchased(item.key)}
-                      onMoveToPantry={() => toggleOwned(item.key)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleGrocerySection>
-          )}
+          {sortedCategories.map((category) => {
+            const rows = groupedItems[category] ?? [];
+            if (rows.length === 0) return null;
+            return (
+              <section key={category} className="card-surface p-4">
+                <div className="mb-3 flex items-baseline justify-between gap-2">
+                  <h2 className="text-base font-semibold text-slate-900">{category}</h2>
+                  <span className="text-xs tabular-nums text-slate-400">{rows.length}</span>
+                </div>
+                <ul className="space-y-2">
+                  {rows.map((item) => (
+                    <li key={item.key}>
+                      <GroceryItemRow
+                        item={item}
+                        checked={purchasedSet.has(item.key)}
+                        inPantry={ownedSet.has(item.key)}
+                        onToggleChecked={() => togglePurchased(item.key)}
+                        onMoveToPantry={() => toggleOwned(item.key)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
 
-          {pantryItems.length > 0 && (
-            <CollapsibleGrocerySection
-              title="Pantry"
-              subtitle={`${pantryItems.length} item${pantryItems.length === 1 ? "" : "s"} already owned at home`}
-              icon={<Package className="h-4 w-4 text-amber-700" aria-hidden />}
-              iconWrapClassName="bg-amber-50"
-              open={pantrySectionOpen}
-              onToggleOpen={() => setPantrySectionOpen((o) => !o)}
-              tone="pantry"
-            >
+          <CollapsibleGrocerySection
+            title="Pantry"
+            subtitle={
+              ownedKeys.length === 0
+                ? "Always available — mark items you already have"
+                : `${ownedKeys.length} item${ownedKeys.length === 1 ? "" : "s"} at home`
+            }
+            icon={<Package className="h-4 w-4 text-amber-700" aria-hidden />}
+            iconWrapClassName="bg-amber-50"
+            open={pantrySectionOpen}
+            onToggleOpen={() => setPantrySectionOpen((o) => !o)}
+            tone="pantry"
+          >
+            {ownedKeys.length === 0 ? (
+              <p className="text-sm text-slate-500">
+                Nothing saved yet. Use Pantry on any grocery row, or open the pantry sheet.
+              </p>
+            ) : (
               <ul className="space-y-2">
-                {pantryItems.map((item) => (
+                {(pantryItems.length > 0 ? pantryItems : ownedKeys.map((key) => ({
+                  key,
+                  name: key.split("::")[1] ?? key,
+                  quantity: 0,
+                  unit: key.split("::")[2] ?? "",
+                  category: "Pantry" as IngredientCategory,
+                }))).map((item) => (
                   <li key={item.key}>
                     <PantryItemRow
                       item={item}
+                      checked={pantryCheckedSet.has(item.key)}
+                      onToggleChecked={() => togglePantryChecked(item.key)}
                       onRestore={() => toggleOwned(item.key)}
                     />
                   </li>
                 ))}
               </ul>
-            </CollapsibleGrocerySection>
-          )}
+            )}
+          </CollapsibleGrocerySection>
         </div>
+      )}
+
+      {pantrySheetOpen && (
+        <PantrySheet
+          items={items}
+          ownedKeys={ownedKeys}
+          checkedKeys={pantryCheckedKeys}
+          onToggleChecked={togglePantryChecked}
+          onRemoveFromPantry={toggleOwned}
+          onClose={() => setPantrySheetOpen(false)}
+        />
       )}
     </div>
   );
@@ -599,20 +604,24 @@ function GroceryCheckbox({
 function GroceryItemRow({
   item,
   checked,
+  inPantry,
   onToggleChecked,
   onMoveToPantry,
 }: {
   item: GroceryItem;
   checked: boolean;
+  inPantry: boolean;
   onToggleChecked: () => void;
   onMoveToPantry: () => void;
 }) {
   return (
     <div
       className={`group flex items-center gap-2 rounded-xl border transition-all duration-300 ease-out ${
-        checked
-          ? "border-emerald-100/80 bg-emerald-50/50"
-          : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
+        inPantry
+          ? "border-amber-100 bg-amber-50/40"
+          : checked
+            ? "border-emerald-100/80 bg-emerald-50/50"
+            : "border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm"
       }`}
     >
       <div
@@ -648,7 +657,7 @@ function GroceryItemRow({
         className="mr-2 flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-slate-400 opacity-80 transition-all hover:bg-amber-50 hover:text-amber-800 group-hover:opacity-100"
       >
         <Package className="h-3.5 w-3.5" aria-hidden />
-        Pantry
+        {inPantry ? "In pantry" : "Pantry"}
       </button>
     </div>
   );
@@ -656,18 +665,39 @@ function GroceryItemRow({
 
 function PantryItemRow({
   item,
+  checked,
+  onToggleChecked,
   onRestore,
 }: {
   item: GroceryItem;
+  checked: boolean;
+  onToggleChecked: () => void;
   onRestore: () => void;
 }) {
   return (
-    <div className="flex min-h-[48px] items-center gap-3 rounded-xl border border-amber-100/80 bg-amber-50/40 px-3 py-2 opacity-80">
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100/80">
-        <Package className="h-3.5 w-3.5 text-amber-700" aria-hidden />
-      </span>
-      <span className="min-w-0 flex-1 text-sm text-slate-500 line-through decoration-slate-300">
-        <span className="font-medium tabular-nums">{formatQty(item.quantity)}</span>{" "}
+    <div
+      className={`flex min-h-[48px] items-center gap-3 rounded-xl border px-3 py-2 ${
+        checked ? "border-amber-100 bg-amber-50/60" : "border-amber-100/80 bg-amber-50/40"
+      }`}
+    >
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`Mark ${item.name} ${checked ? "unchecked" : "checked"} in pantry`}
+        onClick={onToggleChecked}
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 ${
+          checked ? "border-amber-600 bg-amber-600 text-white" : "border-amber-300 bg-white"
+        }`}
+      >
+        {checked ? "✓" : ""}
+      </button>
+      <span
+        className={`min-w-0 flex-1 text-sm ${checked ? "text-slate-500" : "text-slate-700"}`}
+      >
+        {item.quantity > 0 && (
+          <span className="font-medium tabular-nums">{formatQty(item.quantity)} </span>
+        )}
         {item.unit} {item.name}
       </span>
       <button
@@ -676,7 +706,7 @@ function PantryItemRow({
         className="flex shrink-0 items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-primary ring-1 ring-slate-200 transition-colors hover:bg-primary/5"
       >
         <RotateCcw className="h-3 w-3" aria-hidden />
-        Add to list
+        Remove
       </button>
     </div>
   );

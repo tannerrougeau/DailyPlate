@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChefHat, Heart, Search } from "lucide-react";
+import { ChefHat, Heart, Plus, Search, X } from "lucide-react";
+import { AddRecipeSheet } from "@/components/AddRecipeSheet";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
 import { RecipeImage } from "@/components/RecipeImage";
 import { RecipePreferencesSheet } from "@/components/RecipePreferencesSheet";
 import { UsageNote } from "@/components/UsageNote";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { useAppStore } from "@/store/useAppStore";
-import { recipeLibrary } from "@/recipes/recipeLibrary";
+import { allRecipes } from "@/recipes/recipePool";
 import type { CarbVariationId, Recipe } from "@/types";
 import { isMealPrepFriendly } from "@/utils/mealPrep";
 import {
@@ -26,24 +28,36 @@ export function RecipesScreen() {
   const [category, setCategory] = useState<RecipeCategory>("breakfast");
   const [proteinSource, setProteinSource] = useState<ProteinSourceFilter>("all");
   const [prefsOpen, setPrefsOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [mealPrepRecipe, setMealPrepRecipe] = useState<Recipe | null>(null);
   const recipesNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.recipes);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
   const favoriteIds = useAppStore((s) => s.favoriteIds);
   const dislikedIds = useAppStore((s) => s.dislikedIds);
+  const userRecipes = useAppStore((s) => s.userRecipes);
+  const library = useMemo(() => allRecipes(userRecipes), [userRecipes]);
+
+  useOverlayBack(selected != null, () => setSelected(null));
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [selected?.id ?? "list"]);
 
+  useEffect(() => {
+    if (!saveNotice) return;
+    const t = window.setTimeout(() => setSaveNotice(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [saveNotice]);
+
   const proteinCounts = useMemo(
-    () => countRecipesByProtein(recipeLibrary, category),
-    [category],
+    () => countRecipesByProtein(library, category),
+    [category, library],
   );
 
   const filtered = useMemo(
-    () => filterRecipesForLibrary(recipeLibrary, category, proteinSource, query),
-    [category, proteinSource, query],
+    () => filterRecipesForLibrary(library, category, proteinSource, query),
+    [library, category, proteinSource, query],
   );
 
   const categoryLabel = RECIPE_CATEGORY_TABS.find((t) => t.id === category)?.label ?? category;
@@ -67,11 +81,20 @@ export function RecipesScreen() {
     <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Recipes</h1>
-        <button
-          type="button"
-          onClick={() => setPrefsOpen(true)}
-          className="flex min-h-[40px] shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-slate-300"
-        >
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="flex min-h-[40px] items-center gap-1.5 rounded-full bg-[#2563EB] px-3 py-2 text-sm font-semibold text-white shadow-sm"
+          >
+            <Plus className="h-4 w-4" aria-hidden />
+            Add recipe
+          </button>
+          <button
+            type="button"
+            onClick={() => setPrefsOpen(true)}
+            className="flex min-h-[40px] shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:border-slate-300"
+          >
           <Heart className="h-4 w-4 text-red-500" aria-hidden />
           Favorites
           {(favoriteIds.length > 0 || dislikedIds.length > 0) && (
@@ -80,7 +103,25 @@ export function RecipesScreen() {
             </span>
           )}
         </button>
+        </div>
       </div>
+
+      {saveNotice && (
+        <div
+          className="mb-4 flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3"
+          role="status"
+        >
+          <p className="flex-1 text-sm leading-relaxed text-amber-950">{saveNotice}</p>
+          <button
+            type="button"
+            onClick={() => setSaveNotice(null)}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-amber-800 hover:bg-amber-100"
+            aria-label="Dismiss notice"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {!recipesNoteDismissed && (
         <UsageNote
@@ -209,6 +250,11 @@ export function RecipesScreen() {
                 <div className="p-3">
                   <p className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900">
                     {recipe.name}
+                    {recipe.isUserRecipe && (
+                      <span className="ml-1 inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-[#2563EB]">
+                        Yours
+                      </span>
+                    )}
                     {isMealPrepFriendly(recipe) && (
                       <span className="ml-1 inline-block rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-violet-800">
                         Prep
@@ -231,6 +277,12 @@ export function RecipesScreen() {
       </ul>
 
       {prefsOpen && <RecipePreferencesSheet onClose={() => setPrefsOpen(false)} />}
+      {addOpen && (
+        <AddRecipeSheet
+          onClose={() => setAddOpen(false)}
+          onSaved={(notice) => setSaveNotice(notice)}
+        />
+      )}
     </div>
   );
 }

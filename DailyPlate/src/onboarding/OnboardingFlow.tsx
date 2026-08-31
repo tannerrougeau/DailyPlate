@@ -11,7 +11,6 @@ import type { MealSlotId } from "@/types";
 import type {
   ActivityLevel,
   BiologicalSex,
-  HouseholdPreset,
   MacroSplitPreference,
   MainGoal,
   MealTimingPreference,
@@ -20,7 +19,13 @@ import type {
   WeeklyMealPrepRepeatCount,
 } from "@/types/profile";
 import { computeDailyTargets } from "@/utils/tdee";
-import { HOUSEHOLD_OPTIONS } from "@/utils/household";
+import {
+  clampAdults,
+  clampChildren,
+  householdPresetFromCounts,
+  HOUSEHOLD_ADULTS_DEFAULT,
+} from "@/utils/household";
+import { HouseholdPicker } from "@/components/HouseholdPicker";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import {
   HEIGHT_CM_MAX,
@@ -116,8 +121,8 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
   const [goal, setGoal] = useState<MainGoal | null>(null);
   const [knownTdeeInput, setKnownTdeeInput] = useState("");
   const [mealsPerDay, setMealsPerDay] = useState<MealsPerDay | null>(null);
-  const [householdPreset, setHouseholdPreset] = useState<HouseholdPreset | null>(null);
-  const [householdCustom, setHouseholdCustom] = useState("");
+  const [householdAdults, setHouseholdAdults] = useState(HOUSEHOLD_ADULTS_DEFAULT);
+  const [householdChildren, setHouseholdChildren] = useState(0);
   const [macroSplitPreference, setMacroSplitPreference] =
     useState<MacroSplitPreference>("balanced");
   const [goalHint, setGoalHint] = useState<string | null>(null);
@@ -151,12 +156,6 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
   const total = 9;
   const progress = Math.min(1, (stepIndex(step) + (step === "optional" ? 1 : 0)) / total);
 
-  const householdOtherOk =
-    householdPreset !== "other" ||
-    (Number(householdCustom) >= 1 &&
-      Number(householdCustom) <= 20 &&
-      Number.isInteger(Number(householdCustom)));
-
   const resolvedHeightCm = heightCmFromFeetInches(heightFeet, heightInches);
   const resolvedWeightKg = weightKgFromInput(weightValue, weightUnit);
 
@@ -186,8 +185,10 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       prioritizeMinProtein: false,
       minimumProteinGrams: null,
       activityLevel: null,
-      householdPreset: householdPreset ?? "single",
+      householdPreset: householdPresetFromCounts(householdAdults, householdChildren),
       householdCustomCount: null,
+      householdAdults: clampAdults(householdAdults),
+      householdChildren: clampChildren(householdChildren),
       macroSplitPreference: macroSplitPreference ?? "balanced",
       knownTdeeKcal: parsedKnownTdee,
     };
@@ -201,8 +202,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
     resolvedWeightKg !== null &&
     goal &&
     mealsPerDay &&
-    householdPreset &&
-    householdOtherOk;
+    householdAdults >= 1;
 
   function buildBaseProfile(): UserProfile {
     return {
@@ -223,9 +223,10 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       prioritizeMinProtein: false,
       minimumProteinGrams: null,
       activityLevel: null,
-      householdPreset: householdPreset!,
-      householdCustomCount:
-        householdPreset === "other" ? Math.round(Number(householdCustom)) : null,
+      householdPreset: householdPresetFromCounts(householdAdults, householdChildren),
+      householdCustomCount: null,
+      householdAdults: clampAdults(householdAdults),
+      householdChildren: clampChildren(householdChildren),
       macroSplitPreference,
       knownTdeeKcal: parsedKnownTdee,
     };
@@ -524,46 +525,15 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
         {step === "household" && (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-slate-900">How many people are you cooking for?</h2>
-            <p className="text-slate-600">
-              We use this to scale grocery lists and ingredient amounts. Children count as about 0.6
-              of an adult portion.
-            </p>
-            <div className="flex flex-col gap-3">
-              {HOUSEHOLD_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  onClick={() => setHouseholdPreset(o.id)}
-                  className={`min-h-[56px] rounded-2xl border-2 px-4 py-3 text-left text-base font-semibold transition-colors ${
-                    householdPreset === o.id
-                      ? "border-[#2563EB] bg-blue-50 text-blue-900"
-                      : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))}
-            </div>
-            {householdPreset === "other" && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Number of people (1–20)
-                </label>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={20}
-                  value={householdCustom}
-                  onChange={(e) => setHouseholdCustom(e.target.value)}
-                  className="min-h-[56px] w-full rounded-2xl border-2 border-slate-200 bg-white px-4 text-xl font-semibold text-slate-900 outline-none focus:border-[#2563EB]"
-                />
-              </div>
-            )}
+            <HouseholdPicker
+              adults={householdAdults}
+              childrenCount={householdChildren}
+              onAdultsChange={setHouseholdAdults}
+              onChildrenChange={setHouseholdChildren}
+            />
             <NavRow
               onBack={() => setStep("meals")}
               onNext={() => setStep("macro_split")}
-              nextDisabled={!householdPreset || !householdOtherOk}
             />
           </div>
         )}

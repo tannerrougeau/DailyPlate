@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import type { MealTrackingEntry, MealTrackingStatus, PlannedMeal } from "@/types";
 import { mealDisplayName } from "@/utils/recipeDisplay";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 
 const QUICK_OPTIONS: { status: MealTrackingStatus; label: string; hint: string }[] = [
   { status: "all", label: "Ate All", hint: "Full meal logged" },
@@ -22,6 +23,7 @@ export function MealTrackingSheet({
   onSave: (entry: MealTrackingEntry) => void;
   onClear: () => void;
 }) {
+  useOverlayBack(true, onClose);
   const [note, setNote] = useState(existing?.note ?? "");
   const [showNote, setShowNote] = useState(existing?.status === "custom");
 

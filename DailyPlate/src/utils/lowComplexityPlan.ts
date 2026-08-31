@@ -83,8 +83,9 @@ export function pickLowComplexityRecipe(
   slot: MealSlotId,
   options: GenerateOptions,
   excludeIds: Set<string>,
+  recipes: Recipe[] = recipeLibrary,
 ): Recipe | undefined {
-  const pool = recipeLibrary.filter(
+  const pool = recipes.filter(
     (r) =>
       r.mealSlots.includes(slot) &&
       !excludeIds.has(r.id) &&
@@ -92,7 +93,7 @@ export function pickLowComplexityRecipe(
       !recipeExcludedByDislikeChips(r, options.dislikedChips, options.dislikedCustom),
   );
   if (pool.length === 0) {
-    return pickRecipeForSlot(recipeLibrary, slot, options, excludeIds);
+    return pickRecipeForSlot(recipes, slot, options, excludeIds);
   }
 
   const weights = pool.map((r) => {
@@ -121,6 +122,7 @@ function simplifyBreakfasts(
   options: GenerateOptions,
   lockedMeals: string[],
   calorieTarget: number,
+  recipes: Recipe[] = recipeLibrary,
 ): Record<string, PlannedMeal[]> {
   const slotOrder = slotsForMealsPerDay(profile.mealsPerDay);
   if (!slotOrder.includes("breakfast")) return dailyPlans;
@@ -130,7 +132,7 @@ function simplifyBreakfasts(
     for (const m of dailyPlans[key] ?? []) usedIds.add(m.recipe.id);
   }
 
-  const recipe = pickLowComplexityRecipe("breakfast", options, usedIds);
+  const recipe = pickLowComplexityRecipe("breakfast", options, usedIds, recipes);
   if (!recipe) return dailyPlans;
 
   let next = { ...dailyPlans };
@@ -174,6 +176,7 @@ function assignCookGroups(
   profile: UserProfile,
   options: GenerateOptions,
   calorieTarget: number,
+  recipes: Recipe[] = recipeLibrary,
 ): Record<string, PlannedMeal[]> {
   if (positions.length === 0) return dailyPlans;
 
@@ -193,7 +196,7 @@ function assignCookGroups(
       for (const m of meals) usedIds.add(m.recipe.id);
     }
 
-    const recipe = pickLowComplexityRecipe(cookPos.slot, options, usedIds);
+    const recipe = pickLowComplexityRecipe(cookPos.slot, options, usedIds, recipes);
     if (!recipe) continue;
 
     const batchId = newBatchId();
@@ -250,6 +253,7 @@ export function applyLowComplexityToPlans(
   lockedDays: string[],
   lockedMeals: string[],
   calorieTarget: number,
+  recipes: Recipe[] = recipeLibrary,
 ): Record<string, PlannedMeal[]> {
   if (!options.lowComplexity) return dailyPlans;
 
@@ -264,9 +268,10 @@ export function applyLowComplexityToPlans(
     options,
     lockedMeals,
     calorieTarget,
+    recipes,
   );
   const positions = collectMainSlotPositions(eligibleDays, next, lockedMeals);
-  next = assignCookGroups(next, positions, profile, options, calorieTarget);
+  next = assignCookGroups(next, positions, profile, options, calorieTarget, recipes);
   return next;
 }
 

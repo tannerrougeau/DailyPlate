@@ -29,15 +29,16 @@ export function pickWeeklyPrepRecipe(
   slot: MealSlotId,
   options: GenerateOptions,
   excludeIds: Set<string>,
+  recipes: Recipe[] = recipeLibrary,
 ): Recipe | undefined {
-  let pool = recipeLibrary.filter(
+  let pool = recipes.filter(
     (r) =>
       r.mealSlots.includes(slot) &&
       !excludeIds.has(r.id) &&
       !options.dislikedIds.includes(r.id) &&
       !recipeExcludedByDislikeChips(r, options.dislikedChips, options.dislikedCustom),
   );
-  if (pool.length === 0) return pickRecipeForSlot(recipeLibrary, slot, options, excludeIds);
+  if (pool.length === 0) return pickRecipeForSlot(recipes, slot, options, excludeIds);
 
   const weights = pool.map((r) => {
     let w = 10 + mealPrepBoost(r);
@@ -60,6 +61,7 @@ export function applyWeeklyMealPrepToPlans(
   options: GenerateOptions,
   lockedDays: string[],
   calorieTarget: number,
+  recipes: Recipe[] = recipeLibrary,
 ): Record<string, PlannedMeal[]> {
   if (!profile.weeklyMealPrepEnabled || !profile.weeklyMealPrepSlot) {
     return dailyPlans;
@@ -77,7 +79,7 @@ export function applyWeeklyMealPrepToPlans(
     for (const m of dailyPlans[key] ?? []) usedIds.add(m.recipe.id);
   }
 
-  const recipe = pickWeeklyPrepRecipe(slot, options, usedIds);
+  const recipe = pickWeeklyPrepRecipe(slot, options, usedIds, recipes);
   if (!recipe) return dailyPlans;
 
   const batchId =

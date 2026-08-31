@@ -1,4 +1,4 @@
-import type { DailyTargets, PlannedMeal } from "@/types";
+import type { DailyTargets, PlannedMeal, Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { TdeeFeedbackEntry } from "@/types/tdeeFeedback";
 import type { UsageNoteKey } from "@/store/useAppStore";
@@ -19,6 +19,9 @@ export interface SavedAccountState {
   selectedPlanDateKey: string | null;
   grocerySelectedDateKeys: string[];
   groceryCheckedKeys: string[];
+  groceryOwnedKeys?: string[];
+  pantryCheckedKeys?: string[];
+  userRecipes?: Recipe[];
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];

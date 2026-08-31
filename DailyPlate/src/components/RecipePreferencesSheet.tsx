@@ -1,20 +1,24 @@
 import type { ReactNode } from "react";
 import { Heart, ThumbsDown, X } from "lucide-react";
-import { recipeLibrary } from "@/recipes/recipeLibrary";
+import { allRecipes } from "@/recipes/recipePool";
 import { useAppStore } from "@/store/useAppStore";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 
 export function RecipePreferencesSheet({ onClose }: { onClose: () => void }) {
+  useOverlayBack(true, onClose);
   const favoriteIds = useAppStore((s) => s.favoriteIds);
   const dislikedIds = useAppStore((s) => s.dislikedIds);
   const toggleFavorite = useAppStore((s) => s.toggleFavorite);
   const toggleDislike = useAppStore((s) => s.toggleDislike);
+  const userRecipes = useAppStore((s) => s.userRecipes);
+  const library = allRecipes(userRecipes);
 
   const favorites = favoriteIds
-    .map((id) => recipeLibrary.find((r) => r.id === id))
+    .map((id) => library.find((r) => r.id === id))
     .filter((r): r is NonNullable<typeof r> => r != null);
 
   const dislikes = dislikedIds
-    .map((id) => recipeLibrary.find((r) => r.id === id))
+    .map((id) => library.find((r) => r.id === id))
     .filter((r): r is NonNullable<typeof r> => r != null);
 
   return (

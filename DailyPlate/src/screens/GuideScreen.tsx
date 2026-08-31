@@ -64,8 +64,10 @@ export function GuideScreen() {
       <header className="mb-5">
         <h1 className="text-2xl font-bold text-slate-900">Guide</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
-          A quick walkthrough to help you get the most from DailyPlate — without overthinking
-          nutrition.
+          Keep using DailyPlate and plans get closer to you: likes, dislikes, and check-ins
+          personalize picks; leftover and low-complexity options cut busy nights; grocery stays
+          tied to the calendar you actually cook. Targets tighten over time — recipes stay intact,
+          scaled only slightly rather than forced out of shape.
         </p>
       </header>
 
@@ -187,7 +189,7 @@ export function GuideScreen() {
             />
             <FaqItem
               question="Can I customize recipes?"
-              answer="You can pick flavor variations (where available), swap meals, favorite or dislike recipes, and lock meals you want to keep. Full manual recipe editing is coming; for now, swapping and variations give you flexibility without breaking macro balance."
+              answer="Yes. Add your own recipes from the Recipes tab (name, meal type, ingredients, steps, optional tags and variations). You can also pick flavor variations on planned meals, swap meals, favorite or dislike recipes, and lock meals you want to keep. Scaling stays gentle so recipes are not distorted."
             />
             <FaqItem
               question="How often should I do a Check-in?"

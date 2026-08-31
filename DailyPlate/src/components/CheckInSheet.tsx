@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { X } from "lucide-react";
 import { CHECK_IN_DISCLAIMER, CHECK_IN_INTRO } from "@/checkIn/questionnaire";
 import { FoodPreferenceSection } from "@/components/FoodPreferenceSection";
@@ -63,6 +64,7 @@ function ScaleInput({
 }
 
 export function CheckInSheet({ onClose }: { onClose: () => void }) {
+  useOverlayBack(true, onClose);
   const userProfile = useAppStore((s) => s.userProfile);
   const targets = useAppStore((s) => s.targets);
   const submitCheckIn = useAppStore((s) => s.submitCheckIn);

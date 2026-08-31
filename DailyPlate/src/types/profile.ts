@@ -43,6 +43,10 @@ export interface UserProfile {
   householdPreset?: HouseholdPreset;
   /** Whole people count when preset is `other`; otherwise null. */
   householdCustomCount?: number | null;
+  /** Adult count for grocery / serving scale (default 2). Prefer over legacy preset. */
+  householdAdults?: number;
+  /** Child count 0–6 for grocery / serving scale (children ≈ 0.6 adult portion). */
+  householdChildren?: number;
   /** How to allocate calories after protein (default balanced). */
   macroSplitPreference?: MacroSplitPreference | null;
   /** User-provided maintenance TDEE (kcal); overrides formula when set. */

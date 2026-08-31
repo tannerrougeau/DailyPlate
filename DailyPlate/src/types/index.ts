@@ -60,6 +60,8 @@ export interface Recipe {
   mealPrepNotes?: string;
   /** Custom photo path under /public (e.g. /recipes/my-dish.png). */
   imageUrl?: string;
+  /** Saved by the current user; included in generation and the Recipes list. */
+  isUserRecipe?: boolean;
 }
 
 /** Links meals cooked in one batch across multiple days. */

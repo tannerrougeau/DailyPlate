@@ -4,7 +4,8 @@ import type { MealSlotId, Recipe } from "@/types";
 import { useAppStore } from "@/store/useAppStore";
 import { formatQty } from "@/utils/grocery";
 import { fromDateKey } from "@/utils/date";
-import { householdPortionMultiplier } from "@/utils/household";
+import { householdMultiplierFor } from "@/utils/household";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { scaledIngredientsForMeal } from "@/utils/recipeDisplay";
 import {
   MEAL_PREP_PORTION_PRESETS,
@@ -33,6 +34,7 @@ export function MealPrepSheet({
   defaultStartDateKey?: string;
   onClose: () => void;
 }) {
+  useOverlayBack(true, onClose);
   const userProfile = useAppStore((s) => s.userProfile);
   const lockedDays = useAppStore((s) => s.lockedDays);
   const assignMealPrepBatch = useAppStore((s) => s.assignMealPrepBatch);
@@ -62,10 +64,7 @@ export function MealPrepSheet({
     setSelectedKeys(suggestMealPrepDateKeys(startDate, portionsCooked, lockedDays));
   }, [portionsCooked, lockedDays, defaultStartDateKey]);
 
-  const householdMult = householdPortionMultiplier(
-    userProfile?.householdPreset,
-    userProfile?.householdCustomCount,
-  );
+  const householdMult = householdMultiplierFor(userProfile);
   const batchIngredients = scaledIngredientsForMeal(
     recipe,
     undefined,

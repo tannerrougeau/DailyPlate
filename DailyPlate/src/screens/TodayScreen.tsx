@@ -50,6 +50,7 @@ export function TodayScreen() {
   const userProfile = useAppStore((s) => s.userProfile);
   const [lowComplexityForGen, setLowComplexityForGen] = useState(false);
   const generateDay = useAppStore((s) => s.generateDay);
+  const generateDays = useAppStore((s) => s.generateDays);
   const moveMealToSlot = useAppStore((s) => s.moveMealToSlot);
   const setMealTracking = useAppStore((s) => s.setMealTracking);
   const todayNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.today);
@@ -169,6 +170,28 @@ export function TodayScreen() {
           onChange={setLowComplexityForGen}
         />
         <GenerateDayButton onClick={handleGenerateDay} />
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              generateDays(viewDate, 2, { lowComplexity: lowComplexityForGen });
+              setGenerateNotice("2-day plan generated from this date. Grocery list updated.");
+            }}
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800"
+          >
+            Generate 2 days
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              generateDays(viewDate, 3, { lowComplexity: lowComplexityForGen });
+              setGenerateNotice("3-day plan generated from this date. Grocery list updated.");
+            }}
+            className="min-h-[44px] rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800"
+          >
+            Generate 3 days
+          </button>
+        </div>
         {generateNotice && (
           <div
             className="mt-3 flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"

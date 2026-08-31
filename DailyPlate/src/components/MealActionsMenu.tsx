@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { PlannedMeal } from "@/types";
 import { mealDisplayName } from "@/utils/recipeDisplay";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 
 type MealActionsMenuProps = {
   meal: PlannedMeal;
@@ -47,6 +48,7 @@ export function MealActionsMenu({
   onMealPrep,
   onDetails,
 }: MealActionsMenuProps) {
+  useOverlayBack(true, onClose);
   function run(action: () => void) {
     action();
     onClose();

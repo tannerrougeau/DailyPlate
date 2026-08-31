@@ -36,3 +36,30 @@
     display: none;
   }
 }
+
+/* Netlify deploy / collaboration badge — never cover the bottom tab bar. */
+@media (max-width: 768px) {
+  #netlify-badge,
+  .netlify-badge,
+  [id^="netlify-badge"],
+  [class*="netlify-badge"],
+  a[href*="netlify.com"][style*="position: fixed"],
+  a[href*="www.netlify.com"][style*="fixed"],
+  iframe[title*="Netlify" i],
+  #nf-toast,
+  .nf-toast,
+  netlify-identity-widget,
+  #netlify-identity-widget {
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+}
+
+@media (min-width: 769px) {
+  #netlify-badge,
+  .netlify-badge,
+  [class*="netlify-badge"] {
+    bottom: 5.5rem !important;
+  }
+}

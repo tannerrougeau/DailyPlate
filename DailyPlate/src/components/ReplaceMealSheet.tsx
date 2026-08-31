@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { RecipeImage } from "@/components/RecipeImage";
 import { fromDateKey } from "@/utils/date";
-import { recipeLibrary } from "@/recipes/recipeLibrary";
+import { allRecipes } from "@/recipes/recipePool";
+import { useAppStore } from "@/store/useAppStore";
 import type { MealSlotId, PlannedMeal } from "@/types";
 import { mealDisplayName } from "@/utils/recipeDisplay";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 
 const slotLabel: Record<MealSlotId, string> = {
   breakfast: "Breakfast",
@@ -26,15 +28,18 @@ export function ReplaceMealSheet({
   onClose: () => void;
   onSelect: (recipeId: string) => void;
 }) {
+  useOverlayBack(true, onClose);
   const [query, setQuery] = useState("");
+  const userRecipes = useAppStore((s) => s.userRecipes);
 
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let pool = recipeLibrary.filter(
+    const library = allRecipes(userRecipes);
+    let pool = library.filter(
       (r) => r.mealSlots.includes(meal.slot) && r.id !== meal.recipe.id,
     );
     if (pool.length === 0) {
-      pool = recipeLibrary.filter((r) => r.id !== meal.recipe.id);
+      pool = library.filter((r) => r.id !== meal.recipe.id);
     }
     if (!q) return pool;
     return pool.filter(
@@ -43,7 +48,7 @@ export function ReplaceMealSheet({
         r.cuisine.toLowerCase().includes(q) ||
         r.tags.some((t) => t.toLowerCase().includes(q)),
     );
-  }, [meal.recipe.id, meal.slot, query]);
+  }, [meal.recipe.id, meal.slot, query, userRecipes]);
 
   return (
     <div className="fixed inset-0 z-[92] flex items-end justify-center sm:items-center">

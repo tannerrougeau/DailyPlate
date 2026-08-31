@@ -7,7 +7,6 @@ import {
   ChefHat,
   Lock,
   RefreshCw,
-  Trash2,
   X,
 } from "lucide-react";
 import { MealCard } from "@/components/MealCard";
@@ -20,16 +19,23 @@ import { LowComplexityGenerateToggle } from "@/components/LowComplexityGenerateT
 import { useAppStore } from "@/store/useAppStore";
 import {
   addDays,
+  clampWeekStart,
+  dateKeysForRange,
   endOfWeek,
   fromDateKey,
+  isPreviousCalendarWeek,
+  isWeekOlderThanPrevious,
   monthGridDates,
+  monthHasVisibleWeeks,
+  previousWeekStart,
   startOfWeek,
   toDateKey,
   weekDateKeys,
 } from "@/utils/date";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
 import { formatHouseholdPlanningLine } from "@/utils/household";
-import { effectiveCarbVariationId, effectiveVariationId, mealDisplayName, resolveRecipeMacros } from "@/utils/recipeDisplay";
+import { effectiveCarbVariationId, effectiveVariationId, mealDisplayName, resolveRecipeMacros, variationLabels } from "@/utils/recipeDisplay";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { isLowComplexityLeftover, isMealPrepBatchBadge } from "@/utils/mealPrepDisplay";
 import type { MealSlotId } from "@/types";
 
@@ -87,6 +93,15 @@ function confirmClearWeek(weekStart: Date): boolean {
   );
 }
 
+function confirmClearRange(start: Date, dayCount: number): boolean {
+  const end = addDays(start, dayCount - 1);
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return window.confirm(
+    `Remove all meals for ${fmt(start)} – ${fmt(end)}? Locked days and meals will be kept.`,
+  );
+}
+
 const SLOT_ORDER: MealSlotId[] = ["breakfast", "lunch", "dinner", "snack"];
 
 function truncateName(name: string, max = 22): string {
@@ -124,14 +139,21 @@ export function PlanScreen() {
     null,
   );
   const [lowComplexityForGen, setLowComplexityForGen] = useState(false);
+  const [rangeStartKey, setRangeStartKey] = useState(() => toDateKey(new Date()));
+  const [activeRange, setActiveRange] = useState<{ startKey: string; dayCount: number } | null>(
+    null,
+  );
+  const [expandedMealKey, setExpandedMealKey] = useState<string | null>(null);
 
   const userProfile = useAppStore((s) => s.userProfile);
   const selectedDateKey = useAppStore((s) => s.selectedPlanDateKey);
   const setSelectedPlanDateKey = useAppStore((s) => s.setSelectedPlanDateKey);
   const generateWeek = useAppStore((s) => s.generateWeek);
   const generateMonth = useAppStore((s) => s.generateMonth);
+  const generateDays = useAppStore((s) => s.generateDays);
   const clearDayMeals = useAppStore((s) => s.clearDayMeals);
   const clearWeekMeals = useAppStore((s) => s.clearWeekMeals);
+  const clearRangeMeals = useAppStore((s) => s.clearRangeMeals);
   const generateDay = useAppStore((s) => s.generateDay);
   const planNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.plan);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
@@ -160,6 +182,41 @@ export function PlanScreen() {
   }, [userProfile?.lowComplexityEnabled]);
 
   const genOverrides = { lowComplexity: lowComplexityForGen };
+  const today = useMemo(() => new Date(), []);
+  const earliestWeek = useMemo(() => previousWeekStart(today), [today]);
+  const weekIsPrevious = isPreviousCalendarWeek(weekStart, today);
+  const canGoPrevWeek =
+    viewMode === "week"
+      ? !isWeekOlderThanPrevious(addDays(weekStart, -7), today)
+      : monthHasVisibleWeeks(new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1), today);
+  const rangeStartDate = fromDateKey(rangeStartKey);
+  const activeRangeKeys = activeRange
+    ? dateKeysForRange(fromDateKey(activeRange.startKey), activeRange.dayCount)
+    : [];
+
+  useOverlayBack(expandedWeekDayKeys.size > 0, () => {
+    setExpandedMealKey(null);
+    setExpandedWeekDayKeys(new Set());
+  });
+  useOverlayBack(expandedMealKey != null, () => setExpandedMealKey(null));
+
+  function handleGenerateRange(dayCount: number) {
+    generateDays(rangeStartDate, dayCount, genOverrides);
+    setActiveRange({ startKey: rangeStartKey, dayCount });
+  }
+
+  function handleClearWeek() {
+    if (!actionWeekStart) return;
+    if (!confirmClearWeek(actionWeekStart)) return;
+    clearWeekMeals(actionWeekStart);
+  }
+
+  function handleClearRange() {
+    if (!activeRange) return;
+    if (!confirmClearRange(fromDateKey(activeRange.startKey), activeRange.dayCount)) return;
+    clearRangeMeals(activeRangeKeys);
+    setActiveRange(null);
+  }
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-32 pt-3">
@@ -174,7 +231,7 @@ export function PlanScreen() {
 
       {!planNoteDismissed && (
         <UsageNote
-          text="Your week at a glance. Tap a day to expand meals, or use Generate for a fresh plan."
+          text="Your week at a glance. Tap a day to expand meals, then tap a meal to pick a variation."
           onDismiss={() => dismissUsageNote("plan")}
         />
       )}
@@ -183,34 +240,46 @@ export function PlanScreen() {
         <div className="mb-3 flex items-center justify-between gap-2">
           <button
             type="button"
-            aria-label="Previous week"
+            aria-label={viewMode === "week" ? "Previous week" : "Previous month"}
+            disabled={!canGoPrevWeek}
             onClick={() => {
               if (viewMode === "week") {
-                setWeekStart((d) => addDays(d, -7));
+                setWeekStart((d) => clampWeekStart(addDays(d, -7), today));
                 setExpandedWeekDayKeys(new Set());
+                setExpandedMealKey(null);
               } else {
-                setMonthAnchor(
-                  (d) => new Date(d.getFullYear(), d.getMonth() - 1, 1),
-                );
+                const prev = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() - 1, 1);
+                if (!monthHasVisibleWeeks(prev, today)) return;
+                setMonthAnchor(prev);
                 setSelectedMonthWeekStart(null);
               }
             }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-slate-100 disabled:opacity-30"
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
-          <div className="min-w-0 flex-1 text-center">
+          <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
             <p className="truncate text-sm font-semibold text-slate-900">
               {viewMode === "week" ? formatWeekRange(weekStart) : monthLabel}
             </p>
+            {monthWeekActionsReady && actionWeekStart && (
+              <button
+                type="button"
+                onClick={handleClearWeek}
+                className="shrink-0 rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+              >
+                Clear
+              </button>
+            )}
           </div>
           <button
             type="button"
-            aria-label="Next week"
+            aria-label={viewMode === "week" ? "Next week" : "Next month"}
             onClick={() => {
               if (viewMode === "week") {
                 setWeekStart((d) => addDays(d, 7));
                 setExpandedWeekDayKeys(new Set());
+                setExpandedMealKey(null);
               } else {
                 setMonthAnchor(
                   (d) => new Date(d.getFullYear(), d.getMonth() + 1, 1),
@@ -223,6 +292,12 @@ export function PlanScreen() {
             <ChevronRight className="h-5 w-5" />
           </button>
         </div>
+
+        {weekIsPrevious && viewMode === "week" && (
+          <p className="mb-2 text-center text-[11px] font-medium text-slate-400">
+            Previous week · view only
+          </p>
+        )}
 
         <div className="mb-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
           {(["week", "month"] as const).map((mode) => (
@@ -259,7 +334,7 @@ export function PlanScreen() {
                 </span>
               </>
             ) : (
-              "Tap a week row to generate or clear meals"
+              "Tap a week row to generate"
             )}
           </p>
         )}
@@ -269,11 +344,65 @@ export function PlanScreen() {
           onChange={setLowComplexityForGen}
         />
 
+        <label className="mt-3 block">
+          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            Start date
+          </span>
+          <input
+            type="date"
+            value={rangeStartKey}
+            min={toDateKey(earliestWeek)}
+            onChange={(e) => setRangeStartKey(e.target.value || todayKey)}
+            className="min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800 outline-none focus:border-[#2563EB]"
+          />
+        </label>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleGenerateRange(2)}
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-800 hover:border-[#2563EB]/40"
+          >
+            Generate 2 days
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGenerateRange(3)}
+            className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 text-sm font-semibold text-slate-800 hover:border-[#2563EB]/40"
+          >
+            Generate 3 days
+          </button>
+        </div>
+
+        {activeRange && (
+          <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2">
+            <p className="text-xs font-medium text-slate-600">
+              {`${activeRange.dayCount}-day plan`} ·{" "}
+              {fromDateKey(activeRange.startKey).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+              })}{" "}
+              –{" "}
+              {addDays(fromDateKey(activeRange.startKey), activeRange.dayCount - 1).toLocaleDateString(
+                "en-US",
+                { month: "short", day: "numeric" },
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={handleClearRange}
+              className="shrink-0 rounded-full border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+            >
+              Clear
+            </button>
+          </div>
+        )}
+
         <button
           type="button"
-          disabled={!monthWeekActionsReady}
+          disabled={!monthWeekActionsReady || weekIsPrevious}
           onClick={() => actionWeekStart && generateWeek(actionWeekStart, genOverrides)}
-          className="mt-3 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-2 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-[#2563EB] px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           <RefreshCw className="h-4 w-4 shrink-0" />
           Generate Week
@@ -289,22 +418,6 @@ export function PlanScreen() {
             Generate Month
           </button>
         )}
-
-        {monthWeekActionsReady && actionWeekStart && (
-          <div className="mt-2 flex justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                if (!confirmClearWeek(actionWeekStart)) return;
-                clearWeekMeals(actionWeekStart);
-              }}
-              className="flex min-h-[32px] items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 text-xs font-medium text-red-700 hover:border-red-300 hover:bg-red-100"
-            >
-              <Trash2 className="h-3 w-3 shrink-0" />
-              Remove Week Meals
-            </button>
-          </div>
-        )}
       </section>
 
       {viewMode === "week" ? (
@@ -315,13 +428,22 @@ export function PlanScreen() {
           dailyPlans={dailyPlans}
           lockedDays={lockedDays}
           expandedDayKeys={expandedWeekDayKeys}
+          expandedMealKey={expandedMealKey}
+          weekDisabled={weekIsPrevious}
           onToggleDay={(key) =>
             setExpandedWeekDayKeys((prev) => {
               const next = new Set(prev);
-              if (next.has(key)) next.delete(key);
-              else next.add(key);
+              if (next.has(key)) {
+                next.delete(key);
+                setExpandedMealKey(null);
+              } else {
+                next.add(key);
+              }
               return next;
             })
+          }
+          onToggleMeal={(key) =>
+            setExpandedMealKey((prev) => (prev === key ? null : key))
           }
           onManageDay={setSelectedPlanDateKey}
           onGenerateDay={(key) => generateDay(key, genOverrides)}
@@ -387,7 +509,10 @@ function WeekListView({
   dailyPlans,
   lockedDays,
   expandedDayKeys,
+  expandedMealKey,
+  weekDisabled,
   onToggleDay,
+  onToggleMeal,
   onManageDay,
   onGenerateDay,
 }: {
@@ -397,7 +522,10 @@ function WeekListView({
   dailyPlans: Record<string, PlannedMeal[]>;
   lockedDays: string[];
   expandedDayKeys: Set<string>;
+  expandedMealKey: string | null;
+  weekDisabled: boolean;
   onToggleDay: (key: string) => void;
+  onToggleMeal: (key: string) => void;
   onManageDay: (key: string) => void;
   onGenerateDay: (key: string) => void;
 }) {
@@ -418,11 +546,13 @@ function WeekListView({
           <article
             key={key}
             className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition-shadow ${
-              isToday
-                ? "border-primary/40 ring-1 ring-primary/20"
-                : isExpanded
-                  ? "border-primary/30 shadow-md"
-                  : "border-slate-200/80"
+              weekDisabled
+                ? "border-slate-100 bg-slate-50 opacity-60"
+                : isToday
+                  ? "border-primary/40 ring-1 ring-primary/20"
+                  : isExpanded
+                    ? "border-primary/30 shadow-md"
+                    : "border-slate-200/80"
             }`}
           >
             <button
@@ -508,7 +638,12 @@ function WeekListView({
                       <ul className="space-y-3">
                         {sortedMeals.map((meal) => (
                           <li key={meal.slot}>
-                            <DayMealPreview meal={meal} />
+                            <DayMealPreview
+                              meal={meal}
+                              dateKey={key}
+                              expanded={expandedMealKey === `${key}:${meal.slot}`}
+                              onToggle={() => onToggleMeal(`${key}:${meal.slot}`)}
+                            />
                           </li>
                         ))}
                       </ul>
@@ -530,7 +665,7 @@ function WeekListView({
             <div className="border-t border-slate-100 px-4 py-2.5">
               <button
                 type="button"
-                disabled={isLocked}
+                disabled={isLocked || weekDisabled}
                 onClick={() => onGenerateDay(key)}
                 className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-slate-900 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
@@ -545,7 +680,18 @@ function WeekListView({
   );
 }
 
-function DayMealPreview({ meal }: { meal: PlannedMeal }) {
+function DayMealPreview({
+  meal,
+  dateKey,
+  expanded,
+  onToggle,
+}: {
+  meal: PlannedMeal;
+  dateKey: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const setMealVariation = useAppStore((s) => s.setMealVariation);
   const macros = resolveRecipeMacros(
     meal.recipe,
     effectiveVariationId(meal),
@@ -555,33 +701,80 @@ function DayMealPreview({ meal }: { meal: PlannedMeal }) {
   const protein = Math.round(macros.protein * meal.scale);
   const carbs = Math.round(macros.carbs * meal.scale);
   const fat = Math.round(macros.fat * meal.scale);
+  const variations = variationLabels(meal.recipe);
+  const selectedId = effectiveVariationId(meal);
 
   return (
-    <div className="flex gap-3 overflow-hidden rounded-xl border border-slate-100 bg-white p-2 shadow-sm">
-      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg">
-        <RecipeImage recipe={meal.recipe} aspect="square" className="h-full w-full" />
-      </div>
-      <div className="min-w-0 flex-1 py-0.5">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          {SLOT_LABELS[meal.slot]}
-        </p>
-        <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-slate-900">
-          {mealDisplayName(meal)}
-        </p>
-        <p className="mt-1 text-xs tabular-nums text-slate-400">
-          {kcal} kcal · P {protein}g · C {carbs}g · F {fat}g
-        </p>
-      </div>
-      {isLowComplexityLeftover(meal) && (
-        <span className="inline-flex shrink-0 self-start items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-          Leftover
-        </span>
-      )}
-      {isMealPrepBatchBadge(meal) && meal.mealPrep && (
-        <span className="inline-flex shrink-0 self-start items-center gap-0.5 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800">
-          <ChefHat className="h-3 w-3" aria-hidden />
-          Prep
-        </span>
+    <div className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={expanded}
+        className="flex w-full gap-3 p-2 text-left"
+      >
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg">
+          <RecipeImage recipe={meal.recipe} aspect="square" className="h-full w-full" />
+        </div>
+        <div className="min-w-0 flex-1 py-0.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            {SLOT_LABELS[meal.slot]}
+          </p>
+          <p className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-slate-900">
+            {mealDisplayName(meal)}
+          </p>
+          <p className="mt-1 text-xs tabular-nums text-slate-400">
+            {kcal} kcal · P {protein}g · C {carbs}g · F {fat}g
+          </p>
+        </div>
+        <ChevronDown
+          className={`mt-2 h-4 w-4 shrink-0 text-slate-400 transition-transform ${
+            expanded ? "rotate-180 text-[#2563EB]" : ""
+          }`}
+          aria-hidden
+        />
+        {isLowComplexityLeftover(meal) && (
+          <span className="inline-flex shrink-0 self-start items-center gap-0.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+            Leftover
+          </span>
+        )}
+        {isMealPrepBatchBadge(meal) && meal.mealPrep && (
+          <span className="inline-flex shrink-0 self-start items-center gap-0.5 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-800">
+            <ChefHat className="h-3 w-3" aria-hidden />
+            Prep
+          </span>
+        )}
+      </button>
+      {expanded && (
+        <div className="border-t border-slate-100 px-3 pb-3 pt-2">
+          {variations.length > 0 ? (
+            <>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Variation
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {variations.map((v) => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => setMealVariation(dateKey, meal.slot, v.id)}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
+                      selectedId === v.id
+                        ? "border-[#2563EB] bg-blue-50 text-blue-900"
+                        : "border-slate-200 bg-white text-slate-600"
+                    }`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-slate-400">
+                Updates this meal on Plan and Grocery. Base variation is used until you change it.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-slate-500">No variations for this recipe.</p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -610,6 +803,7 @@ function DayDetailSheet({
   onDismissMacroNotice: () => void;
   onMealPrep: (recipe: Recipe) => void;
 }) {
+  useOverlayBack(true, onClose);
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
       <button
@@ -681,6 +875,7 @@ function DayDetailSheet({
                   meal={meal}
                   dateKey={dateKey}
                   dayMeals={meals}
+                  inlineDetailsDropdown
                   onMealPrep={onMealPrep}
                 />
               </li>
@@ -825,6 +1020,7 @@ function MonthView({
   const gridDates = monthGridDates(anchorDate);
   const calendarWeeks = useMemo(() => chunkMonthWeeks(gridDates), [gridDates]);
   const currentMonth = anchorDate.getMonth();
+  const today = useMemo(() => new Date(), []);
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -836,8 +1032,10 @@ function MonthView({
       <div className="space-y-2">
         {calendarWeeks.map((week, weekIndex) => {
           const weekStart = week[0]!;
+          if (isWeekOlderThanPrevious(weekStart, today)) return null;
           const weekStartKey = toDateKey(weekStart);
           const isWeekSelected = selectedWeekStartKey === weekStartKey;
+          const isPrevWeek = isPreviousCalendarWeek(weekStart, today);
           const weekHasPlans = week.some(
             (date) => (dailyPlans[toDateKey(date)] ?? []).length > 0,
           );
@@ -847,31 +1045,41 @@ function MonthView({
             <div
               key={weekStartKey}
               className={`rounded-xl transition-all ${
-                isWeekSelected
-                  ? "bg-blue-50 ring-2 ring-[#2563EB]/50 shadow-sm"
-                  : weekHasPlans
-                    ? "border border-slate-200 bg-slate-50/40"
-                    : "border border-dashed border-slate-200 bg-slate-50/30"
+                isPrevWeek
+                  ? "bg-slate-50 opacity-60"
+                  : isWeekSelected
+                    ? "bg-blue-50 ring-2 ring-[#2563EB]/50 shadow-sm"
+                    : weekHasPlans
+                      ? "border border-slate-200 bg-slate-50/40"
+                      : "border border-dashed border-slate-200 bg-slate-50/30"
               }`}
             >
               <button
                 type="button"
                 onClick={() => onSelectWeek(weekStart)}
+                disabled={isPrevWeek}
                 aria-pressed={isWeekSelected}
                 className={`mb-1 flex min-h-[36px] w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left transition-colors ${
-                  isWeekSelected
-                    ? "bg-[#2563EB]/10"
-                    : weekInMonth
-                      ? "hover:bg-white/80"
-                      : "opacity-60 hover:bg-white/60"
+                  isPrevWeek
+                    ? "cursor-not-allowed text-slate-400"
+                    : isWeekSelected
+                      ? "bg-[#2563EB]/10"
+                      : weekInMonth
+                        ? "hover:bg-white/80"
+                        : "opacity-60 hover:bg-white/60"
                 }`}
               >
                 <span
                   className={`text-xs font-semibold ${
-                    isWeekSelected ? "text-[#2563EB]" : "text-slate-600"
+                    isPrevWeek
+                      ? "text-slate-400"
+                      : isWeekSelected
+                        ? "text-[#2563EB]"
+                        : "text-slate-600"
                   }`}
                 >
-                  Week {weekIndex + 1} · {monthWeekLabel(week)}
+                  {isPrevWeek ? "Previous · " : `Week ${weekIndex + 1} · `}
+                  {monthWeekLabel(week)}
                 </span>
                 <span
                   className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 ${
@@ -897,8 +1105,8 @@ function MonthView({
                       isLocked={lockedDays.includes(key)}
                       isDaySelected={selectedDateKey === key}
                       isWeekSelected={isWeekSelected}
-                      onSelectDay={onSelectDay}
-                      onClearDay={onClearDay}
+                      onSelectDay={isPrevWeek ? () => undefined : onSelectDay}
+                      onClearDay={isPrevWeek ? () => undefined : onClearDay}
                     />
                   );
                 })}

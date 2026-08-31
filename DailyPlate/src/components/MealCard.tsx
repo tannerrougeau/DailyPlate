@@ -17,7 +17,8 @@ import { SwipeableRow } from "@/components/SwipeableRow";
 import type { CarbVariationId, MealSlotId, MealTrackingEntry, PlannedMeal } from "@/types";
 import { useAppStore } from "@/store/useAppStore";
 import { isMealLocked } from "@/utils/mealLocks";
-import { householdPortionMultiplier } from "@/utils/household";
+import { householdMultiplierFor } from "@/utils/household";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import {
   effectiveCarbVariationId,
   effectiveVariationId,
@@ -86,6 +87,8 @@ export function MealCard({
     setCarbVariationId(effectiveCarbVariationId(meal));
   }, [meal.selectedVariationId, meal.selectedCarbVariationId, meal.recipe.id]);
 
+  useOverlayBack(detailsOpen, () => setDetailsOpen(false));
+
   const favoriteIds = useAppStore((s) => s.favoriteIds);
   const dislikedIds = useAppStore((s) => s.dislikedIds);
   const userProfile = useAppStore((s) => s.userProfile);
@@ -113,10 +116,7 @@ export function MealCard({
     [dayMeals, slot],
   );
 
-  const householdMult = householdPortionMultiplier(
-    userProfile?.householdPreset,
-    userProfile?.householdCustomCount,
-  );
+  const householdMult = householdMultiplierFor(userProfile);
 
   const displayVariationId = effectiveVariationId(meal);
   const displayCarbId = effectiveCarbVariationId(meal);

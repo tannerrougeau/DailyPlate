@@ -15,6 +15,9 @@ export function snapshotAppState(
     | "selectedPlanDateKey"
     | "grocerySelectedDateKeys"
     | "groceryCheckedKeys"
+    | "groceryOwnedKeys"
+    | "pantryCheckedKeys"
+    | "userRecipes"
     | "dismissedUsageNotes"
     | "favoriteIds"
     | "dislikedIds"
@@ -37,6 +40,9 @@ export function snapshotAppState(
     selectedPlanDateKey: s.selectedPlanDateKey,
     grocerySelectedDateKeys: s.grocerySelectedDateKeys,
     groceryCheckedKeys: s.groceryCheckedKeys,
+    groceryOwnedKeys: s.groceryOwnedKeys,
+    pantryCheckedKeys: s.pantryCheckedKeys,
+    userRecipes: s.userRecipes,
     dismissedUsageNotes: s.dismissedUsageNotes,
     favoriteIds: s.favoriteIds,
     dislikedIds: s.dislikedIds,
@@ -61,6 +67,9 @@ export function savedStateToPatch(state: SavedAccountState): Partial<AppState> {
     selectedPlanDateKey: state.selectedPlanDateKey,
     grocerySelectedDateKeys: state.grocerySelectedDateKeys,
     groceryCheckedKeys: state.groceryCheckedKeys,
+    groceryOwnedKeys: state.groceryOwnedKeys ?? [],
+    pantryCheckedKeys: state.pantryCheckedKeys ?? [],
+    userRecipes: state.userRecipes ?? [],
     dismissedUsageNotes: state.dismissedUsageNotes,
     favoriteIds: state.favoriteIds,
     dislikedIds: state.dislikedIds,
