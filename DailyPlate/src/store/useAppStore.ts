@@ -62,6 +62,7 @@ import {
   validateAccountCredentials,
 } from "@/auth/appStateSnapshot";
 import type { AuthSession, LoginResult, RegisterResult } from "@/auth/types";
+import type { HouseholdDayOverride } from "@/utils/household";
 
 export type NavTab = "today" | "plan" | "recipes" | "grocery" | "guide";
 export type UsageNoteKey = "today" | "plan" | "recipes" | "grocery";
@@ -359,6 +360,8 @@ export interface AppState {
   pantryCheckedKeys: string[];
   /** User-created recipes included in generation and the Recipes list. */
   userRecipes: Recipe[];
+  /** One-day people count for Today only; does not change onboarding. */
+  todayHouseholdOverride: HouseholdDayOverride | null;
   /** dateKey → slot → log entry */
   mealTracking: Record<string, DayMealTracking>;
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
@@ -380,6 +383,8 @@ export interface AppState {
   syncAccountSnapshot: () => Promise<void>;
   finishOnboarding: () => void;
   setTodayDateKey: (key: string) => void;
+  ensureTodaySynced: () => void;
+  setTodayHouseholdOverride: (override: HouseholdDayOverride | null) => void;
   setSelectedPlanDateKey: (key: string | null) => void;
   dismissUsageNote: (key: UsageNoteKey) => void;
   dismissMacroRedistributionNotice: (dateKey: string) => void;
@@ -388,6 +393,7 @@ export interface AppState {
   generateDay: (dateKey?: string, overrides?: GenerateOverrides) => GenerateDayResult;
   generateWeek: (anchorDate?: Date, overrides?: GenerateOverrides) => void;
   generateDays: (startDate: Date, dayCount: number, overrides?: GenerateOverrides) => void;
+  generateForDateKeys: (dateKeys: string[], overrides?: GenerateOverrides) => void;
   clearDayMeals: (dateKey: string) => void;
   clearWeekMeals: (anchorDate: Date) => void;
   clearRangeMeals: (dateKeys: string[]) => void;
@@ -407,6 +413,11 @@ export interface AppState {
     dateKey: string,
     slot: PlannedMeal["slot"],
     carbVariationId: import("@/types").CarbVariationId,
+  ) => void;
+  setMealFatVariation: (
+    dateKey: string,
+    slot: PlannedMeal["slot"],
+    fatVariationId: import("@/types").FatVariationId,
   ) => void;
   swapMealSlots: (dateKey: string, slotA: MealSlotId, slotB: MealSlotId) => void;
   moveMealToSlot: (
@@ -450,6 +461,7 @@ const defaultTargets: DailyTargets = {
   protein: 165,
   carbs: 220,
   fat: 73,
+  fiber: 31,
 };
 
 export const useAppStore = create<AppState>()(
@@ -471,6 +483,7 @@ export const useAppStore = create<AppState>()(
       groceryOwnedKeys: [],
       pantryCheckedKeys: [],
       userRecipes: [],
+      todayHouseholdOverride: null,
       mealTracking: {},
       dismissedUsageNotes: {
         today: false,
@@ -530,6 +543,7 @@ export const useAppStore = create<AppState>()(
           groceryOwnedKeys: [],
           pantryCheckedKeys: [],
           userRecipes: [],
+          todayHouseholdOverride: null,
           mealTracking: {},
           favoriteIds: [],
           dislikedIds: [],
@@ -584,7 +598,46 @@ export const useAppStore = create<AppState>()(
         void get().syncAccountSnapshot();
       },
 
-      setTodayDateKey: (key) => set({ todayDateKey: key }),
+      setTodayDateKey: (key) =>
+        set((s) => ({
+          todayDateKey: key,
+          todayHouseholdOverride:
+            s.todayHouseholdOverride?.dateKey === key ? s.todayHouseholdOverride : null,
+        })),
+      ensureTodaySynced: () => {
+        const actual = toDateKey(new Date());
+        const s = get();
+        const nextPlans = { ...s.dailyPlans };
+        if (s.plannedMeals.length > 0 && (nextPlans[s.todayDateKey]?.length ?? 0) === 0) {
+          nextPlans[s.todayDateKey] = s.plannedMeals;
+        }
+        const sourceMeals =
+          (nextPlans[s.todayDateKey]?.length ? nextPlans[s.todayDateKey] : null) ??
+          (s.plannedMeals.length > 0 ? s.plannedMeals : null) ??
+          [];
+        if ((nextPlans[actual]?.length ?? 0) === 0 && sourceMeals.length > 0) {
+          nextPlans[actual] = sourceMeals;
+        }
+        const todayMeals = nextPlans[actual] ?? [];
+        const plansUnchanged =
+          nextPlans[actual] === s.dailyPlans[actual] &&
+          nextPlans[s.todayDateKey] === s.dailyPlans[s.todayDateKey];
+        if (
+          s.todayDateKey === actual &&
+          s.plannedMeals === todayMeals &&
+          plansUnchanged
+        ) {
+          return;
+        }
+        set({
+          todayDateKey: actual,
+          dailyPlans: nextPlans,
+          plannedMeals: todayMeals,
+          todayHouseholdOverride:
+            s.todayHouseholdOverride?.dateKey === actual ? s.todayHouseholdOverride : null,
+        });
+      },
+      setTodayHouseholdOverride: (override) => set({ todayHouseholdOverride: override }),
       setSelectedPlanDateKey: (key) => set({ selectedPlanDateKey: key }),
       dismissUsageNote: (key) =>
         set((s) => ({
@@ -705,11 +758,16 @@ export const useAppStore = create<AppState>()(
       },
 
       generateDays: (startDate, dayCount, overrides) => {
+        get().generateForDateKeys(dateKeysForRange(startDate, dayCount), overrides);
+      },
+
+      generateForDateKeys: (dateKeys, overrides) => {
         const state = get();
         const opts = buildGenerateOptions(state, overrides);
         if (!opts || !state.userProfile) return;
         const library = recipesFor(state);
-        const keys = dateKeysForRange(startDate, dayCount);
+        const keys = [...new Set(dateKeys)].sort();
+        if (keys.length === 0) return;
         let nextDailyPlans = { ...state.dailyPlans };
         const noticeKeys: string[] = [];
         for (const key of keys) {
@@ -720,25 +778,27 @@ export const useAppStore = create<AppState>()(
             if (built.redistributed) noticeKeys.push(key);
           }
         }
-        nextDailyPlans = applyWeeklyMealPrepToPlans(
-          keys,
-          nextDailyPlans,
-          state.userProfile,
-          opts,
-          state.lockedDays,
-          state.targets.calories,
-          library,
-        );
-        nextDailyPlans = applyLowComplexityToPlans(
-          keys,
-          nextDailyPlans,
-          state.userProfile,
-          opts,
-          state.lockedDays,
-          state.lockedMeals,
-          state.targets.calories,
-          library,
-        );
+        for (const weekKeys of groupDateKeysByWeek(keys)) {
+          nextDailyPlans = applyWeeklyMealPrepToPlans(
+            weekKeys,
+            nextDailyPlans,
+            state.userProfile,
+            opts,
+            state.lockedDays,
+            state.targets.calories,
+            library,
+          );
+          nextDailyPlans = applyLowComplexityToPlans(
+            weekKeys,
+            nextDailyPlans,
+            state.userProfile,
+            opts,
+            state.lockedDays,
+            state.lockedMeals,
+            state.targets.calories,
+            library,
+          );
+        }
         set((s) => ({
           dailyPlans: nextDailyPlans,
           plannedMeals: nextDailyPlans[s.todayDateKey] ?? s.plannedMeals,
@@ -747,8 +807,6 @@ export const useAppStore = create<AppState>()(
               ? [...new Set([...s.macroRedistributionNotices, ...noticeKeys])]
               : s.macroRedistributionNotices,
           grocerySelectedDateKeys: mergeGroceryDates(s.grocerySelectedDateKeys, keys),
-          groceryCheckedKeys: [],
-          pantryCheckedKeys: [],
         }));
         void get().syncAccountSnapshot();
       },
@@ -993,6 +1051,26 @@ export const useAppStore = create<AppState>()(
         const updateMeals = (meals: PlannedMeal[]) =>
           meals.map((m) =>
             m.slot === slot ? { ...m, selectedCarbVariationId: carbVariationId } : m,
+          );
+        const nextDaily = { ...state.dailyPlans };
+        if (nextDaily[dateKey]) {
+          nextDaily[dateKey] = updateMeals(nextDaily[dateKey]!);
+        }
+        set((s) => ({
+          dailyPlans: nextDaily,
+          plannedMeals:
+            dateKey === s.todayDateKey ? updateMeals(s.plannedMeals) : s.plannedMeals,
+        }));
+        void get().syncAccountSnapshot();
+      },
+
+      setMealFatVariation: (dateKey, slot, fatVariationId) => {
+        const state = get();
+        const meal = mealsForDate(state, dateKey).find((m) => m.slot === slot);
+        if (!meal) return;
+        const updateMeals = (meals: PlannedMeal[]) =>
+          meals.map((m) =>
+            m.slot === slot ? { ...m, selectedFatVariationId: fatVariationId } : m,
           );
         const nextDaily = { ...state.dailyPlans };
         if (nextDaily[dateKey]) {
@@ -1393,6 +1471,7 @@ export const useAppStore = create<AppState>()(
         groceryOwnedKeys: s.groceryOwnedKeys,
         pantryCheckedKeys: s.pantryCheckedKeys,
         userRecipes: s.userRecipes,
+        todayHouseholdOverride: s.todayHouseholdOverride,
         mealTracking: s.mealTracking,
         dismissedUsageNotes: s.dismissedUsageNotes,
         favoriteIds: s.favoriteIds,
@@ -1404,6 +1483,9 @@ export const useAppStore = create<AppState>()(
         adaptiveTdeeEstimate: s.adaptiveTdeeEstimate,
         personalizationInsight: s.personalizationInsight,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.ensureTodaySynced();
+      },
     },
   ),
 );
@@ -1415,6 +1497,7 @@ export function applyProfileToTargets(profile: UserProfile): DailyTargets {
 
 export function useTodayTotals() {
   const todayDateKey = useAppStore((s) => s.todayDateKey);
-  const meals = useAppStore((s) => s.dailyPlans[todayDateKey] ?? s.plannedMeals);
-  return sumPlannedMacros(meals);
+  const dailyPlans = useAppStore((s) => s.dailyPlans);
+  const plannedMeals = useAppStore((s) => s.plannedMeals);
+  return sumPlannedMacros(mealsForDate({ dailyPlans, plannedMeals, todayDateKey }, todayDateKey));
 }

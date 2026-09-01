@@ -60,8 +60,12 @@ export function roundIngredientQuantity(
     return Math.max(1, Math.round(rawQty));
   }
 
-  if (["clove", "pack", "medium", "spear"].includes(unit)) {
+  if (["clove", "pack", "medium", "spear", "can"].includes(unit)) {
     return Math.max(1, Math.round(rawQty));
+  }
+
+  if (unit === "fl oz" || unit === "floz") {
+    return roundToStep(rawQty, 1, 1);
   }
 
   if (unit === "pcs") {

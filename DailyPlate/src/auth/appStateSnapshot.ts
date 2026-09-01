@@ -18,6 +18,7 @@ export function snapshotAppState(
     | "groceryOwnedKeys"
     | "pantryCheckedKeys"
     | "userRecipes"
+    | "todayHouseholdOverride"
     | "dismissedUsageNotes"
     | "favoriteIds"
     | "dislikedIds"
@@ -43,6 +44,7 @@ export function snapshotAppState(
     groceryOwnedKeys: s.groceryOwnedKeys,
     pantryCheckedKeys: s.pantryCheckedKeys,
     userRecipes: s.userRecipes,
+    todayHouseholdOverride: s.todayHouseholdOverride,
     dismissedUsageNotes: s.dismissedUsageNotes,
     favoriteIds: s.favoriteIds,
     dislikedIds: s.dislikedIds,
@@ -70,6 +72,7 @@ export function savedStateToPatch(state: SavedAccountState): Partial<AppState> {
     groceryOwnedKeys: state.groceryOwnedKeys ?? [],
     pantryCheckedKeys: state.pantryCheckedKeys ?? [],
     userRecipes: state.userRecipes ?? [],
+    todayHouseholdOverride: state.todayHouseholdOverride ?? null,
     dismissedUsageNotes: state.dismissedUsageNotes,
     favoriteIds: state.favoriteIds,
     dislikedIds: state.dislikedIds,

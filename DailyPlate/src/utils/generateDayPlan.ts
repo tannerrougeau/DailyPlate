@@ -15,6 +15,9 @@ import {
   effectiveCarbVariationId,
   resolveRecipeMacros,
 } from "@/utils/recipeDisplay";
+import { isBeverageRecipe } from "@/utils/beverages";
+
+export { isBeverageRecipe } from "@/utils/beverages";
 
 export function slotsForMealsPerDay(
   m: "two" | "three" | "three_snack" | "flexible",
@@ -97,6 +100,7 @@ function isRecipeAllowed(
   dislikedChips: string[],
   dislikedCustom: string,
 ): boolean {
+  if (isBeverageRecipe(recipe)) return false;
   if (dislikedIds.has(recipe.id)) return false;
   if (recipeExcludedByDislikeChips(recipe, dislikedChips, dislikedCustom)) return false;
   return true;
@@ -180,7 +184,7 @@ export function generateDayPlan(
       );
     }
     if (pool.length === 0) {
-      pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id));
+      pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
     }
     const recipe = weightedPick(pool, (r) => recipeWeight(r, slot, options));
     if (!recipe) continue;
@@ -223,7 +227,7 @@ export function generateSlotsPlan(
       );
     }
     if (pool.length === 0) {
-      pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id));
+      pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
     }
     const recipe = weightedPick(pool, (r) => recipeWeight(r, slot, options));
     if (!recipe) continue;
@@ -263,7 +267,7 @@ export function pickRecipeForSlot(
     );
   }
   if (pool.length === 0) {
-    pool = recipes.filter((r) => !options.dislikedIds.includes(r.id) && !excludeIds.has(r.id));
+    pool = recipes.filter((r) => !options.dislikedIds.includes(r.id) && !excludeIds.has(r.id) && !isBeverageRecipe(r));
   }
   return weightedPick(pool, (r) => recipeWeight(r, slot, options));
 }

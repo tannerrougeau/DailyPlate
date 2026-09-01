@@ -9,7 +9,7 @@ import { UsageNote } from "@/components/UsageNote";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { useAppStore } from "@/store/useAppStore";
 import { allRecipes } from "@/recipes/recipePool";
-import type { CarbVariationId, Recipe } from "@/types";
+import type { CarbVariationId, FatVariationId, Recipe } from "@/types";
 import { isMealPrepFriendly } from "@/utils/mealPrep";
 import {
   countRecipesByProtein,
@@ -125,21 +125,21 @@ export function RecipesScreen() {
 
       {!recipesNoteDismissed && (
         <UsageNote
-          text="Browse by meal type, filter by protein source, and search — recipes are sorted A–Z."
+          text="Browse by meal type — Drinks has Milk, Fat-free milk, and Sweetened drink. Search is A–Z by any word."
           onDismiss={() => dismissUsageNote("recipes")}
         />
       )}
 
       {/* Meal category */}
       <section aria-label="Meal category" className="mb-3 card-surface p-1.5">
-        <div className="grid grid-cols-4 gap-1">
+        <div className="grid grid-cols-5 gap-1">
           {RECIPE_CATEGORY_TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setCategory(tab.id)}
               aria-pressed={category === tab.id}
-              className={`min-h-[44px] rounded-xl px-1 text-xs font-semibold transition-colors ${
+              className={`min-h-[44px] rounded-xl px-0.5 text-[11px] font-semibold transition-colors ${
                 category === tab.id
                   ? "bg-primary text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-50"
@@ -255,6 +255,11 @@ export function RecipesScreen() {
                         Yours
                       </span>
                     )}
+                    {recipe.tags.includes("beverage") && (
+                      <span className="ml-1 inline-block rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-sky-800">
+                        Drink
+                      </span>
+                    )}
                     {isMealPrepFriendly(recipe) && (
                       <span className="ml-1 inline-block rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-violet-800">
                         Prep
@@ -300,6 +305,7 @@ function RecipeDetail({
     recipe.variationDetails?.[0]?.id,
   );
   const [carbVariationId, setCarbVariationId] = useState<CarbVariationId>("white-rice");
+  const [fatVariationId, setFatVariationId] = useState<FatVariationId>("olive-oil");
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
@@ -336,6 +342,8 @@ function RecipeDetail({
               onVariationChange={setVariationId}
               carbVariationId={carbVariationId}
               onCarbVariationChange={setCarbVariationId}
+              fatVariationId={fatVariationId}
+              onFatVariationChange={setFatVariationId}
             />
           </section>
         </div>

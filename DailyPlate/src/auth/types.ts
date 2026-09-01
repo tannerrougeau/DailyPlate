@@ -2,6 +2,7 @@ import type { DailyTargets, PlannedMeal, Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { TdeeFeedbackEntry } from "@/types/tdeeFeedback";
 import type { UsageNoteKey } from "@/store/useAppStore";
+import type { HouseholdDayOverride } from "@/utils/household";
 
 export interface AuthSession {
   email: string;
@@ -22,6 +23,7 @@ export interface SavedAccountState {
   groceryOwnedKeys?: string[];
   pantryCheckedKeys?: string[];
   userRecipes?: Recipe[];
+  todayHouseholdOverride?: HouseholdDayOverride | null;
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];

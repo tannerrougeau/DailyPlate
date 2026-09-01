@@ -3,6 +3,9 @@ export type MealSlotId = "breakfast" | "lunch" | "dinner" | "snack";
 /** Lower-calorie swap for white rice in rice-based recipes. */
 export type CarbVariationId = "white-rice" | "riced-cauliflower" | "riced-broccoli";
 
+/** Pan fat used to cook: olive oil is the default; butter is a swap, not a new recipe. */
+export type FatVariationId = "olive-oil" | "butter";
+
 export type IngredientCategory =
   | "Produce"
   | "Protein"
@@ -42,7 +45,7 @@ export interface Recipe {
   protein: number;
   carbs: number;
   fat: number;
-  /** Optional authored fiber (g). When omitted, meal cards estimate from carbs. */
+  /** Optional authored fiber (g). When omitted, estimated from ingredients. */
   fiber?: number;
   prepMinutes: number;
   cookMinutes: number;
@@ -62,6 +65,11 @@ export interface Recipe {
   mealPrepNotes?: string;
   /** Custom photo path under /public (e.g. /recipes/my-dish.png). */
   imageUrl?: string;
+  /**
+   * mixed = cooked together (show combined batch weight).
+   * assembled = parts cooked separately (serving lines, no mixed weight).
+   */
+  cookStyle?: "mixed" | "assembled";
   /** Saved by the current user; included in generation and the Recipes list. */
   isUserRecipe?: boolean;
 }
@@ -87,6 +95,8 @@ export interface PlannedMeal {
   selectedVariationId?: string;
   /** Carb base swap when the recipe includes white rice. */
   selectedCarbVariationId?: CarbVariationId;
+  /** Olive oil (default) or butter for cooking fat. */
+  selectedFatVariationId?: FatVariationId;
 }
 
 export interface DailyTargets {
@@ -94,6 +104,8 @@ export interface DailyTargets {
   protein: number;
   carbs: number;
   fat: number;
+  /** Daily fiber target (g). Optional in older saves. */
+  fiber?: number;
 }
 
 export type MealTrackingStatus = "all" | "half" | "skipped" | "custom";

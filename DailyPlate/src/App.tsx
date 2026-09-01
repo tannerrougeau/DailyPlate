@@ -15,6 +15,13 @@ export default function App() {
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
+    const persistApi = useAppStore.persist;
+    const sync = () => useAppStore.getState().ensureTodaySynced();
+    if (persistApi.hasHydrated()) sync();
+    return persistApi.onFinishHydration(sync);
+  }, []);
+
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, [nav]);
 

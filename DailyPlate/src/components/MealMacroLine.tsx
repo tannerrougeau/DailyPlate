@@ -20,7 +20,7 @@ export function MealMacroLine({
     <div className="min-w-0">
       {kcal != null && (
         <p className={`font-semibold tabular-nums text-slate-800 ${compact ? "text-[11px]" : "text-xs"}`}>
-          {kcal} kcal
+          {kcal} calories
         </p>
       )}
       <div className={`grid grid-cols-2 gap-x-2 gap-y-0.5 tabular-nums ${kcal != null ? "mt-1" : ""}`}>

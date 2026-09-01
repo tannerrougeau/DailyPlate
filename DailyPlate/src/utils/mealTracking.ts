@@ -6,7 +6,12 @@ import type {
   PlannedMeal,
 } from "@/types";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
-import { effectiveCarbVariationId, effectiveVariationId, resolveRecipeMacros } from "@/utils/recipeDisplay";
+import {
+  effectiveCarbVariationId,
+  effectiveVariationId,
+  recipeFiberGrams,
+  resolveRecipeMacros,
+} from "@/utils/recipeDisplay";
 
 export function mealsForDateKey(
   dateKey: string,
@@ -40,6 +45,7 @@ export function macrosForMeal(meal: PlannedMeal): DailyTargets {
     protein: m.protein * meal.scale,
     carbs: m.carbs * meal.scale,
     fat: m.fat * meal.scale,
+    fiber: recipeFiberGrams(meal.recipe, effectiveVariationId(meal), effectiveCarbVariationId(meal)) * meal.scale,
   };
 }
 
@@ -54,11 +60,12 @@ export function sumTrackedMacros(
 } {
   const planned = sumPlannedMacros(meals);
   const loggedCount = tracking ? Object.keys(tracking).length : 0;
+  const empty: DailyTargets = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   if (!tracking || loggedCount === 0) {
-    return { eaten: planned, planned, hasTracking: false, loggedCount: 0 };
+    return { eaten: empty, planned, hasTracking: false, loggedCount: 0 };
   }
 
-  const eaten: DailyTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  const eaten: DailyTargets = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   for (const meal of meals) {
     const entry = tracking[meal.slot];
     if (!entry) continue;
@@ -68,6 +75,7 @@ export function sumTrackedMacros(
     eaten.protein += m.protein * mult;
     eaten.carbs += m.carbs * mult;
     eaten.fat += m.fat * mult;
+    eaten.fiber = (eaten.fiber ?? 0) + (m.fiber ?? 0) * mult;
   }
   return { eaten, planned, hasTracking: true, loggedCount };
 }

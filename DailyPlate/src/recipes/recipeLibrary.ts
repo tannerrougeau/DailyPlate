@@ -1106,6 +1106,7 @@ export const recipeLibrary: Recipe[] = [
     prepMinutes: 5,
     cookMinutes: 12,
     servingWeightGrams: 285,
+    cookStyle: "assembled",
     ingredients: [
       { name: "Eggs", quantity: 2, unit: "large", category: "Protein" },
       { name: "Butter or oil", quantity: 1, unit: "tsp", category: "Pantry" },
@@ -1138,6 +1139,7 @@ export const recipeLibrary: Recipe[] = [
     prepMinutes: 5,
     cookMinutes: 12,
     servingWeightGrams: 295,
+    cookStyle: "assembled",
     ingredients: [
       { name: "Eggs", quantity: 2, unit: "large", category: "Protein" },
       { name: "Sliced cheddar or American cheese", quantity: 1, unit: "slice", category: "Dairy" },
@@ -1173,6 +1175,7 @@ export const recipeLibrary: Recipe[] = [
     prepMinutes: 3,
     cookMinutes: 8,
     servingWeightGrams: 280,
+    cookStyle: "assembled",
     ingredients: [
       { name: "Eggs", quantity: 2, unit: "large", category: "Protein" },
       { name: "Deli ham (lean)", quantity: 2, unit: "slices", category: "Protein" },
@@ -1845,5 +1848,77 @@ export const recipeLibrary: Recipe[] = [
       "Bake 10–12 minutes until salmon flakes easily."
     ],
   },
-  // Snack
+  // Snack / beverages (selectable; not auto-generated)
+  {
+    id: "bev-milk",
+    number: 36,
+    name: "Milk",
+    cuisine: "american",
+    tags: ["beverage", "whole_food", "quick"],
+    mealSlots: ["breakfast", "lunch", "dinner", "snack"],
+    calories: 122,
+    protein: 8,
+    carbs: 12,
+    fat: 5,
+    fiber: 0,
+    prepMinutes: 0,
+    cookMinutes: 0,
+    servingWeightGrams: 244,
+    cookStyle: "assembled",
+    ingredients: [
+      { name: "Milk (2%)", quantity: 1, unit: "cup", category: "Dairy" },
+    ],
+    instructions: [
+      "Pour 1 cup (8 fl oz) per adult serving. Child servings are smaller automatically.",
+      "Serve cold.",
+    ],
+  },
+  {
+    id: "bev-fat-free-milk",
+    number: 37,
+    name: "Fat-free milk",
+    cuisine: "american",
+    tags: ["beverage", "whole_food", "quick"],
+    mealSlots: ["breakfast", "lunch", "dinner", "snack"],
+    calories: 83,
+    protein: 8,
+    carbs: 12,
+    fat: 0,
+    fiber: 0,
+    prepMinutes: 0,
+    cookMinutes: 0,
+    servingWeightGrams: 245,
+    cookStyle: "assembled",
+    ingredients: [
+      { name: "Fat-free milk", quantity: 1, unit: "cup", category: "Dairy" },
+    ],
+    instructions: [
+      "Pour 1 cup (8 fl oz) per adult serving. Child servings are smaller automatically.",
+      "Serve cold.",
+    ],
+  },
+  {
+    id: "bev-sweetened-drink",
+    number: 38,
+    name: "Sweetened drink",
+    cuisine: "american",
+    tags: ["beverage", "quick"],
+    mealSlots: ["breakfast", "lunch", "dinner", "snack"],
+    calories: 140,
+    protein: 0,
+    carbs: 39,
+    fat: 0,
+    fiber: 0,
+    prepMinutes: 0,
+    cookMinutes: 0,
+    servingWeightGrams: 355,
+    cookStyle: "assembled",
+    ingredients: [
+      { name: "Sweetened drink (soda, juice, or similar)", quantity: 12, unit: "fl oz", category: "Pantry" },
+    ],
+    instructions: [
+      "One 12 fl oz serving per adult. Child servings are smaller automatically.",
+      "Generic sugar-sweetened beverage — use soda, juice, or a similar sweetened drink.",
+    ],
+  },
 ];

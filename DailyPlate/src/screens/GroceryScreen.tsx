@@ -4,24 +4,29 @@ import {
   ChevronDown,
   Package,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { UsageNote } from "@/components/UsageNote";
+import { RollingWeekCalendar } from "@/components/RollingWeekCalendar";
+import { ClearDatesButton } from "@/components/ClearDatesButton";
 import { useAppStore } from "@/store/useAppStore";
-import { groceriesFromMeals, formatQty } from "@/utils/grocery";
+import { formatQty, groceriesFromMeals, groceryVolumeLabel, mergeGroceryLists, simplifyGroceryList } from "@/utils/grocery";
 import {
-  isDateKeyBefore,
+  fromDateKey,
   isDateKeyOnOrAfter,
-  isPreviousCalendarWeek,
-  isWeekOlderThanPrevious,
-  monthGridDates,
-  monthHasVisibleWeeks,
   toDateKey,
   weekDateKeys,
 } from "@/utils/date";
-import { formatHouseholdCookingLine, householdMultiplierFor } from "@/utils/household";
+import {
+  countsFromOverride,
+  formatHouseholdCookingLine,
+  householdMultiplierFor,
+} from "@/utils/household";
 import { mealsForDateKey } from "@/utils/mealTracking";
+import { mealDisplayName } from "@/utils/recipeDisplay";
+import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { PantrySheet } from "@/components/PantrySheet";
-import type { GroceryItem, IngredientCategory } from "@/types";
+import type { GroceryItem, IngredientCategory, PlannedMeal } from "@/types";
 
 const CATEGORY_ORDER: IngredientCategory[] = [
   "Produce",
@@ -32,27 +37,17 @@ const CATEGORY_ORDER: IngredientCategory[] = [
   "Spices",
 ];
 
-function chunkWeeks(dates: Date[]): Date[][] {
-  const weeks: Date[][] = [];
-  for (let i = 0; i < dates.length; i += 7) {
-    weeks.push(dates.slice(i, i + 7));
-  }
-  return weeks;
-}
-
-function weekLabel(week: Date[]): string {
-  const start = week[0]!;
-  const end = week[6]!;
-  const fmt = (d: Date) =>
-    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  if (start.getMonth() === end.getMonth()) {
-    return `${fmt(start)} – ${end.getDate()}`;
-  }
-  return `${fmt(start)} – ${fmt(end)}`;
-}
-
 function weekKeys(week: Date[]): string[] {
   return week.map((d) => toDateKey(d));
+}
+
+function formatSelectedDateRange(keys: string[]): string | null {
+  if (keys.length === 0) return null;
+  const sorted = [...keys].sort();
+  const fmt = (key: string) =>
+    fromDateKey(key).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (sorted.length === 1) return fmt(sorted[0]!);
+  return `${fmt(sorted[0]!)} – ${fmt(sorted[sorted.length - 1]!)}`;
 }
 
 function sortByName(rows: GroceryItem[]): GroceryItem[] {
@@ -66,6 +61,7 @@ export function GroceryScreen() {
   const userProfile = useAppStore((s) => s.userProfile);
   const purchasedKeys = useAppStore((s) => s.groceryCheckedKeys);
   const ownedKeys = useAppStore((s) => s.groceryOwnedKeys);
+  const todayHouseholdOverride = useAppStore((s) => s.todayHouseholdOverride);
   const groceryNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.grocery);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
   const selectedDateKeys = useAppStore((s) => s.grocerySelectedDateKeys);
@@ -75,17 +71,12 @@ export function GroceryScreen() {
   const toggleOwned = useAppStore((s) => s.toggleGroceryItemOwned);
   const pantryCheckedKeys = useAppStore((s) => s.pantryCheckedKeys);
   const togglePantryChecked = useAppStore((s) => s.togglePantryItemChecked);
-  const clearGroceryAll = useAppStore((s) => s.clearGroceryAll);
-  const [anchorDate, setAnchorDate] = useState(new Date());
   const [pantrySheetOpen, setPantrySheetOpen] = useState(false);
   const [pantrySectionOpen, setPantrySectionOpen] = useState(true);
-  const initialMonthDefaultApplied = useRef(false);
+  const [peekDateKey, setPeekDateKey] = useState<string | null>(null);
+  const [extraFutureWeeks, setExtraFutureWeeks] = useState(0);
+  const initialWeekDefaultApplied = useRef(false);
   const prevOwnedCount = useRef(0);
-
-  const gridDates = useMemo(() => monthGridDates(anchorDate), [anchorDate]);
-  const calendarWeeks = useMemo(() => chunkWeeks(gridDates), [gridDates]);
-  const monthLabel = anchorDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const currentMonth = anchorDate.getMonth();
 
   useEffect(() => {
     const pruned = selectedDateKeys.filter((key) => isDateKeyOnOrAfter(key, todayDateKey));
@@ -95,24 +86,27 @@ export function GroceryScreen() {
   }, [todayDateKey, selectedDateKeys, setGrocerySelectedDateKeys]);
 
   useEffect(() => {
-    if (initialMonthDefaultApplied.current) return;
+    if (initialWeekDefaultApplied.current) return;
     if (selectedDateKeys.length > 0) {
-      initialMonthDefaultApplied.current = true;
+      initialWeekDefaultApplied.current = true;
       return;
     }
-    const defaults = gridDates
-      .filter((d) => d.getMonth() === currentMonth)
-      .map((d) => toDateKey(d))
-      .filter((key) => isDateKeyOnOrAfter(key, todayDateKey));
-    setGrocerySelectedDateKeys(defaults);
-    initialMonthDefaultApplied.current = true;
-  }, [currentMonth, gridDates, selectedDateKeys.length, setGrocerySelectedDateKeys, todayDateKey]);
+    setGrocerySelectedDateKeys(
+      weekDateKeys(new Date()).filter((key) => isDateKeyOnOrAfter(key, todayDateKey)),
+    );
+    initialWeekDefaultApplied.current = true;
+  }, [selectedDateKeys.length, setGrocerySelectedDateKeys, todayDateKey]);
 
   const selectedDateSet = useMemo(() => new Set(selectedDateKeys), [selectedDateKeys]);
 
-  const householdMult = useMemo(
+  const todayCountsOverride = countsFromOverride(todayHouseholdOverride, todayDateKey);
+  const profileMult = useMemo(
     () => householdMultiplierFor(userProfile),
     [userProfile],
+  );
+  const todayMult = useMemo(
+    () => householdMultiplierFor(userProfile, todayCountsOverride),
+    [userProfile, todayCountsOverride],
   );
 
   const groceryDateKeys = useMemo(
@@ -121,20 +115,19 @@ export function GroceryScreen() {
   );
 
   const items = useMemo(() => {
-    const meals = groceryDateKeys.flatMap((key) =>
-      mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey),
-    );
-    return groceriesFromMeals(
-      meals,
-      householdMult,
-      userProfile?.prioritizeMinProtein === true,
-    );
+    const lists = groceryDateKeys.map((key) => {
+      const meals = mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey);
+      const mult = key === todayDateKey ? todayMult : profileMult;
+      return groceriesFromMeals(meals, mult, userProfile?.prioritizeMinProtein === true);
+    });
+    return simplifyGroceryList(mergeGroceryLists(lists));
   }, [
     dailyPlans,
     plannedMeals,
     todayDateKey,
     groceryDateKeys,
-    householdMult,
+    profileMult,
+    todayMult,
     userProfile?.prioritizeMinProtein,
   ]);
 
@@ -168,8 +161,10 @@ export function GroceryScreen() {
   }, [groupedItems]);
 
   const shoppingTotal = items.length;
-  const purchasedCount = items.filter((item) => purchasedSet.has(item.key)).length;
-  const progressPct = shoppingTotal > 0 ? (purchasedCount / shoppingTotal) * 100 : 0;
+  const checkedCount = items.filter(
+    (item) => purchasedSet.has(item.key) || ownedSet.has(item.key),
+  ).length;
+  const progressPct = shoppingTotal > 0 ? (checkedCount / shoppingTotal) * 100 : 0;
 
   useEffect(() => {
     if (pantryItems.length > prevOwnedCount.current) {
@@ -197,8 +192,7 @@ export function GroceryScreen() {
     );
   }
 
-  const hasSelection =
-    selectedDateKeys.length > 0 || purchasedKeys.length > 0 || ownedKeys.length > 0;
+  const selectedRangeLabel = formatSelectedDateRange(selectedDateKeys);
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
@@ -214,7 +208,7 @@ export function GroceryScreen() {
       </p>
       {userProfile && (
         <p className="mb-4 card-surface px-4 py-2.5 text-center text-sm font-medium text-slate-700">
-          {formatHouseholdCookingLine(userProfile)}
+          {formatHouseholdCookingLine(userProfile, todayCountsOverride)}
         </p>
       )}
 
@@ -231,160 +225,34 @@ export function GroceryScreen() {
           onClick={() => setPantrySheetOpen(true)}
           className="min-h-[44px] rounded-full border-2 border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900"
         >
-          Pantry
-        </button>
-        <button
-          type="button"
-          onClick={clearGroceryAll}
-          disabled={!hasSelection}
-          className="min-h-[40px] rounded-full border-2 border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 disabled:opacity-40"
-        >
-          Clear dates
+          View Pantry
         </button>
       </div>
+      <p className="mb-4 text-xs leading-relaxed text-slate-500">
+        Update pantry if this isn’t accurate.
+      </p>
 
-      <section className="section-gap card-surface p-3">
-        <div className="mb-3 flex items-center justify-between">
-          <button
-            type="button"
-            disabled={!monthHasVisibleWeeks(new Date(anchorDate.getFullYear(), anchorDate.getMonth() - 1, 1))}
-            onClick={() => setAnchorDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-            className="text-sm text-slate-500 disabled:opacity-30"
-          >
-            Previous
-          </button>
-          <h2 className="text-sm font-semibold text-slate-900">{monthLabel}</h2>
-          <button
-            type="button"
-            onClick={() => setAnchorDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-            className="text-sm text-slate-500"
-          >
-            Next
-          </button>
-        </div>
-        <p className="mb-2 text-center text-xs font-medium text-slate-500">
-          Check a week or individual days to include in your list
-        </p>
-        <div className="mb-2 grid grid-cols-7 text-center text-[10px] font-medium uppercase text-slate-400">
-          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
-        <div className="space-y-2">
-          {calendarWeeks.map((week, weekIndex) => {
-            const weekStart = week[0]!;
-            if (isWeekOlderThanPrevious(weekStart)) return null;
-            const isPrevWeek = isPreviousCalendarWeek(weekStart);
-            const keys = weekKeys(week);
-            const eligibleKeys = keys.filter((key) => isDateKeyOnOrAfter(key, todayDateKey));
-            const weekSelected =
-              eligibleKeys.length > 0 && eligibleKeys.every((k) => selectedDateSet.has(k));
-            const weekPartial =
-              !weekSelected && eligibleKeys.some((k) => selectedDateSet.has(k));
-            return (
-              <div
-                key={weekIndex}
-                className={`rounded-xl transition-all ${
-                  isPrevWeek
-                    ? "bg-slate-50 opacity-60"
-                    : weekSelected
-                      ? "bg-blue-50 ring-2 ring-primary/50 shadow-sm"
-                      : weekPartial
-                        ? "bg-blue-50/40 ring-1 ring-primary/25"
-                        : "border border-dashed border-slate-200 bg-slate-50/50"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleWeek(week)}
-                  disabled={isPrevWeek || eligibleKeys.length === 0}
-                  className={`mb-1 flex min-h-[40px] w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition-colors ${
-                    isPrevWeek || eligibleKeys.length === 0
-                      ? "cursor-not-allowed opacity-50"
-                      : weekSelected || weekPartial
-                        ? "bg-primary/10"
-                        : "hover:bg-white/80"
-                  }`}
-                  aria-pressed={weekSelected}
-                  aria-label={`Toggle week ${weekLabel(week)}`}
-                >
-                  <span
-                    className={`text-xs font-semibold ${
-                      isPrevWeek
-                        ? "text-slate-400"
-                        : weekSelected || weekPartial
-                          ? "text-primary"
-                          : "text-slate-700"
-                    }`}
-                  >
-                    {isPrevWeek ? "Previous · " : "Week · "}
-                    {weekLabel(week)}
-                  </span>
-                  <span
-                    className={`mt-0.5 h-4 w-4 shrink-0 rounded border ${
-                      weekSelected
-                        ? "border-primary bg-primary"
-                        : weekPartial
-                          ? "border-primary bg-primary/40"
-                          : "border-slate-300 bg-white"
-                    }`}
-                  />
-                </button>
-                <div className="grid grid-cols-7 gap-1 px-0.5 pb-1">
-                  {week.map((date) => {
-                    const key = toDateKey(date);
-                    const isPast = isDateKeyBefore(key, todayDateKey);
-                    const selected = !isPast && selectedDateSet.has(key);
-                    const inMonth = date.getMonth() === currentMonth;
-                    const hasMeals = (dailyPlans[key] ?? []).length > 0;
-                    return (
-                      <button
-                        type="button"
-                        key={key}
-                        disabled={isPast}
-                        onClick={() => {
-                          if (!isPast) toggleGroceryDateSelected(key);
-                        }}
-                        className={`relative min-h-[52px] rounded-lg border px-1 py-1 text-left ${
-                          isPast
-                            ? "cursor-not-allowed border-slate-100 bg-slate-50 opacity-50"
-                            : selected
-                              ? "border-primary bg-blue-50 ring-1 ring-primary/40"
-                              : "border-slate-200 bg-white hover:bg-slate-50"
-                        }`}
-                        aria-pressed={selected}
-                        aria-label={`Toggle ${date.toLocaleDateString("en-US", {
-                          weekday: "short",
-                          month: "short",
-                          day: "numeric",
-                        })}`}
-                      >
-                        <div className="flex items-start justify-between gap-1">
-                          <span
-                            className={`text-xs font-semibold ${inMonth ? "text-slate-800" : "text-slate-300"}`}
-                          >
-                            {date.getDate()}
-                          </span>
-                          <span
-                            className={`mt-0.5 h-3.5 w-3.5 rounded border ${
-                              selected
-                                ? "border-primary bg-primary"
-                                : "border-slate-300 bg-white"
-                            }`}
-                          />
-                        </div>
-                        {hasMeals && (
-                          <span className="absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-primary" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      <RollingWeekCalendar
+        todayDateKey={todayDateKey}
+        selectedDateKeys={selectedDateSet}
+        showChecks
+        onWeekClick={toggleWeek}
+        onViewDay={(key) => setPeekDateKey(key)}
+        onToggleHighlight={(key) => toggleGroceryDateSelected(key)}
+        extraFutureWeeks={extraFutureWeeks}
+        onLoadMoreDates={() => setExtraFutureWeeks((n) => n + 4)}
+        dayHasMeals={(key) =>
+          mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey).length > 0
+        }
+        caption={
+          selectedRangeLabel ? (
+            <div className="mb-2 flex items-center justify-center gap-2">
+              <p className="text-xs font-medium text-slate-600">{selectedRangeLabel}</p>
+              <ClearDatesButton onClear={() => setGrocerySelectedDateKeys([])} />
+            </div>
+          ) : null
+        }
+      />
 
       {items.length === 0 ? (
         <div className="card-surface p-6 text-sm text-slate-500">
@@ -398,7 +266,7 @@ export function GroceryScreen() {
               <div className="flex items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-800">Shopping progress</p>
                 <p className="text-sm tabular-nums text-slate-500">
-                  {purchasedCount} / {shoppingTotal} checked
+                  {checkedCount} / {shoppingTotal} checked
                 </p>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
@@ -410,7 +278,7 @@ export function GroceryScreen() {
             </div>
           )}
 
-          {purchasedCount === shoppingTotal && shoppingTotal > 0 && (
+          {checkedCount === shoppingTotal && shoppingTotal > 0 && (
             <div className="card-surface px-4 py-5 text-center">
               <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50">
                 <Check className="h-5 w-5 text-emerald-600" aria-hidden />
@@ -436,9 +304,18 @@ export function GroceryScreen() {
                     <li key={item.key}>
                       <GroceryItemRow
                         item={item}
-                        checked={purchasedSet.has(item.key)}
+                        checked={purchasedSet.has(item.key) || ownedSet.has(item.key)}
                         inPantry={ownedSet.has(item.key)}
-                        onToggleChecked={() => togglePurchased(item.key)}
+                        onToggleChecked={() => {
+                          const owned = ownedSet.has(item.key);
+                          const purchased = purchasedSet.has(item.key);
+                          if (purchased || owned) {
+                            if (purchased) togglePurchased(item.key);
+                            if (owned) toggleOwned(item.key);
+                          } else {
+                            togglePurchased(item.key);
+                          }
+                        }}
                         onMoveToPantry={() => toggleOwned(item.key)}
                       />
                     </li>
@@ -489,6 +366,14 @@ export function GroceryScreen() {
         </div>
       )}
 
+      {peekDateKey && (
+        <GroceryDayMealsSheet
+          dateKey={peekDateKey}
+          meals={mealsForDateKey(peekDateKey, dailyPlans, plannedMeals, todayDateKey)}
+          included={selectedDateSet.has(peekDateKey)}
+          onClose={() => setPeekDateKey(null)}
+        />
+      )}
       {pantrySheetOpen && (
         <PantrySheet
           items={items}
@@ -499,6 +384,77 @@ export function GroceryScreen() {
           onClose={() => setPantrySheetOpen(false)}
         />
       )}
+    </div>
+  );
+}
+
+function slotTitle(slot: PlannedMeal["slot"]): string {
+  return slot === "snack" ? "Snack" : slot.charAt(0).toUpperCase() + slot.slice(1);
+}
+
+function GroceryDayMealsSheet({
+  dateKey,
+  meals,
+  included,
+  onClose,
+}: {
+  dateKey: string;
+  meals: PlannedMeal[];
+  included: boolean;
+  onClose: () => void;
+}) {
+  useOverlayBack(true, onClose);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        aria-label="Close meal preview"
+        className="absolute inset-0 bg-slate-900/40"
+        onClick={onClose}
+      />
+      <section className="relative z-[81] max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-3xl">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {fromDateKey(dateKey).toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "short",
+              day: "numeric",
+            })}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-50"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="mb-3 text-xs text-slate-500">
+          {included
+            ? "This day is included in your grocery list."
+            : "This day is not highlighted for shopping."}
+        </p>
+        {meals.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+            No meals on this day.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {meals.map((meal) => (
+              <li
+                key={meal.slot}
+                className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5"
+              >
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  {slotTitle(meal.slot)}
+                </p>
+                <p className="text-sm font-semibold text-slate-900">{mealDisplayName(meal)}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
@@ -643,10 +599,12 @@ function GroceryItemRow({
               : "text-slate-800"
           }`}
         >
-          <span className={`font-medium tabular-nums ${checked ? "" : "text-slate-900"}`}>
-            {formatQty(item.quantity)}
-          </span>{" "}
-          <span className="text-slate-500">{item.unit}</span> {item.name}
+          <span className={checked ? "text-slate-400" : "font-medium text-slate-900"}>
+            {item.name}
+          </span>
+          <span className="mt-0.5 block text-xs tabular-nums text-slate-500">
+            {groceryVolumeLabel(item)}
+          </span>
         </button>
       </div>
       <button

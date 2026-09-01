@@ -10,12 +10,19 @@ import { CheckInSheet } from "@/components/CheckInSheet";
 import { SettingsSheet } from "@/components/SettingsSheet";
 import { SmartAdjustmentBadge } from "@/components/SmartAdjustmentBadge";
 import { TodayHeader } from "@/components/TodayHeader";
+import { TodayHouseholdSheet } from "@/components/TodayHouseholdSheet";
 import { UsageNote } from "@/components/UsageNote";
 import { PersonalizationInsightBanner } from "@/components/PersonalizationInsightBanner";
 import { MacroRedistributionNotice } from "@/components/MacroRedistributionNotice";
 import { useAppStore } from "@/store/useAppStore";
 import { slotsForMealsPerDay } from "@/utils/generateDayPlan";
-import { sumTrackedMacros } from "@/utils/mealTracking";
+import { fromDateKey } from "@/utils/date";
+import {
+  countsFromOverride,
+  formatHouseholdCookingLine,
+  resolveHouseholdCounts,
+} from "@/utils/household";
+import { mealsForDateKey, sumTrackedMacros } from "@/utils/mealTracking";
 
 const fallbackOrder = ["breakfast", "lunch", "dinner", "snack"] as const;
 
@@ -31,6 +38,8 @@ export function TodayScreen() {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [mealPrepRecipe, setMealPrepRecipe] = useState<Recipe | null>(null);
   const [generateNotice, setGenerateNotice] = useState<string | null>(null);
+  const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   const targets = useAppStore((s) => s.targets);
   const plannedMeals = useAppStore((s) => s.plannedMeals);
@@ -38,6 +47,8 @@ export function TodayScreen() {
   const mealTracking = useAppStore((s) => s.mealTracking);
   const todayDateKey = useAppStore((s) => s.todayDateKey);
   const userProfile = useAppStore((s) => s.userProfile);
+  const todayHouseholdOverride = useAppStore((s) => s.todayHouseholdOverride);
+  const setTodayHouseholdOverride = useAppStore((s) => s.setTodayHouseholdOverride);
   const generateDay = useAppStore((s) => s.generateDay);
   const setMealTracking = useAppStore((s) => s.setMealTracking);
   const todayNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.today);
@@ -53,10 +64,19 @@ export function TodayScreen() {
     ? slotsForMealsPerDay(userProfile.mealsPerDay)
     : [...fallbackOrder];
 
-  const viewDate = new Date();
-  const mealsForViewDate = dailyPlans[todayDateKey] ?? plannedMeals;
+  const todayCountsOverride = countsFromOverride(todayHouseholdOverride, todayDateKey);
+  const cookingLine = formatHouseholdCookingLine(userProfile, todayCountsOverride);
+  const currentCounts = resolveHouseholdCounts(userProfile, todayCountsOverride);
+
+  const viewDate = fromDateKey(todayDateKey);
+  const mealsForViewDate = mealsForDateKey(
+    todayDateKey,
+    dailyPlans,
+    plannedMeals,
+    todayDateKey,
+  );
   const dayTracking = mealTracking[todayDateKey];
-  const { eaten, planned, hasTracking, loggedCount } = sumTrackedMacros(
+  const { eaten, loggedCount } = sumTrackedMacros(
     mealsForViewDate,
     dayTracking,
   );
@@ -120,27 +140,59 @@ export function TodayScreen() {
       )}
 
       <div className="section-gap">
+        <button
+          type="button"
+          onClick={() => setHouseholdSheetOpen(true)}
+          className="card-surface flex min-h-[44px] w-full items-center justify-center px-4 py-2.5 text-center text-sm font-medium text-slate-700"
+        >
+          {cookingLine}
+        </button>
+      </div>
+
+      <div className="section-gap">
         <NutritionDashboard
           targets={targets}
           eaten={eaten}
-          planned={planned}
-          hasTracking={hasTracking}
           loggedCount={loggedCount}
           mealCount={sortedMeals.length}
-          anchorDateKey={todayDateKey}
-          storeTodayDateKey={todayDateKey}
-          isViewingToday
-          dailyPlans={dailyPlans}
-          plannedMeals={plannedMeals}
-          mealTracking={mealTracking}
         />
       </div>
 
-      <div className="section-gap space-y-3">
-        <GenerateDayButton label="Regenerate today" onClick={handleRegenerateToday} />
+      <div className="section-gap">
+        <div className="flex justify-center">
+          <GenerateDayButton
+            label="Regenerate Today"
+            compact
+            onClick={() => setConfirmRegenerate(true)}
+          />
+        </div>
+        {confirmRegenerate && (
+          <div className="mt-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <p className="text-sm font-medium text-slate-800">Replace today’s meals?</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmRegenerate(false)}
+                className="min-h-[36px] rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmRegenerate(false);
+                  handleRegenerateToday();
+                }}
+                className="min-h-[36px] rounded-xl bg-[#2563EB] px-3 text-sm font-semibold text-white"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        )}
         {generateNotice && (
           <div
-            className="flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+            className="mt-2 flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
             role="status"
           >
             <p className="flex-1 text-sm leading-relaxed text-emerald-900">{generateNotice}</p>
@@ -172,7 +224,7 @@ export function TodayScreen() {
           <div className="card-surface px-6 py-14 text-center">
             <p className="text-base leading-relaxed text-slate-500">
               No meals yet — tap{" "}
-              <span className="font-semibold text-primary">Regenerate today</span> to fill your
+              <span className="font-semibold text-primary">Regenerate Today</span> to fill your
               day.
             </p>
           </div>
@@ -217,6 +269,17 @@ export function TodayScreen() {
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {feedbackOpen && <CheckInSheet onClose={() => setFeedbackOpen(false)} />}
+      {householdSheetOpen && (
+        <TodayHouseholdSheet
+          profile={userProfile}
+          current={currentCounts}
+          onSave={(counts) =>
+            setTodayHouseholdOverride({ dateKey: todayDateKey, ...counts })
+          }
+          onReset={() => setTodayHouseholdOverride(null)}
+          onClose={() => setHouseholdSheetOpen(false)}
+        />
+      )}
       {mealPrepRecipe && (
         <MealPrepSheet
           recipe={mealPrepRecipe}

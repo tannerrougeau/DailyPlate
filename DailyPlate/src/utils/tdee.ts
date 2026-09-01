@@ -48,6 +48,7 @@ export interface ComputedTargets {
   protein: number;
   carbs: number;
   fat: number;
+  fiber: number;
 }
 
 /** Maintenance TDEE from Mifflin–St Jeor × activity (no goal adjustment). */
@@ -76,11 +77,13 @@ export function computeDailyTargets(profile: UserProfile): ComputedTargets {
   );
   const fatG = Math.round(fatKcal / 9);
   const carbsG = Math.round(carbKcal / 4);
+  const fiberG = Math.round((calories / 1000) * 14);
 
   return {
     calories,
     protein: proteinG,
     carbs: carbsG,
     fat: fatG,
+    fiber: fiberG,
   };
 }

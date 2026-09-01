@@ -7,7 +7,7 @@ export function LowComplexityPreferenceSection({
 }) {
   return (
     <section className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-      <h3 className="text-base font-semibold text-slate-900">Low complexity</h3>
+      <h3 className="text-base font-semibold text-slate-900">Low Complexity</h3>
       <p className="text-sm text-slate-600">
         Fewer cooking days. Leftovers and simpler whole-food meals preferred.
       </p>
@@ -21,7 +21,7 @@ export function LowComplexityPreferenceSection({
             : "border-slate-200 bg-white text-slate-800"
         }`}
       >
-        {enabled ? "Low complexity on" : "Enable low complexity"}
+        {enabled ? "Low Complexity on" : "Enable Low Complexity"}
       </button>
     </section>
   );

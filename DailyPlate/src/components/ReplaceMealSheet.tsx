@@ -6,6 +6,8 @@ import { allRecipes } from "@/recipes/recipePool";
 import { useAppStore } from "@/store/useAppStore";
 import type { MealSlotId, PlannedMeal } from "@/types";
 import { mealDisplayName } from "@/utils/recipeDisplay";
+import { recipeMatchesSearch } from "@/utils/recipeProteinSource";
+import { isBeverageRecipe } from "@/utils/generateDayPlan";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 
 const slotLabel: Record<MealSlotId, string> = {
@@ -35,19 +37,23 @@ export function ReplaceMealSheet({
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
     const library = allRecipes(userRecipes);
+    const beverages = library.filter(isBeverageRecipe);
     let pool = library.filter(
       (r) => r.mealSlots.includes(meal.slot) && r.id !== meal.recipe.id,
+    );
+    for (const drink of beverages) {
+      if (drink.id !== meal.recipe.id && !pool.some((r) => r.id === drink.id)) {
+        pool.push(drink);
+      }
+    }
+    pool = [...pool].sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     );
     if (pool.length === 0) {
       pool = library.filter((r) => r.id !== meal.recipe.id);
     }
     if (!q) return pool;
-    return pool.filter(
-      (r) =>
-        r.name.toLowerCase().includes(q) ||
-        r.cuisine.toLowerCase().includes(q) ||
-        r.tags.some((t) => t.toLowerCase().includes(q)),
-    );
+    return pool.filter((r) => recipeMatchesSearch(r, q));
   }, [meal.recipe.id, meal.slot, query, userRecipes]);
 
   return (

@@ -83,7 +83,7 @@ export function HouseholdPicker({
       />
       {compact && (
         <p className="text-xs text-slate-500">
-          Child plates default smaller than adult. Set sizes below if you like.
+          Child plates start smaller than the adult serving.
         </p>
       )}
     </div>

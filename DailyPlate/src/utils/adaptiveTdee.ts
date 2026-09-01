@@ -242,5 +242,6 @@ export function targetsWithCalories(
     protein: base.protein,
     carbs: Math.round(carbKcal / 4),
     fat: base.fat,
+    fiber: Math.round((calories / 1000) * 14),
   };
 }

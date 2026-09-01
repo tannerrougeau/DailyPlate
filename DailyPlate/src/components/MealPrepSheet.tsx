@@ -4,7 +4,7 @@ import type { MealSlotId, Recipe } from "@/types";
 import { useAppStore } from "@/store/useAppStore";
 import { formatQty } from "@/utils/grocery";
 import { fromDateKey } from "@/utils/date";
-import { formatHouseholdServingSplit, householdMultiplierFor } from "@/utils/household";
+import { countsFromOverride, formatHouseholdServingSplit, householdMultiplierFor } from "@/utils/household";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { scaledIngredientsForMeal } from "@/utils/recipeDisplay";
 import {
@@ -36,6 +36,8 @@ export function MealPrepSheet({
 }) {
   useOverlayBack(true, onClose);
   const userProfile = useAppStore((s) => s.userProfile);
+  const todayDateKey = useAppStore((s) => s.todayDateKey);
+  const todayHouseholdOverride = useAppStore((s) => s.todayHouseholdOverride);
   const lockedDays = useAppStore((s) => s.lockedDays);
   const assignMealPrepBatch = useAppStore((s) => s.assignMealPrepBatch);
 
@@ -64,7 +66,11 @@ export function MealPrepSheet({
     setSelectedKeys(suggestMealPrepDateKeys(startDate, portionsCooked, lockedDays));
   }, [portionsCooked, lockedDays, defaultStartDateKey]);
 
-  const householdMult = householdMultiplierFor(userProfile);
+  const householdCounts =
+    defaultStartDateKey === todayDateKey
+      ? countsFromOverride(todayHouseholdOverride, todayDateKey)
+      : null;
+  const householdMult = householdMultiplierFor(userProfile, householdCounts);
   const batchIngredients = scaledIngredientsForMeal(
     recipe,
     undefined,
@@ -232,7 +238,7 @@ export function MealPrepSheet({
           <section className="mb-5 rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
             <p className="text-sm font-semibold text-emerald-950">Batch ingredients</p>
             <p className="mt-1 text-xs text-emerald-900/80">
-              {portionsCooked} portion-days · {formatHouseholdServingSplit(userProfile)} each
+              {portionsCooked} portion-days · {formatHouseholdServingSplit(userProfile, householdCounts)} each
               {householdMult !== 1 ? ` (${householdMult.toFixed(2)}× recipe)` : ""}
             </p>
             <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-xs text-emerald-950">

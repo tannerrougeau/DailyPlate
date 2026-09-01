@@ -1,28 +1,29 @@
 import { formatQty } from "@/utils/grocery";
 import {
-  adultPortionMultiplier,
-  childPortionMultiplier,
   formatHouseholdServingSplit,
   resolveHouseholdCounts,
+  type HouseholdDayCounts,
 } from "@/utils/household";
 import {
-  batchWeightLabel,
+  assembledServingGuidance,
   carbVariationLabels,
-  estimateServingWeightGrams,
+  fatVariationLabels,
+  formatPersonServingWeights,
   getVariationDetail,
-  perPersonIngredientQty,
+  mixedPersonServingWeights,
   platingNoteForHousehold,
   recipeFiberGrams,
+  recipeIsMixedBatch,
   resolveRecipeInstructions,
   resolveRecipeMacros,
-  resolveRecipeIngredients,
   scaledIngredientsForMeal,
-  servingWeightForMeal,
   shouldShowProteinAdjustNote,
   variationLabels,
 } from "@/utils/recipeDisplay";
-import { MealMacroLine } from "@/components/MealMacroLine";
-import type { CarbVariationId, PlannedMeal, Recipe } from "@/types";
+import { NutritionDetails } from "@/components/NutritionDetails";
+import { MicronutrientDetails } from "@/components/MicronutrientDetails";
+import { notableMicronutrients } from "@/utils/micronutrients";
+import type { CarbVariationId, FatVariationId, PlannedMeal, Recipe } from "@/types";
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
 
@@ -32,9 +33,12 @@ export function RecipeDetailsBody({
   onVariationChange,
   carbVariationId,
   onCarbVariationChange,
+  fatVariationId,
+  onFatVariationChange,
   mealScale = 1,
   householdMult = 1,
   userProfile,
+  countsOverride,
   targets,
   meal,
   showSaveVariation,
@@ -45,9 +49,12 @@ export function RecipeDetailsBody({
   onVariationChange?: (id: string) => void;
   carbVariationId?: CarbVariationId;
   onCarbVariationChange?: (id: CarbVariationId) => void;
+  fatVariationId?: FatVariationId;
+  onFatVariationChange?: (id: FatVariationId) => void;
   mealScale?: number;
   householdMult?: number;
   userProfile?: UserProfile | null;
+  countsOverride?: HouseholdDayCounts | null;
   targets?: DailyTargets | null;
   meal?: PlannedMeal;
   showSaveVariation?: boolean;
@@ -57,6 +64,8 @@ export function RecipeDetailsBody({
   const selectedId = variationId ?? labels[0]?.id;
   const carbLabels = carbVariationLabels(recipe, selectedId);
   const selectedCarbId = carbVariationId ?? "white-rice";
+  const fatLabels = fatVariationLabels(recipe, selectedId);
+  const selectedFatId = fatVariationId ?? "olive-oil";
   const variation = getVariationDetail(recipe, selectedId);
   const macros = resolveRecipeMacros(recipe, selectedId, selectedCarbId);
   const ingredients = scaledIngredientsForMeal(
@@ -66,31 +75,41 @@ export function RecipeDetailsBody({
     householdMult,
     userProfile?.prioritizeMinProtein === true,
     selectedCarbId,
+    selectedFatId,
   );
-  const instructions = resolveRecipeInstructions(recipe, selectedId, selectedCarbId);
-  const baseIngredients = resolveRecipeIngredients(recipe, selectedId, selectedCarbId);
-  const prioritizeProtein = userProfile?.prioritizeMinProtein === true;
-  const { children: childCount } = resolveHouseholdCounts(userProfile);
-  const adultMult = adultPortionMultiplier(userProfile);
-  const childMult = childPortionMultiplier(userProfile);
-  const platingNote = platingNoteForHousehold(userProfile);
+  const instructions = resolveRecipeInstructions(
+    recipe,
+    selectedId,
+    selectedCarbId,
+    selectedFatId,
+  );
+  const mixedBatch = recipeIsMixedBatch(recipe);
+  const { children: childCount } = resolveHouseholdCounts(userProfile, countsOverride);
+  const platingNote = mixedBatch ? platingNoteForHousehold(userProfile, countsOverride) : null;
+  const servingGuide = assembledServingGuidance(recipe, {
+    variationId: selectedId,
+    carbVariationId: selectedCarbId,
+    fatVariationId: selectedFatId,
+    mealScale,
+    profile: userProfile,
+    countsOverride,
+  });
   const fiber = Math.round(recipeFiberGrams(recipe, selectedId, selectedCarbId) * mealScale);
-  const weightGrams = meal
-    ? servingWeightForMeal(meal, householdMult, targets)
-    : (() => {
-        const explicit = variation?.servingWeightGrams ?? recipe.servingWeightGrams;
-        const est = estimateServingWeightGrams(
-          macros.protein,
-          macros.carbs,
-          macros.fat,
-          explicit,
-          mealScale * householdMult,
-        );
-        return est > 0 ? est : null;
-      })();
-  const batchLabel = meal ? batchWeightLabel(meal, householdMult) : null;
+  const personWeights = mixedBatch
+    ? mixedPersonServingWeights(recipe, {
+        meal,
+        variationId: selectedId,
+        carbVariationId: selectedCarbId,
+        mealScale,
+        profile: userProfile,
+        countsOverride,
+        targets,
+      })
+    : null;
+  const weightLine = formatPersonServingWeights(personWeights);
   const proteinNote =
     meal && shouldShowProteinAdjustNote(userProfile ?? null, meal);
+  const micros = notableMicronutrients(recipe, selectedId, mealScale);
 
   return (
     <>
@@ -151,66 +170,67 @@ export function RecipeDetailsBody({
         </div>
       )}
 
-      {weightGrams != null && weightGrams > 0 && (
-        <p className="mt-3 text-sm text-slate-600">
-          <span className="font-medium text-slate-800">Batch weight:</span> ~{weightGrams} g
-          {batchLabel && (
-            <span className="mt-1 block text-xs text-slate-500">{batchLabel}</span>
-          )}
-        </p>
+      {fatLabels.length > 0 && (
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Cooking fat
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {fatLabels.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => onFatVariationChange?.(f.id)}
+                className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  selectedFatId === f.id
+                    ? "border-amber-600 bg-amber-50 text-amber-950"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {weightLine && (
+        <p className="mt-3 whitespace-pre-line text-sm text-slate-600">{weightLine}</p>
+      )}
+
+      {servingGuide && (
+        <p className="mt-3 text-sm leading-relaxed text-slate-700">{servingGuide}</p>
       )}
 
       <p className="mt-3 text-sm font-medium text-slate-800">
-        {formatHouseholdServingSplit(userProfile)}
+        {formatHouseholdServingSplit(userProfile, countsOverride)}
       </p>
 
       {proteinNote && (
-        <p className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900">
-          Protein-forward scaling: protein ingredients are bumped slightly; oats, fats, and
-          sweeteners are trimmed to keep texture balanced while meeting your protein target.
+        <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold leading-snug text-blue-950">
+          Protein-forward: protein scaled up a little; oats and fats trimmed.
         </p>
       )}
 
-      <div className="mt-3">
-        <MealMacroLine
-          kcal={Math.round(macros.calories * mealScale)}
-          protein={Math.round(macros.protein * mealScale)}
-          carbs={Math.round(macros.carbs * mealScale)}
-          fat={Math.round(macros.fat * mealScale)}
-          fiber={fiber}
-        />
-      </div>
+      <NutritionDetails
+        calories={Math.round(macros.calories * mealScale)}
+        protein={Math.round(macros.protein * mealScale)}
+        carbs={Math.round(macros.carbs * mealScale)}
+        fat={Math.round(macros.fat * mealScale)}
+        fiber={fiber}
+      />
+      <MicronutrientDetails items={micros} />
 
       <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-        {ingredients.map((ing) => {
-          const base = baseIngredients.find(
-            (b) => b.name === ing.name && b.unit === ing.unit,
-          );
-          const perAdult =
-            base != null
-              ? perPersonIngredientQty(base.quantity, mealScale, adultMult, ing, prioritizeProtein)
-              : null;
-          const perChild =
-            base != null
-              ? perPersonIngredientQty(base.quantity, mealScale, childMult, ing, prioritizeProtein)
-              : null;
-          return (
-            <li key={`${ing.name}-${ing.unit}`}>
-              <span>
-                {formatQty(ing.quantity)} {ing.unit} {ing.name}
-              </span>
-              {childCount > 0 && perAdult != null && perChild != null && (
-                <span className="mt-0.5 block text-xs text-slate-500">
-                  {formatQty(perAdult)} / adult · {formatQty(perChild)} / child
-                </span>
-              )}
-            </li>
-          );
-        })}
+        {ingredients.map((ing) => (
+          <li key={`${ing.name}-${ing.unit}`}>
+            {formatQty(ing.quantity)} {ing.unit} {ing.name}
+          </li>
+        ))}
       </ul>
 
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
-        {platingNote && <li>{platingNote}</li>}
+        {platingNote && childCount > 0 && <li>{platingNote}</li>}
         {instructions.map((step, idx) => (
           <li key={idx}>{step}</li>
         ))}

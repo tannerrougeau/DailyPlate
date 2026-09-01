@@ -78,3 +78,37 @@ export function monthHasVisibleWeeks(anchor: Date, today = new Date()): boolean 
   return false;
 }
 
+/** Previous week plus `futureWeeks` ahead. Default 5 future weeks = 6 visible weeks. */
+export function rollingVisibleWeeks(today = new Date(), futureWeeks = 5): Date[][] {
+  const start = previousWeekStart(today);
+  const weeks: Date[][] = [];
+  for (let i = 0; i < futureWeeks + 1; i += 1) {
+    const weekStart = addDays(start, i * 7);
+    weeks.push(Array.from({ length: 7 }, (_, d) => addDays(weekStart, d)));
+  }
+  return weeks;
+}
+
+export function weekRangeLabel(week: Date[]): string {
+  const start = week[0]!;
+  const end = week[6] ?? week[week.length - 1]!;
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  if (start.getMonth() === end.getMonth()) {
+    return `${fmt(start)} – ${end.getDate()}`;
+  }
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+
+/** Month heading when a week starts a new month, or for the first visible week. */
+export function weekMonthHeading(week: Date[], isFirst: boolean): string | null {
+  const firstOfMonth = week.find((d) => d.getDate() === 1);
+  if (firstOfMonth) {
+    return firstOfMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  if (isFirst) {
+    return week[0]!.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  }
+  return null;
+}
+

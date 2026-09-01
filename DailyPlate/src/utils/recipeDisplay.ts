@@ -1,5 +1,6 @@
 import type {
   CarbVariationId,
+  FatVariationId,
   MealSlotId,
   PlannedMeal,
   Recipe,
@@ -9,9 +10,12 @@ import type {
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import {
+  collapsedPersonPortions,
   formatHouseholdServingSplit,
   resolveHouseholdCounts,
+  type HouseholdDayCounts,
 } from "@/utils/household";
+import { estimateFiberFromIngredients } from "@/utils/fiberEstimate";
 import {
   applyCarbSwapToIngredients,
   applyCarbSwapToInstructions,
@@ -21,8 +25,15 @@ import {
   recipeIngredientsIncludeRice,
   resolveCarbVariationId,
 } from "@/recipes/riceAlternatives";
+import {
+  applyFatSwapToIngredients,
+  applyFatSwapToInstructions,
+  FAT_VARIATION_OPTIONS,
+  recipeHasCookingFatSwap,
+  resolveFatVariationId,
+} from "@/recipes/fatAlternatives";
 import { RECIPE_SCALE_MAX, RECIPE_SCALE_MIN } from "@/utils/macroRedistribution";
-import { applyPracticalIngredientScaling } from "@/utils/practicalScaling";
+import { applyPracticalIngredientScaling, formatPracticalQty } from "@/utils/practicalScaling";
 
 const PROTEIN_INGREDIENT_HINT =
   /protein powder|whey|casein|egg white|cottage cheese|greek yogurt|skyr|collagen/i;
@@ -63,8 +74,18 @@ export function effectiveCarbVariationId(meal: PlannedMeal): CarbVariationId {
   return resolveCarbVariationId(meal.selectedCarbVariationId);
 }
 
+export function effectiveFatVariationId(meal: PlannedMeal): FatVariationId {
+  const variationId = effectiveVariationId(meal);
+  if (!recipeSupportsFatSwap(meal.recipe, variationId)) return "olive-oil";
+  return resolveFatVariationId(meal.selectedFatVariationId);
+}
+
 export function recipeSupportsCarbSwap(recipe: Recipe, variationId?: string): boolean {
   return recipeIngredientsIncludeRice(rawRecipeIngredients(recipe, variationId));
+}
+
+export function recipeSupportsFatSwap(recipe: Recipe, variationId?: string): boolean {
+  return recipeHasCookingFatSwap(rawRecipeIngredients(recipe, variationId));
 }
 
 export function carbVariationLabels(
@@ -73,6 +94,14 @@ export function carbVariationLabels(
 ): { id: CarbVariationId; label: string }[] {
   if (!recipeSupportsCarbSwap(recipe, variationId)) return [];
   return CARB_VARIATION_OPTIONS;
+}
+
+export function fatVariationLabels(
+  recipe: Recipe,
+  variationId?: string,
+): { id: FatVariationId; label: string }[] {
+  if (!recipeSupportsFatSwap(recipe, variationId)) return [];
+  return FAT_VARIATION_OPTIONS;
 }
 
 function rawRecipeIngredients(recipe: Recipe, variationId?: string): RecipeIngredient[] {
@@ -114,18 +143,20 @@ export function variationLabels(recipe: Recipe): { id: string; label: string }[]
   }));
 }
 
-/** Fiber per recipe serving. Uses authored grams when present; otherwise a light estimate from carbs so Fiber is never hidden. */
+/** Fiber per recipe serving, from ingredients after carb/fat swaps so sides are counted and meat-and-oil plates stay near 0. */
 export function recipeFiberGrams(
   recipe: Recipe,
   variationId?: string,
   carbVariationId?: CarbVariationId,
+  fatVariationId?: FatVariationId,
 ): number {
+  const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
+  const fromIngredients = estimateFiberFromIngredients(ingredients);
+  if (fromIngredients > 0) return fromIngredients;
   if (typeof recipe.fiber === "number" && Number.isFinite(recipe.fiber)) {
     return Math.max(0, Math.round(recipe.fiber));
   }
-  const macros = resolveRecipeMacros(recipe, variationId, carbVariationId);
-  const estimated = Math.round(macros.carbs * 0.12);
-  return macros.carbs >= 6 ? Math.max(1, estimated) : estimated;
+  return 0;
 }
 
 export function resolveRecipeMacros(
@@ -149,24 +180,32 @@ export function resolveRecipeIngredients(
   recipe: Recipe,
   variationId?: string,
   carbVariationId?: CarbVariationId,
+  fatVariationId?: FatVariationId,
 ): RecipeIngredient[] {
   const raw = rawRecipeIngredients(recipe, variationId);
   const carb = resolveCarbVariationId(carbVariationId);
-  return applyCarbSwapToIngredients(raw, carb);
+  const afterCarb = applyCarbSwapToIngredients(raw, carb);
+  return applyFatSwapToIngredients(afterCarb, resolveFatVariationId(fatVariationId));
 }
 
 export function resolveRecipeInstructions(
   recipe: Recipe,
   variationId?: string,
   carbVariationId?: CarbVariationId,
+  fatVariationId?: FatVariationId,
 ): string[] {
   const v = getVariationDetail(recipe, variationId);
   const base = v ? [...recipe.instructions, ...v.instructions] : recipe.instructions;
+  const raw = rawRecipeIngredients(recipe, variationId);
   const carb = resolveCarbVariationId(carbVariationId);
-  if (!recipeIngredientsIncludeRice(rawRecipeIngredients(recipe, variationId))) {
-    return base;
-  }
-  return applyCarbSwapToInstructions(base, carb);
+  const afterCarb = recipeIngredientsIncludeRice(raw)
+    ? applyCarbSwapToInstructions(base, carb)
+    : base;
+  return applyFatSwapToInstructions(
+    afterCarb,
+    resolveFatVariationId(fatVariationId),
+    raw,
+  );
 }
 
 /** Per-ingredient multiplier when boosting protein without over-scaling carbs/fats. */
@@ -192,9 +231,10 @@ export function scaledIngredientsForMeal(
   householdMult: number,
   prioritizeProtein: boolean,
   carbVariationId?: CarbVariationId,
+  fatVariationId?: FatVariationId,
 ): RecipeIngredient[] {
   const effectiveId = resolveVariationId(recipe, variationId);
-  const base = resolveRecipeIngredients(recipe, effectiveId, carbVariationId);
+  const base = resolveRecipeIngredients(recipe, effectiveId, carbVariationId, fatVariationId);
   const total = mealScale * householdMult;
   const scaled = base.map((ing) => ({
     ...ing,
@@ -255,6 +295,60 @@ export function servingWeightForMeal(
   return grams;
 }
 
+export function mixedPersonServingWeights(
+  recipe: Recipe,
+  opts: {
+    meal?: PlannedMeal | null;
+    variationId?: string;
+    carbVariationId?: CarbVariationId;
+    mealScale?: number;
+    profile?: UserProfile | null;
+    countsOverride?: HouseholdDayCounts | null;
+    targets?: DailyTargets | null;
+  } = {},
+): { label: string; grams: number; kind: "adult" | "child" }[] | null {
+  if (!recipeIsMixedBatch(recipe)) return null;
+  const mealScale = opts.mealScale ?? opts.meal?.scale ?? 1;
+  const people = collapsedPersonPortions(opts.profile, opts.countsOverride);
+  if (people.length === 0) return null;
+  const variationId =
+    opts.variationId ?? (opts.meal ? effectiveVariationId(opts.meal) : undefined);
+  const carbVariationId =
+    opts.carbVariationId ?? (opts.meal ? effectiveCarbVariationId(opts.meal) : undefined);
+  const variation = getVariationDetail(recipe, variationId);
+  const macros = resolveRecipeMacros(recipe, variationId, carbVariationId);
+  const mealGrams =
+    opts.meal != null ? servingWeightForMeal(opts.meal, 1, opts.targets) : null;
+  const perRecipe =
+    mealGrams != null && opts.meal
+      ? mealGrams / Math.max(opts.meal.scale, 0.01)
+      : (variation?.servingWeightGrams ??
+          recipe.servingWeightGrams ??
+          estimateServingWeightGrams(macros.protein, macros.carbs, macros.fat, undefined, 1));
+  if (!(perRecipe > 0)) return null;
+  return people.map((p) => {
+    const title =
+      p.label === "Adult" ? "Adult serving" : p.label === "Child" ? "Child serving" : p.label;
+    return {
+      label: title,
+      grams: Math.round(perRecipe * mealScale * p.multiplier),
+      kind: p.kind,
+    };
+  });
+}
+
+export function formatPersonServingWeights(
+  weights: { label: string; grams: number }[] | null | undefined,
+  compact = false,
+): string | null {
+  if (!weights?.length) return null;
+  const parts = weights
+    .filter((w) => w.grams > 0)
+    .map((w) => `${w.label}: ~${w.grams} g`);
+  if (parts.length === 0) return null;
+  return compact ? parts.join(" · ") : parts.join("\n");
+}
+
 export function batchWeightLabel(
   meal: PlannedMeal,
   householdMult: number,
@@ -300,10 +394,151 @@ export function shouldShowProteinAdjustNote(
   return clampMealScaleForRecipe(meal.scale) > 1.05;
 }
 
-export function platingNoteForHousehold(profile: UserProfile | null | undefined): string | null {
-  const { children } = resolveHouseholdCounts(profile);
+export function recipeIsMixedBatch(recipe: Recipe): boolean {
+  if (recipe.cookStyle === "mixed") return true;
+  if (recipe.cookStyle === "assembled") return false;
+  const name = recipe.name.toLowerCase();
+  if (
+    /sandwich|taco|toast|platter|wrap|quesadilla|burrito|bagel/.test(name) &&
+    !/skillet|soup|stew|chili|casserole/.test(name)
+  ) {
+    return false;
+  }
+  const steps = [
+    ...recipe.instructions,
+    ...(recipe.variationDetails ?? []).flatMap((v) => v.instructions),
+  ]
+    .join(" ")
+    .toLowerCase();
+  if (
+    /close the sandwich|stack fried eggs|stack eggs|build the sandwich|serve open-faced|warm deli ham|toast the bread|layer bacon/.test(
+      steps,
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isServingGuidancePart(ing: RecipeIngredient): boolean {
+  const name = ing.name.toLowerCase();
+  if (ing.category === "Spices") return false;
+  if (/salt|pepper|oil|butter|seasoning/.test(name) && ing.category !== "Protein") return false;
+  if (ing.category === "Protein" || ing.category === "Grains") return true;
+  if (/milk|sweetened drink|soda|juice/.test(name)) return true;
+  return /avocado/.test(name);
+}
+
+function servingPartRank(ing: RecipeIngredient): number {
+  const name = ing.name.toLowerCase();
+  if (/egg/.test(name)) return 0;
+  if (/ham|bacon|turkey bacon|sausage|steak|chicken/.test(name)) return 1;
+  if (/toast|bread|bagel|biscuit|tortilla/.test(name)) return 2;
+  if (/avocado|tomato/.test(name)) return 3;
+  if (/cheese/.test(name)) return 4;
+  return 5;
+}
+
+function servingNoun(ing: RecipeIngredient, qty: number): string {
+  const name = ing.name
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const plural = qty >= 1.5;
+  if (/egg/.test(name)) return plural ? "eggs" : "egg";
+  if (/ham/.test(name)) return plural ? "slices ham" : "slice ham";
+  if (/turkey bacon/.test(name)) return plural ? "slices turkey bacon" : "slice turkey bacon";
+  if (/bacon/.test(name)) return plural ? "slices bacon" : "slice bacon";
+  if (
+    /sliced bread|toast|^bread$/.test(name) ||
+    /for toast/i.test(ing.name)
+  ) {
+    if (qty >= 1.5) return "slices toast";
+    return "toast";
+  }
+  if (/bagel/.test(name)) return plural ? "bagels" : "bagel";
+  if (/biscuit/.test(name)) return plural ? "biscuits" : "biscuit";
+  if (/tortilla/.test(name)) return plural ? "tortillas" : "tortilla";
+  if (/avocado/.test(name)) return "avocado";
+  const unit = ing.unit.toLowerCase();
+  if (unit === "slice" || unit === "slices") {
+    const noun = name.replace(/^sliced /, "");
+    return plural ? `slices ${noun}` : `slice ${noun}`;
+  }
+  return name;
+}
+
+function formatServingQty(ing: RecipeIngredient, qty: number): string {
+  const toastLike = /toast|sliced bread|for toast|^bread$/i.test(ing.name);
+  if (toastLike && qty > 0.3 && qty < 0.85) return "½–1";
+  const rounded =
+    /egg|slice|ham|bacon|toast|bagel|biscuit|tortilla/i.test(ing.name)
+      ? Math.max(0.5, Math.round(qty * 2) / 2)
+      : qty;
+  return formatPracticalQty(rounded);
+}
+
+function formatServingPart(ing: RecipeIngredient, qty: number): string {
+  const amount = formatServingQty(ing, qty);
+  const unit = ing.unit.toLowerCase();
+  const noun = servingNoun(ing, qty);
+  if (
+    /egg|ham|bacon|toast|bagel|biscuit|tortilla|bread/.test(ing.name.toLowerCase()) ||
+    unit === "slice" ||
+    unit === "slices" ||
+    unit === "large"
+  ) {
+    return `${amount} ${noun}`;
+  }
+  return `${amount} ${ing.unit} ${noun}`;
+}
+
+export function assembledServingGuidance(
+  recipe: Recipe,
+  opts: {
+    variationId?: string;
+    carbVariationId?: CarbVariationId;
+    fatVariationId?: FatVariationId;
+    mealScale?: number;
+    profile?: UserProfile | null;
+    countsOverride?: HouseholdDayCounts | null;
+  } = {},
+): string | null {
+  if (recipeIsMixedBatch(recipe)) return null;
+  const mealScale = opts.mealScale ?? 1;
+  const ingredients = resolveRecipeIngredients(
+    recipe,
+    opts.variationId,
+    opts.carbVariationId,
+    opts.fatVariationId,
+  );
+  const parts = ingredients
+    .filter(isServingGuidancePart)
+    .sort((a, b) => servingPartRank(a) - servingPartRank(b))
+    .slice(0, 4);
+  if (parts.length === 0) return null;
+  const people = collapsedPersonPortions(opts.profile, opts.countsOverride);
+  if (people.length === 0) return null;
+  return (
+    people
+      .map((p) => {
+        const line = parts
+          .map((ing) => formatServingPart(ing, ing.quantity * mealScale * p.multiplier))
+          .join(" + ");
+        return `${p.label}: ${line}`;
+      })
+      .join(". ") + "."
+  );
+}
+
+export function platingNoteForHousehold(
+  profile: UserProfile | null | undefined,
+  countsOverride?: HouseholdDayCounts | null,
+): string | null {
+  const { children } = resolveHouseholdCounts(profile, countsOverride);
   if (children <= 0) return null;
-  return `Cook the full batch, then plate larger adult portions and smaller child portions (${formatHouseholdServingSplit(profile)}).`;
+  return `Cook the full batch, then plate larger adult portions and smaller child portions (${formatHouseholdServingSplit(profile, countsOverride)}).`;
 }
 
 export function perPersonIngredientQty(

@@ -90,6 +90,7 @@ export function pickLowComplexityRecipe(
       r.mealSlots.includes(slot) &&
       !excludeIds.has(r.id) &&
       !options.dislikedIds.includes(r.id) &&
+      !r.tags.includes("beverage") &&
       !recipeExcludedByDislikeChips(r, options.dislikedChips, options.dislikedCustom),
   );
   if (pool.length === 0) {

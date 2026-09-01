@@ -26,7 +26,7 @@ export function HouseholdMembersEditor({
   return (
     <div className="space-y-2">
       <p className="text-sm leading-relaxed text-slate-600">
-        Optional. Child plates default smaller than adult. Size adjusts grocery and prep amounts.
+        Optional. Extra family details can improve portion accuracy but aren’t required for the app to work.
       </p>
       {members.map((member, index) => {
         if (member.kind === "adult") adultN += 1;
