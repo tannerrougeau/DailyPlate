@@ -1,6 +1,7 @@
 import type { DailyTargets, PlannedMeal, Recipe, MealSlotId } from "@/types";
 import type { GenerateOptions } from "@/utils/generateDayPlan";
 import { pickRecipeForSlot, sumPlannedMacros } from "@/utils/generateDayPlan";
+import { recipeFitsSlot } from "@/utils/planningPrefs";
 import { defaultVariationId, effectiveCarbVariationId, resolveRecipeMacros } from "@/utils/recipeDisplay";
 
 export const RECIPE_SCALE_MIN = 0.75;
@@ -45,7 +46,7 @@ function trySwapForMoreProtein(
   const candidates = recipes
     .filter(
       (r) =>
-        r.mealSlots.includes(slot) &&
+        recipeFitsSlot(r, slot) &&
         r.id !== current.recipe.id &&
         !used.has(r.id) &&
         proteinDensity(r) > proteinDensity(current.recipe) + 0.0005,

@@ -12,24 +12,21 @@ import {
   defaultSlotForRecipe,
   formatMealPrepDayLabel,
   mealPrepDayPickerKeys,
+  resolveMealPrepVariationId,
   suggestMealPrepDateKeys,
 } from "@/utils/mealPrep";
-import { slotsForMealsPerDay } from "@/utils/generateDayPlan";
-
-const slotOptions: { id: MealSlotId; label: string }[] = [
-  { id: "breakfast", label: "Breakfast" },
-  { id: "lunch", label: "Lunch" },
-  { id: "dinner", label: "Dinner" },
-  { id: "snack", label: "Snack" },
-];
+import { recipeFitsSlot, slotsForMealsPerDay } from "@/utils/generateDayPlan";
+import { SLOT_LABELS } from "@/utils/planningPrefs";
 
 export function MealPrepSheet({
   recipe,
+  variationId,
   defaultSlot,
   defaultStartDateKey,
   onClose,
 }: {
   recipe: Recipe;
+  variationId?: string;
   defaultSlot?: MealSlotId;
   defaultStartDateKey?: string;
   onClose: () => void;
@@ -71,20 +68,21 @@ export function MealPrepSheet({
       ? countsFromOverride(todayHouseholdOverride, todayDateKey)
       : null;
   const householdMult = householdMultiplierFor(userProfile, householdCounts);
+  const prepVariationId = resolveMealPrepVariationId(recipe, variationId);
   const batchIngredients = scaledIngredientsForMeal(
     recipe,
-    undefined,
+    prepVariationId,
     portionsCooked,
     householdMult,
     userProfile?.prioritizeMinProtein === true,
   );
   const profileSlots = userProfile
-    ? slotsForMealsPerDay(userProfile.mealsPerDay)
-    : slotOptions.map((s) => s.id);
+    ? slotsForMealsPerDay(userProfile)
+    : (["breakfast", "lunch", "dinner", "snack"] as MealSlotId[]);
 
-  const slotChoices = slotOptions.filter(
-    (s) => recipe.mealSlots.includes(s.id) && profileSlots.includes(s.id),
-  );
+  const slotChoices = profileSlots
+    .filter((id) => recipeFitsSlot(recipe, id))
+    .map((id) => ({ id, label: SLOT_LABELS[id] }));
 
   function toggleDay(key: string) {
     setSelectedKeys((prev) =>
@@ -185,7 +183,13 @@ export function MealPrepSheet({
           <section className="mb-5 space-y-2 rounded-2xl border border-slate-200 bg-white p-4">
             <p className="text-sm font-semibold text-slate-900">Meal slot</p>
             <div className="flex flex-wrap gap-2">
-              {(slotChoices.length > 0 ? slotChoices : slotOptions).map((s) => (
+              {(slotChoices.length > 0
+                ? slotChoices
+                : (["breakfast", "lunch", "dinner", "snack"] as MealSlotId[]).map((id) => ({
+                    id,
+                    label: SLOT_LABELS[id],
+                  }))
+              ).map((s) => (
                 <button
                   key={s.id}
                   type="button"
@@ -259,6 +263,7 @@ export function MealPrepSheet({
                 slot,
                 portionsCooked,
                 dateKeys: selectedKeys.slice(0, portionsCooked),
+                selectedVariationId: prepVariationId,
               });
               onClose();
             }}

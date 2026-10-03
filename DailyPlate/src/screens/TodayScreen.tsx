@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { GenerateDayButton } from "@/components/GenerateDayButton";
 import { MealCard } from "@/components/MealCard";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
-import type { Recipe } from "@/types";
+import type { MealSlotId, Recipe } from "@/types";
 import { NutritionDashboard } from "@/components/NutritionDashboard";
 import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
@@ -24,7 +24,7 @@ import {
 } from "@/utils/household";
 import { mealsForDateKey, sumTrackedMacros } from "@/utils/mealTracking";
 
-const fallbackOrder = ["breakfast", "lunch", "dinner", "snack"] as const;
+const fallbackOrder: MealSlotId[] = ["breakfast", "lunch", "dinner", "snack", "snack_2", "snack_3"];
 
 function isRecentCheckIn(iso?: string | null, days = 14): boolean {
   if (!iso) return false;
@@ -35,8 +35,12 @@ function isRecentCheckIn(iso?: string | null, days = 14): boolean {
 
 export function TodayScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const openSettingsOnStart = useAppStore((s) => s.openSettingsOnStart);
+  const consumeOpenSettingsRequest = useAppStore((s) => s.consumeOpenSettingsRequest);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [mealPrepRecipe, setMealPrepRecipe] = useState<Recipe | null>(null);
+  const [mealPrep, setMealPrep] = useState<{ recipe: Recipe; variationId?: string } | null>(
+    null,
+  );
   const [generateNotice, setGenerateNotice] = useState<string | null>(null);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
@@ -61,7 +65,7 @@ export function TodayScreen() {
   const dismissPersonalizationInsight = useAppStore((s) => s.dismissPersonalizationInsight);
 
   const slotOrder = userProfile
-    ? slotsForMealsPerDay(userProfile.mealsPerDay)
+    ? slotsForMealsPerDay(userProfile)
     : [...fallbackOrder];
 
   const todayCountsOverride = countsFromOverride(todayHouseholdOverride, todayDateKey);
@@ -91,6 +95,12 @@ export function TodayScreen() {
     const timer = window.setTimeout(() => setGenerateNotice(null), 7000);
     return () => window.clearTimeout(timer);
   }, [generateNotice]);
+
+  useEffect(() => {
+    if (!openSettingsOnStart) return;
+    setSettingsOpen(true);
+    consumeOpenSettingsRequest();
+  }, [openSettingsOnStart, consumeOpenSettingsRequest]);
 
   function handleRegenerateToday() {
     // Future: dedicated low-complexity vs detailed generate mode. Honor profile flag until then.
@@ -237,7 +247,7 @@ export function TodayScreen() {
                   dateKey={todayDateKey}
                   dayMeals={sortedMeals}
                   inlineDetailsDropdown
-                  onMealPrep={setMealPrepRecipe}
+                  onMealPrep={(recipe, variationId) => setMealPrep({ recipe, variationId })}
                   trackingEntry={dayTracking?.[meal.slot]}
                   showEatenSkip
                   onEaten={() => {
@@ -280,11 +290,12 @@ export function TodayScreen() {
           onClose={() => setHouseholdSheetOpen(false)}
         />
       )}
-      {mealPrepRecipe && (
+      {mealPrep && (
         <MealPrepSheet
-          recipe={mealPrepRecipe}
+          recipe={mealPrep.recipe}
+          variationId={mealPrep.variationId}
           defaultStartDateKey={todayDateKey}
-          onClose={() => setMealPrepRecipe(null)}
+          onClose={() => setMealPrep(null)}
         />
       )}
     </div>

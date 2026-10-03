@@ -10,6 +10,7 @@ import {
   highProteinOvernightOats,
   highProteinSmoothie,
 } from "@/recipes/enhancedBreakfastRecipes";
+import { snackRecipes } from "@/recipes/snackRecipes";
 
 const sheetPanChickenVariations: RecipeVariationDetail[] = [
   {
@@ -808,7 +809,7 @@ const bakedMeatballVariations: RecipeVariationDetail[] = [
   },
 ];
 
-export const recipeLibrary: Recipe[] = [
+const baseRecipeLibrary: Recipe[] = [
   // Breakfast
   {
     id: "blended-cottage-cheese-pudding-49",
@@ -898,33 +899,6 @@ export const recipeLibrary: Recipe[] = [
     ],
   },
   {
-    id: "greek-yogurt-berry-protein-bowl-with-oats-05",
-    number: 4,
-    name: "Greek Yogurt and Berries Protein Bowl",
-    imageUrl: "/recipes/greek-yogurt-and-berries-protein-bowl.png",
-    cuisine: "mediterranean",
-    tags: ["whole_food", "high_protein", "quick", "meal_prep"],
-    mealSlots: ["breakfast", "snack"],
-    calories: 395,
-    protein: 28,
-    carbs: 48,
-    fat: 10,
-    prepMinutes: 6,
-    cookMinutes: 0,
-    ingredients: [
-      { name: "Plain Greek yogurt", quantity: 1, unit: "cup", category: "Dairy" },
-      { name: "Rolled oats", quantity: 0.33, unit: "cup", category: "Grains" },
-      { name: "Mixed berries", quantity: 0.75, unit: "cup", category: "Produce" },
-      { name: "Chia seeds", quantity: 1, unit: "tbsp", category: "Pantry" },
-      { name: "Honey", quantity: 1, unit: "tsp", category: "Pantry" }
-    ],
-    instructions: [
-      "Add yogurt to a bowl.",
-      "Top with oats, berries, and chia seeds.",
-      "Drizzle honey if desired and serve."
-    ],
-  },
-  {
     id: "greek-yogurt-parfait-51",
     number: 5,
     name: "Greek Yogurt Parfait",
@@ -932,10 +906,11 @@ export const recipeLibrary: Recipe[] = [
     cuisine: "mediterranean",
     tags: ["whole_food", "high_protein", "meal_prep", "breakfast_friendly", "quick"],
     mealSlots: ["breakfast", "snack"],
-    calories: 445,
-    protein: 32,
-    carbs: 48,
-    fat: 16,
+    calories: 468,
+    protein: 35,
+    carbs: 42,
+    fat: 19,
+    fiber: 7,
     prepMinutes: 6,
     cookMinutes: 0,
     ingredients: [
@@ -950,6 +925,77 @@ export const recipeLibrary: Recipe[] = [
       "Drizzle or dollop peanut butter on top.",
       "Seal and refrigerate if meal prepping.",
       "Note: Extremely quick, no-cook high-protein breakfast. Perfect for meal prep.",
+    ],
+    variationDetails: [
+      {
+        id: "classic-parfait",
+        label: "Classic parfait",
+        ingredients: [],
+        instructions: [],
+        calories: 468,
+        protein: 35,
+        carbs: 42,
+        fat: 19,
+        fiber: 7,
+        mealSlots: ["breakfast", "snack"],
+      },
+      {
+        id: "plain-cup",
+        label: "Plain cup",
+        replaceBase: true,
+        ingredients: [
+          { name: "Plain Greek yogurt cup (5.3 oz)", quantity: 1, unit: "cup", category: "Dairy" },
+        ],
+        instructions: ["Eat the yogurt cup as-is."],
+        calories: 89,
+        protein: 15,
+        carbs: 5,
+        fat: 1,
+        fiber: 0,
+        servingWeightGrams: 150,
+        mealSlots: ["snack", "breakfast"],
+      },
+      {
+        id: "berry-parfait-lighter",
+        label: "Berry parfait, lighter",
+        replaceBase: true,
+        ingredients: [
+          { name: "Nonfat Greek yogurt", quantity: 1, unit: "cup", category: "Dairy" },
+          { name: "Mixed berries", quantity: 0.5, unit: "cup", category: "Produce" },
+          { name: "Granola", quantity: 2, unit: "tbsp", category: "Grains" },
+        ],
+        instructions: ["Layer yogurt, berries, and granola."],
+        calories: 251,
+        protein: 28,
+        carbs: 25,
+        fat: 5,
+        fiber: 5,
+        servingWeightGrams: 330,
+        mealSlots: ["snack", "breakfast"],
+      },
+      {
+        id: "protein-bowl-berries",
+        label: "Protein bowl with berries",
+        replaceBase: true,
+        ingredients: [
+          { name: "Plain Greek yogurt", quantity: 1, unit: "cup", category: "Dairy" },
+          { name: "Rolled oats", quantity: 0.33, unit: "cup", category: "Grains" },
+          { name: "Mixed berries", quantity: 0.75, unit: "cup", category: "Produce" },
+          { name: "Chia seeds", quantity: 1, unit: "tbsp", category: "Pantry" },
+          { name: "Honey", quantity: 1, unit: "tsp", category: "Pantry" },
+        ],
+        instructions: [
+          "Add yogurt to a bowl.",
+          "Top with oats, berries, and chia seeds.",
+          "Drizzle honey if desired and serve.",
+        ],
+        calories: 375,
+        protein: 32,
+        carbs: 50,
+        fat: 7,
+        fiber: 11,
+        mealSlots: ["breakfast", "snack"],
+      },
     ],
   },
   {
@@ -1921,4 +1967,54 @@ export const recipeLibrary: Recipe[] = [
       "Generic sugar-sweetened beverage — use soda, juice, or a similar sweetened drink.",
     ],
   },
+  {
+    id: "bev-water",
+    number: 39,
+    name: "Water",
+    cuisine: "american",
+    tags: ["beverage", "whole_food", "quick"],
+    mealSlots: ["breakfast", "lunch", "dinner", "snack"],
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    fiber: 0,
+    prepMinutes: 0,
+    cookMinutes: 0,
+    servingWeightGrams: 237,
+    cookStyle: "assembled",
+    ingredients: [
+      { name: "Water", quantity: 1, unit: "cup", category: "Pantry" },
+    ],
+    instructions: [
+      "Pour 1 cup (8 fl oz) per adult serving. Child servings are smaller automatically.",
+      "Serve cold or room temperature.",
+    ],
+  },
+  {
+    id: "bev-diet-beverage",
+    number: 40,
+    name: "Diet beverage",
+    cuisine: "american",
+    tags: ["beverage", "quick"],
+    mealSlots: ["breakfast", "lunch", "dinner", "snack"],
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    fiber: 0,
+    prepMinutes: 0,
+    cookMinutes: 0,
+    servingWeightGrams: 355,
+    cookStyle: "assembled",
+    ingredients: [
+      { name: "Diet beverage (zero-calorie soda, sparkling water, or similar)", quantity: 12, unit: "fl oz", category: "Pantry" },
+    ],
+    instructions: [
+      "One 12 fl oz serving per adult. Child servings are smaller automatically.",
+      "Zero-calorie diet soda, flavored sparkling water, or a similar diet drink.",
+    ],
+  },
 ];
+
+export const recipeLibrary: Recipe[] = [...baseRecipeLibrary, ...snackRecipes];

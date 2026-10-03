@@ -6,9 +6,11 @@ import {
   slotsForMealsPerDay,
   type GenerateOptions,
 } from "@/utils/generateDayPlan";
+import { recipeFitsSlot } from "@/utils/planningPrefs";
 import { recipeExcludedByDislikeChips } from "@/utils/chipMatching";
-import { isMealPrepFriendly } from "@/utils/mealPrep";
+import { recipeHasMealPrepOption } from "@/utils/mealPrep";
 import { createPlannedMeal, resolveRecipeMacros } from "@/utils/recipeDisplay";
+import { pickPreferredVariationId } from "@/utils/variationPrefs";
 
 function spreadDayIndices(totalDays: number, count: number): number[] {
   if (count <= 0 || totalDays <= 0) return [];
@@ -22,7 +24,7 @@ function spreadDayIndices(totalDays: number, count: number): number[] {
 }
 
 function mealPrepBoost(recipe: Recipe): number {
-  return isMealPrepFriendly(recipe) ? 25 : 0;
+  return recipeHasMealPrepOption(recipe) ? 25 : 0;
 }
 
 export function pickWeeklyPrepRecipe(
@@ -33,7 +35,7 @@ export function pickWeeklyPrepRecipe(
 ): Recipe | undefined {
   let pool = recipes.filter(
     (r) =>
-      r.mealSlots.includes(slot) &&
+      recipeFitsSlot(r, slot) &&
       !excludeIds.has(r.id) &&
       !options.dislikedIds.includes(r.id) &&
       !r.tags.includes("beverage") &&
@@ -87,7 +89,7 @@ export function applyWeeklyMealPrepToPlans(
     typeof crypto !== "undefined" && crypto.randomUUID
       ? crypto.randomUUID()
       : `batch-${Date.now()}`;
-  const slotOrder = slotsForMealsPerDay(profile.mealsPerDay);
+  const slotOrder = slotsForMealsPerDay(profile);
   const next = { ...dailyPlans };
 
   prepKeys.forEach((dateKey, index) => {
@@ -96,7 +98,16 @@ export function applyWeeklyMealPrepToPlans(
     const otherCals = withoutSlot.reduce((s, m) => s + m.recipe.calories * m.scale, 0);
     const slotBudget = Math.max(300, calorieTarget - otherCals);
     let scale = 1;
-    const recipeCals = resolveRecipeMacros(recipe).calories;
+    const variationId =
+      recipe.variationDetails?.find((v) => v.mealPrep === true)?.id ??
+      pickPreferredVariationId(
+        recipe,
+        slot,
+        options.dislikedChips,
+        options.dislikedCustom,
+        options.snackStyle,
+      );
+    const recipeCals = resolveRecipeMacros(recipe, variationId).calories;
     if (recipeCals > 0) {
       scale = slotBudget / recipeCals;
       scale = Math.min(1.5, Math.max(0.75, scale));
@@ -104,6 +115,7 @@ export function applyWeeklyMealPrepToPlans(
     }
     const meal = createPlannedMeal(slot, recipe, {
       scale,
+      selectedVariationId: variationId,
       mealPrep: {
         batchId,
         portionsCooked: prepKeys.length,

@@ -31,6 +31,8 @@ const SLOT_DEFAULT_MACROS: Record<MealSlotId, { calories: number; protein: numbe
   lunch: { calories: 520, protein: 38, carbs: 48, fat: 16 },
   dinner: { calories: 560, protein: 42, carbs: 50, fat: 18 },
   snack: { calories: 220, protein: 18, carbs: 20, fat: 8 },
+  snack_2: { calories: 220, protein: 18, carbs: 20, fat: 8 },
+  snack_3: { calories: 220, protein: 18, carbs: 20, fat: 8 },
 };
 
 function hasMacroInput(n: number | null | undefined): n is number {
@@ -121,7 +123,7 @@ export function buildUserRecipe(
     name,
     cuisine: "Personal",
     tags: ["personal", ...draft.tags.map((t) => t.trim().toLowerCase().replace(/\s+/g, "_")).filter(Boolean)],
-    mealSlots: [draft.mealSlot],
+    mealSlots: [draft.mealSlot === "snack_2" || draft.mealSlot === "snack_3" ? "snack" : draft.mealSlot],
     calories,
     protein,
     carbs,

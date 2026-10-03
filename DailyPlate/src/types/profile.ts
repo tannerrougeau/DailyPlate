@@ -1,4 +1,4 @@
-import type { MealSlotId } from "@/types";
+import type { KitchenEquipmentId, MealSlotId, RecipeMealSlotId } from "@/types";
 import type { HouseholdPreset } from "@/utils/household";
 
 export type { HouseholdPreset };
@@ -7,16 +7,29 @@ export type WeeklyMealPrepRepeatCount = 2 | 3 | 4;
 
 export type BiologicalSex = "male" | "female" | "unspecified";
 
-/** Relative plate size. Children default smaller than adults. */
+/** @deprecated Use OtherAdultSize / ChildAgeBand. Kept to migrate older saves. */
 export type PersonSize = "small" | "medium" | "large";
 
 export type HouseholdMemberKind = "adult" | "child";
 
+/** Other adults vs the user. Default similar (1.0 × maintenance base). */
+export type OtherAdultSize = "smaller" | "similar" | "larger";
+
+/** Child age band. Default 4–8 (0.6 × maintenance base). */
+export type ChildAgeBand = "1_3" | "4_8" | "9_13" | "14_18";
+
 /** Optional per-person details for household portioning. */
 export interface HouseholdMember {
   kind: HouseholdMemberKind;
+  /** Other adults only. Owner (first adult) ignores this. */
+  adultSize?: OtherAdultSize | null;
+  /** Children only. Null means not set — use 4–8. */
+  childAgeBand?: ChildAgeBand | null;
+  /** @deprecated Migrated onto adultSize. */
   size?: PersonSize | null;
+  /** @deprecated Migrated onto childAgeBand. */
   age?: number | null;
+  /** @deprecated No longer used. */
   sex?: BiologicalSex | null;
 }
 
@@ -32,6 +45,14 @@ export type ActivityLevel = "sedentary" | "light" | "moderate" | "very";
 /** Remaining daily macros after protein target is met. */
 export type MacroSplitPreference = "balanced" | "higher_carb" | "lower_carb";
 
+export type ProteinPreference = "less" | "recommended" | "more";
+
+export type IngredientVariety = "minimal" | "varied";
+
+export type SnackStyle = "whole_food" | "packaged" | "both";
+
+export type { KitchenEquipmentId };
+
 export interface UserProfile {
   age: number;
   sex: BiologicalSex;
@@ -39,6 +60,26 @@ export interface UserProfile {
   weightKg: number;
   goal: MainGoal;
   mealsPerDay: MealsPerDay;
+  /** Which of breakfast / lunch / dinner they eat. */
+  eatenMeals?: RecipeMealSlotId[];
+  /** Extra snacks per day (0–3). */
+  snacksPerDay?: number;
+  /** Protein target style. Default recommended (goal-linked g/kg). */
+  proteinPreference?: ProteinPreference | null;
+  /** Grocery trips per week. Default 1. */
+  shoppingTripsPerWeek?: number;
+  /** Distinct cook events per week. Default 4 (the 3–5 band). */
+  cookingEventsPerWeek?: number;
+  /** Days in a row they will eat the same leftovers. Default 3. */
+  maxLeftoverStreakDays?: number;
+  /** Overlapping ingredients vs more variety. Default minimal. */
+  ingredientVariety?: IngredientVariety;
+  /** Cap on prep+cook minutes per cook event. */
+  maxPrepMinutes?: number | null;
+  snackStyle?: SnackStyle;
+  preferredProteinSources?: string[];
+  avoidedProteinSources?: string[];
+  kitchenEquipment?: KitchenEquipmentId[];
   mealTiming: MealTimingPreference | null;
   favoriteFoodChips: string[];
   dislikedFoodChips: string[];
@@ -60,8 +101,11 @@ export interface UserProfile {
   householdAdults?: number;
   /** Child count 0–6 for grocery / serving scale (children default smaller than adults). */
   householdChildren?: number;
-  /** Optional per-person size/age/gender. Length should match adults + children. */
+  /** Optional per-person adult size / child age band. Length should match adults + children. */
   householdMembers?: HouseholdMember[];
+  /** Household-wide allergies or dislikes, merged into generator exclusions. */
+  householdFoodAvoidChips?: string[];
+  householdFoodAvoidCustom?: string;
   /** How to allocate calories after protein (default balanced). */
   macroSplitPreference?: MacroSplitPreference | null;
   /** User-provided maintenance TDEE (kcal); overrides formula when set. */

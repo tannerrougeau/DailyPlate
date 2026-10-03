@@ -8,12 +8,14 @@ import {
 } from "@/utils/generateDayPlan";
 import { recipeExcludedByDislikeChips } from "@/utils/chipMatching";
 import { isMealLocked } from "@/utils/mealLocks";
+import {
+  cookingEventsPerWeek,
+  leftoverStreakDays,
+  recipeFitsSlot,
+} from "@/utils/planningPrefs";
 import { createPlannedMeal, resolveRecipeMacros } from "@/utils/recipeDisplay";
 
 const MAIN_SLOTS: MealSlotId[] = ["lunch", "dinner"];
-const MIN_COOK_EVENTS = 3;
-const MAX_COOK_EVENTS = 5;
-const MAX_LEFTOVERS_PER_COOK = 3;
 
 type SlotPosition = { dateKey: string; slot: MealSlotId };
 
@@ -66,7 +68,7 @@ function setMealAtSlot(
   const scale =
     existingScale ?? scaleForSlotBudget(recipe, otherCals, calorieTarget);
   const meal = createPlannedMeal(slot, recipe, { scale, mealPrep });
-  const slotOrder = slotsForMealsPerDay(profile.mealsPerDay);
+  const slotOrder = slotsForMealsPerDay(profile);
   return {
     ...dailyPlans,
     [dateKey]: [...withoutSlot, meal].sort(
@@ -87,7 +89,7 @@ export function pickLowComplexityRecipe(
 ): Recipe | undefined {
   const pool = recipes.filter(
     (r) =>
-      r.mealSlots.includes(slot) &&
+      recipeFitsSlot(r, slot) &&
       !excludeIds.has(r.id) &&
       !options.dislikedIds.includes(r.id) &&
       !r.tags.includes("beverage") &&
@@ -125,7 +127,7 @@ function simplifyBreakfasts(
   calorieTarget: number,
   recipes: Recipe[] = recipeLibrary,
 ): Record<string, PlannedMeal[]> {
-  const slotOrder = slotsForMealsPerDay(profile.mealsPerDay);
+  const slotOrder = slotsForMealsPerDay(profile);
   if (!slotOrder.includes("breakfast")) return dailyPlans;
 
   const usedIds = new Set<string>();
@@ -182,9 +184,11 @@ function assignCookGroups(
   if (positions.length === 0) return dailyPlans;
 
   let next = { ...dailyPlans };
+  const leftoverCap = leftoverStreakDays(profile);
+  const cookTarget = cookingEventsPerWeek(profile);
   const cookCount = Math.min(
-    MAX_COOK_EVENTS,
-    Math.max(MIN_COOK_EVENTS, Math.ceil(positions.length / 3)),
+    cookTarget,
+    Math.max(2, Math.ceil(positions.length / leftoverCap)),
   );
   const cookIndices = spreadIndices(positions.length, cookCount);
   const assigned = new Set<number>();
@@ -205,7 +209,7 @@ function assignCookGroups(
     assigned.add(cookIdx);
 
     let leftoverCount = 0;
-    for (let i = cookIdx + 1; i < positions.length && leftoverCount < MAX_LEFTOVERS_PER_COOK; i++) {
+    for (let i = cookIdx + 1; i < positions.length && leftoverCount < leftoverCap; i++) {
       if (assigned.has(i)) continue;
       if (positions[i]!.slot !== cookPos.slot) continue;
       groupIndices.push(i);
@@ -304,7 +308,7 @@ export function applyLowComplexityFromDay(
     const batchId = newBatchId();
     const leftoverKeys = eligibleWeekKeys.slice(
       cookDayIdx + 1,
-      cookDayIdx + 1 + MAX_LEFTOVERS_PER_COOK,
+      cookDayIdx + 1 + leftoverStreakDays(profile),
     );
     const portionsCooked = 1 + leftoverKeys.length;
 

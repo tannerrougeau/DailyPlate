@@ -52,6 +52,18 @@ export function dateKeysForRange(start: Date, dayCount: number): string[] {
   return Array.from({ length: n }, (_, i) => toDateKey(addDays(start, i)));
 }
 
+export function dateKeysInclusive(a: string, b: string): string[] {
+  const startKey = a < b ? a : b;
+  const endKey = a < b ? b : a;
+  const keys: string[] = [];
+  let cursor = fromDateKey(startKey);
+  while (toDateKey(cursor) <= endKey) {
+    keys.push(toDateKey(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return keys;
+}
+
 export function previousWeekStart(today = new Date()): Date {
   return startOfWeek(addDays(today, -7));
 }

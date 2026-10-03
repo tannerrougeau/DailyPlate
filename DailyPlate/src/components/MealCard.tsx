@@ -14,33 +14,36 @@ import { ReplaceMealSheet } from "@/components/ReplaceMealSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
 import { RecipeImage } from "@/components/RecipeImage";
 import { SwipeableRow } from "@/components/SwipeableRow";
-import type { CarbVariationId, FatVariationId, MealSlotId, MealTrackingEntry, PlannedMeal } from "@/types";
+import type { BeverageId, CarbVariationId, FatVariationId, MealSlotId, MealTrackingEntry, PlannedMeal } from "@/types";
+import {
+  BEVERAGES,
+  beverageOptionLabel,
+  mealMacrosWithBeverage,
+  plannedMealFoodScale,
+  resolveBeverage,
+} from "@/utils/beverages";
 import { useAppStore } from "@/store/useAppStore";
 import { isMealLocked } from "@/utils/mealLocks";
-import { countsFromOverride, householdMultiplierFor } from "@/utils/household";
+import {
+  countsFromOverride,
+  formatHouseholdServesLine,
+  householdMultiplierFor,
+} from "@/utils/household";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import {
-  assembledServingGuidance,
   effectiveCarbVariationId,
   effectiveFatVariationId,
   effectiveVariationId,
-  formatPersonServingWeights,
   mealDisplayName,
-  mixedPersonServingWeights,
-  recipeIsMixedBatch,
-  recipeFiberGrams,
-  resolveRecipeMacros,
 } from "@/utils/recipeDisplay";
 import { MealMacroLine } from "@/components/MealMacroLine";
 import { trackingBadgeClass, trackingLabel } from "@/utils/mealTracking";
+import { variationIsMealPrep } from "@/utils/mealPrep";
 import { isLowComplexityLeftover, isMealPrepBatchBadge } from "@/utils/mealPrepDisplay";
 
-const slotLabel: Record<PlannedMeal["slot"], string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack",
-};
+import { SLOT_LABELS } from "@/utils/planningPrefs";
+
+const slotLabel = SLOT_LABELS;
 
 function tagLine(recipe: PlannedMeal["recipe"]) {
   const extra = recipe.tags[0]?.replace(/_/g, " ") ?? "balanced";
@@ -69,7 +72,7 @@ export function MealCard({
 }: {
   meal: PlannedMeal;
   dateKey?: string;
-  onMealPrep?: (recipe: PlannedMeal["recipe"]) => void;
+  onMealPrep?: (recipe: PlannedMeal["recipe"], variationId?: string) => void;
   draggable?: boolean;
   isDragOver?: boolean;
   onDragStart?: (event: React.DragEvent) => void;
@@ -86,7 +89,7 @@ export function MealCard({
   onEaten?: () => void;
   onSkip?: () => void;
 }) {
-  const { recipe, scale, slot } = meal;
+  const { recipe, slot } = meal;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
@@ -128,6 +131,7 @@ export function MealCard({
   const setMealVariation = useAppStore((s) => s.setMealVariation);
   const setMealCarbVariation = useAppStore((s) => s.setMealCarbVariation);
   const setMealFatVariation = useAppStore((s) => s.setMealFatVariation);
+  const setMealBeverage = useAppStore((s) => s.setMealBeverage);
 
   const effectiveDateKey = dateKey ?? todayDateKey;
   const dayLocked = lockedDays.includes(effectiveDateKey);
@@ -146,38 +150,16 @@ export function MealCard({
       : null;
   const householdMult = householdMultiplierFor(userProfile, householdCounts);
 
-  const displayVariationId = effectiveVariationId(meal);
-  const displayCarbId = effectiveCarbVariationId(meal);
-  const displayFatId = effectiveFatVariationId(meal);
-  const macros = resolveRecipeMacros(recipe, displayVariationId, displayCarbId);
+  const macros = mealMacrosWithBeverage(meal);
+  const foodScale = plannedMealFoodScale(meal);
   const fav = favoriteIds.includes(recipe.id);
   const dislike = dislikedIds.includes(recipe.id);
-  const kcal = Math.round(macros.calories * scale);
-  const protein = Math.round(macros.protein * scale);
-  const carbs = Math.round(macros.carbs * scale);
-  const fat = Math.round(macros.fat * scale);
-  const fiber = Math.round(
-    recipeFiberGrams(recipe, displayVariationId, displayCarbId) * scale,
-  );
-  const servingLine = recipeIsMixedBatch(recipe)
-    ? formatPersonServingWeights(
-        mixedPersonServingWeights(recipe, {
-          meal,
-          mealScale: scale,
-          profile: userProfile,
-          countsOverride: householdCounts,
-          targets,
-        }),
-        true,
-      )
-    : assembledServingGuidance(recipe, {
-        variationId: displayVariationId,
-        carbVariationId: displayCarbId,
-        fatVariationId: displayFatId,
-        mealScale: scale,
-        profile: userProfile,
-        countsOverride: householdCounts,
-      });
+  const kcal = Math.round(macros.calories);
+  const protein = Math.round(macros.protein);
+  const carbs = Math.round(macros.carbs);
+  const fat = Math.round(macros.fat);
+  const fiber = Math.round(macros.fiber ?? 0);
+  const servingLine = formatHouseholdServesLine(userProfile, householdCounts);
 
   function handleVariationChange(nextVariationId: string) {
     setVariationId(nextVariationId);
@@ -215,6 +197,8 @@ export function MealCard({
         fat={fat}
         fiber={fiber}
         servingLine={servingLine}
+        beverageId={resolveBeverage(meal.beverageId).id}
+        onBeverageChange={(id) => setMealBeverage(effectiveDateKey, slot, id)}
         trackingEntry={trackingEntry}
         showEatenSkip={showEatenSkip}
         onEaten={onEaten}
@@ -362,7 +346,7 @@ export function MealCard({
                 onCarbVariationChange={handleCarbVariationChange}
                 fatVariationId={fatVariationId}
                 onFatVariationChange={handleFatVariationChange}
-                mealScale={scale}
+                mealScale={foodScale}
                 householdMult={householdMult}
                 userProfile={userProfile}
                 countsOverride={householdCounts}
@@ -395,7 +379,11 @@ export function MealCard({
             onAddNote={onAddNote ?? onTrackTap}
             onToggleFavorite={() => toggleFavorite(recipe.id)}
             onToggleLock={() => toggleMealLock(effectiveDateKey, slot)}
-            onMealPrep={onMealPrep ? () => onMealPrep(recipe) : undefined}
+            onMealPrep={
+              onMealPrep && variationIsMealPrep(recipe, variationId)
+                ? () => onMealPrep(recipe, variationId)
+                : undefined
+            }
             onDetails={
               inlineDetailsDropdown ? undefined : () => setDetailsOpen(true)
             }
@@ -429,6 +417,8 @@ function MealCardMainContent({
   fat,
   fiber,
   servingLine,
+  beverageId,
+  onBeverageChange,
   trackingEntry,
   showEatenSkip,
   onEaten,
@@ -444,6 +434,8 @@ function MealCardMainContent({
   fat: number;
   fiber: number;
   servingLine: string | null;
+  beverageId: BeverageId;
+  onBeverageChange: (id: BeverageId) => void;
   trackingEntry?: MealTrackingEntry;
   showEatenSkip?: boolean;
   onEaten?: () => void;
@@ -497,6 +489,25 @@ function MealCardMainContent({
       {servingLine && (
         <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-slate-500">{servingLine}</p>
       )}
+      <label className="mt-1.5 flex min-w-0 items-center gap-1 text-[11px] leading-snug text-slate-600">
+        <span className="shrink-0 font-medium text-slate-500">Drink:</span>
+        <select
+          value={beverageId}
+          aria-label="Drink"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            e.stopPropagation();
+            onBeverageChange(e.target.value as BeverageId);
+          }}
+          className="min-w-0 flex-1 truncate rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[11px] font-medium text-slate-700"
+        >
+          {BEVERAGES.map((drink) => (
+            <option key={drink.id} value={drink.id}>
+              {beverageOptionLabel(drink)}
+            </option>
+          ))}
+        </select>
+      </label>
       {showEatenSkip && (
         <div className="mt-2.5 flex gap-1.5">
           <button

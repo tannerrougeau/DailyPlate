@@ -2,6 +2,13 @@ import type { MainGoal, UserProfile } from "@/types/profile";
 import type { CalorieRecommendation, CheckInEntry } from "@/types/tdeeFeedback";
 import { MIN_FEEDBACK_FOR_ADAPTIVE, MIN_WEEKS_FOR_ADAPTIVE } from "@/types/tdeeFeedback";
 import { weightToKg, type WeightUnit } from "@/utils/bodyMeasurements";
+import {
+  CHECK_IN_SCALE_MAX,
+  checkInScale,
+  isHighScore,
+  isLowScore,
+  isMidLowScore,
+} from "@/utils/checkInScale";
 import { computeDailyTargets, computeFormulaTdee } from "@/utils/tdee";
 
 const KCAL_PER_KG = 7700;
@@ -54,10 +61,10 @@ function goalCalorieDelta(goal: MainGoal): number {
 function estimateIntervalTdee(
   periodDays: number,
   calorieTarget: number,
-  adherence10: number,
+  adherence: number,
   weightDeltaKg: number,
 ): number {
-  const avgIntake = calorieTarget * (adherence10 / 10);
+  const avgIntake = calorieTarget * (adherence / CHECK_IN_SCALE_MAX);
   const dailyEnergyBalance = (-weightDeltaKg * KCAL_PER_KG) / periodDays;
   return avgIntake + dailyEnergyBalance;
 }
@@ -77,7 +84,7 @@ export function estimateDataDrivenTdee(history: CheckInEntry[]): number | null {
     const tdee = estimateIntervalTdee(
       days,
       curr.calorieTargetAtSubmit,
-      curr.calorieAdherence,
+      checkInScale(curr, "calorieAdherence"),
       deltaKg,
     );
     if (Number.isFinite(tdee) && tdee >= 1200 && tdee <= 6000) {
@@ -104,7 +111,13 @@ function questionnaireCalorieNudge(
     entry.weightChangeUnit,
   );
 
-  if (entry.energyLevel <= 4) {
+  const energy = checkInScale(entry, "energyLevel");
+  const calorieAdherence = checkInScale(entry, "calorieAdherence");
+  const proteinAdherence = checkInScale(entry, "proteinAdherence");
+  const sleepQuality = checkInScale(entry, "sleepQuality");
+  const strengthProgress = checkInScale(entry, "strengthProgress");
+
+  if (isLowScore(energy)) {
     if (weightKg < -0.2) {
       delta += 100;
       reasons.push("Low energy with weight loss — a modest calorie bump may help recovery.");
@@ -114,12 +127,12 @@ function questionnaireCalorieNudge(
     }
   }
 
-  if (entry.calorieAdherence >= 8 && entry.weightChangeDirection === "same" && goal === "lose") {
+  if (isHighScore(calorieAdherence) && entry.weightChangeDirection === "same" && goal === "lose") {
     delta -= 75;
     reasons.push("Strong adherence with little weight change — a small reduction may restart progress.");
   }
 
-  if (entry.calorieAdherence <= 4) {
+  if (isLowScore(calorieAdherence)) {
     reasons.push("Adherence was lower this period — focus on consistency before large target changes.");
   }
 
@@ -131,19 +144,19 @@ function questionnaireCalorieNudge(
     reasons.push("Activity decreased — a slightly lower target may match current burn.");
   }
 
-  if (entry.sleepQuality <= 4) {
+  if (isLowScore(sleepQuality)) {
     reasons.push("Sleep was low — recovery can affect scale weight and hunger; be gentle with big cuts.");
   }
 
-  if (entry.proteinAdherence <= 5) {
+  if (isMidLowScore(proteinAdherence)) {
     reasons.push("Protein adherence was moderate — hitting protein supports muscle and satiety.");
-  } else if (entry.proteinAdherence >= 8) {
+  } else if (isHighScore(proteinAdherence)) {
     reasons.push("Strong protein adherence — great for preserving lean mass.");
   }
 
-  if (entry.strengthProgress >= 8) {
+  if (isHighScore(strengthProgress)) {
     reasons.push("Training progress looked solid — keep protein up as you adjust calories.");
-  } else if (entry.strengthProgress <= 4) {
+  } else if (isLowScore(strengthProgress)) {
     reasons.push("Training felt tougher — energy and sleep may be limiting factors.");
   }
 

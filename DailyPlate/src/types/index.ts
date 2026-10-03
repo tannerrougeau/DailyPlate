@@ -1,4 +1,16 @@
-export type MealSlotId = "breakfast" | "lunch" | "dinner" | "snack";
+export type RecipeMealSlotId = "breakfast" | "lunch" | "dinner" | "snack";
+export type MealSlotId = RecipeMealSlotId | "snack_2" | "snack_3";
+
+export type KitchenEquipmentId =
+  | "oven"
+  | "stovetop"
+  | "microwave"
+  | "air_fryer"
+  | "slow_cooker"
+  | "instant_pot"
+  | "grill"
+  | "blender"
+  | "toaster_oven";
 
 /** Lower-calorie swap for white rice in rice-based recipes. */
 export type CarbVariationId = "white-rice" | "riced-cauliflower" | "riced-broccoli";
@@ -30,6 +42,13 @@ export interface RecipeVariationDetail {
   protein?: number;
   carbs?: number;
   fat?: number;
+  fiber?: number;
+  /** When true, this variation replaces recipe.ingredients/instructions instead of adding to them. */
+  replaceBase?: boolean;
+  /** Slot tags for this build. Omitted = inherit the recipe's mealSlots. */
+  mealSlots?: RecipeMealSlotId[];
+  /** When set, overrides recipe-level meal-prep eligibility for this build. */
+  mealPrep?: boolean;
   /** Per-serving weight (grams) for this variation when known. */
   servingWeightGrams?: number;
 }
@@ -40,7 +59,9 @@ export interface Recipe {
   name: string;
   cuisine: string;
   tags: string[];
-  mealSlots: MealSlotId[];
+  mealSlots: RecipeMealSlotId[];
+  /** Tools this recipe needs. Omitted = any basic kitchen is fine. */
+  equipment?: KitchenEquipmentId[];
   calories: number;
   protein: number;
   carbs: number;
@@ -65,6 +86,8 @@ export interface Recipe {
   mealPrepNotes?: string;
   /** Custom photo path under /public (e.g. /recipes/my-dish.png). */
   imageUrl?: string;
+  /** Extra search terms (e.g. a former name) so filters still find the recipe. */
+  searchAliases?: string[];
   /**
    * mixed = cooked together (show combined batch weight).
    * assembled = parts cooked separately (serving lines, no mixed weight).
@@ -86,6 +109,14 @@ export interface MealPrepInfo {
   cookDateKey?: string;
 }
 
+export type BeverageId =
+  | "water"
+  | "diet"
+  | "milk"
+  | "fat_free_milk"
+  | "sweetened"
+  | "none";
+
 export interface PlannedMeal {
   slot: MealSlotId;
   recipe: Recipe;
@@ -97,6 +128,8 @@ export interface PlannedMeal {
   selectedCarbVariationId?: CarbVariationId;
   /** Olive oil (default) or butter for cooking fat. */
   selectedFatVariationId?: FatVariationId;
+  /** Drink on this meal card. Default water. */
+  beverageId?: BeverageId;
 }
 
 export interface DailyTargets {

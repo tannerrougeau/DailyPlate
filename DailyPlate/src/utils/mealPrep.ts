@@ -6,10 +6,44 @@ export const MEAL_PREP_PORTION_PRESETS = [2, 4, 6, 8] as const;
 export const DEFAULT_MEAL_PREP_NOTES =
   "Cool completely before storing. Refrigerate up to 4 days in airtight containers. Reheat to 165°F / 74°C. Freeze up to 3 months; thaw overnight in the fridge before reheating.";
 
-export function isMealPrepFriendly(recipe: Recipe): boolean {
+function recipeHasMealPrepTag(recipe: Recipe): boolean {
   return recipe.tags.some(
     (t) => t === "meal_prep" || t === "batch_friendly" || t === "meal_prep_friendly",
   );
+}
+
+export function variationIsMealPrep(recipe: Recipe, variationId?: string): boolean {
+  const details = recipe.variationDetails ?? [];
+  const id = variationId ?? details[0]?.id;
+  const variation = details.find((v) => v.id === id);
+  if (variation && typeof variation.mealPrep === "boolean") return variation.mealPrep;
+  return recipeHasMealPrepTag(recipe);
+}
+
+/** True when this recipe can be batch-prepped as at least one variation. */
+export function recipeHasMealPrepOption(recipe: Recipe): boolean {
+  if (recipe.variationDetails?.some((v) => v.mealPrep === true)) return true;
+  return recipeHasMealPrepTag(recipe);
+}
+
+export function isMealPrepFriendly(recipe: Recipe, variationId?: string): boolean {
+  if (recipe.variationDetails?.some((v) => typeof v.mealPrep === "boolean")) {
+    return variationIsMealPrep(recipe, variationId);
+  }
+  return recipeHasMealPrepTag(recipe);
+}
+
+/** Variation to persist when cooking leftovers. Prefers the selected meal-prep build. */
+export function resolveMealPrepVariationId(
+  recipe: Recipe,
+  variationId?: string,
+): string | undefined {
+  if (variationIsMealPrep(recipe, variationId)) {
+    const details = recipe.variationDetails ?? [];
+    const id = variationId ?? details[0]?.id;
+    if (id && details.some((v) => v.id === id)) return id;
+  }
+  return recipe.variationDetails?.find((v) => v.mealPrep === true)?.id;
 }
 
 export function resolveMealPrepNotes(recipe: Recipe): string | null {

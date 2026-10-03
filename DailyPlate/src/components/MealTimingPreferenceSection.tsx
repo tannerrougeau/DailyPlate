@@ -1,4 +1,7 @@
+import { useEffect } from "react";
+import type { RecipeMealSlotId } from "@/types";
 import type { MealTimingPreference } from "@/types/profile";
+import { isMealTimingAllowed } from "@/utils/planningPrefs";
 
 export const MEAL_TIMING_OPTIONS: { id: MealTimingPreference; label: string; hint: string }[] = [
   { id: "light_breakfast", label: "Light breakfast", hint: "Smaller AM meals, calories later" },
@@ -9,20 +12,28 @@ export const MEAL_TIMING_OPTIONS: { id: MealTimingPreference; label: string; hin
 export function MealTimingPreferenceSection({
   value,
   onChange,
+  eatenMeals,
 }: {
   value: MealTimingPreference | null;
   onChange: (value: MealTimingPreference | null) => void;
+  eatenMeals: RecipeMealSlotId[];
 }) {
+  const options = MEAL_TIMING_OPTIONS.filter((o) => isMealTimingAllowed(o.id, eatenMeals));
+
+  useEffect(() => {
+    if (!isMealTimingAllowed(value, eatenMeals)) onChange(null);
+  }, [value, eatenMeals, onChange]);
+
   return (
     <section className="space-y-3">
       <div>
         <h3 className="text-base font-semibold text-slate-900">Meal timing</h3>
         <p className="mt-1 text-sm text-slate-600">
-          Where you prefer calories across breakfast, lunch, and dinner.
+          Where you prefer calories across the meals you eat.
         </p>
       </div>
       <div className="flex flex-col gap-2">
-        {MEAL_TIMING_OPTIONS.map((o) => (
+        {options.map((o) => (
           <button
             key={o.id}
             type="button"

@@ -55,11 +55,13 @@ export function resolveVariationId(
 ): string | undefined {
   const baseId = defaultVariationId(recipe);
   if (!baseId) return selectedVariationId;
+  const mappedId =
+    selectedVariationId === "premier-packaged" ? "rtd-packaged" : selectedVariationId;
   if (
-    selectedVariationId &&
-    recipe.variationDetails?.some((v) => v.id === selectedVariationId)
+    mappedId &&
+    recipe.variationDetails?.some((v) => v.id === mappedId)
   ) {
-    return selectedVariationId;
+    return mappedId;
   }
   return baseId;
 }
@@ -106,8 +108,9 @@ export function fatVariationLabels(
 
 function rawRecipeIngredients(recipe: Recipe, variationId?: string): RecipeIngredient[] {
   const v = getVariationDetail(recipe, variationId);
-  if (v) return [...recipe.ingredients, ...v.ingredients];
-  return recipe.ingredients;
+  if (!v) return recipe.ingredients;
+  if (v.replaceBase) return v.ingredients;
+  return [...recipe.ingredients, ...v.ingredients];
 }
 
 export function createPlannedMeal(
@@ -121,6 +124,9 @@ export function createPlannedMeal(
     scale: partial?.scale ?? 1,
     mealPrep: partial?.mealPrep,
     selectedVariationId: partial?.selectedVariationId ?? defaultVariationId(recipe),
+    selectedCarbVariationId: partial?.selectedCarbVariationId,
+    selectedFatVariationId: partial?.selectedFatVariationId,
+    beverageId: partial?.beverageId,
   };
 }
 
@@ -150,6 +156,10 @@ export function recipeFiberGrams(
   carbVariationId?: CarbVariationId,
   fatVariationId?: FatVariationId,
 ): number {
+  const v = getVariationDetail(recipe, variationId);
+  if (typeof v?.fiber === "number" && Number.isFinite(v.fiber)) {
+    return Math.max(0, v.fiber);
+  }
   const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
   const fromIngredients = estimateFiberFromIngredients(ingredients);
   if (fromIngredients > 0) return fromIngredients;
@@ -195,7 +205,11 @@ export function resolveRecipeInstructions(
   fatVariationId?: FatVariationId,
 ): string[] {
   const v = getVariationDetail(recipe, variationId);
-  const base = v ? [...recipe.instructions, ...v.instructions] : recipe.instructions;
+  const base = v
+    ? v.replaceBase
+      ? v.instructions
+      : [...recipe.instructions, ...v.instructions]
+    : recipe.instructions;
   const raw = rawRecipeIngredients(recipe, variationId);
   const carb = resolveCarbVariationId(carbVariationId);
   const afterCarb = recipeIngredientsIncludeRice(raw)

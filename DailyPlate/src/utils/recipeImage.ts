@@ -1,9 +1,11 @@
 import type { MealSlotId, Recipe } from "@/types";
 import { recipeLibrary } from "@/recipes/recipeLibrary";
+import { RECIPE_MIGRATIONS } from "@/utils/recipeMigration";
 
 /** Use the current library recipe so persisted meal snapshots get up-to-date photos. */
 export function resolveRecipeForDisplay(recipe: Recipe): Recipe {
-  return recipeLibrary.find((r) => r.id === recipe.id) ?? recipe;
+  const targetId = RECIPE_MIGRATIONS[recipe.id]?.recipeId ?? recipe.id;
+  return recipeLibrary.find((r) => r.id === targetId) ?? recipe;
 }
 
 /** Curated Unsplash food photography — stable, high-quality thumbnails. */
@@ -30,6 +32,18 @@ const SLOT_IMAGES: Record<MealSlotId, string[]> = {
     "photo-1565557623262-b51c2513a641",
   ],
   snack: [
+    "photo-1613478223719-0ab772a0e7c8",
+    "photo-1606312619070-d48aeb4cdbf6",
+    "photo-1590301157890-4810ed352733",
+    "photo-1488477181946-6428a0291777",
+  ],
+  snack_2: [
+    "photo-1613478223719-0ab772a0e7c8",
+    "photo-1606312619070-d48aeb4cdbf6",
+    "photo-1590301157890-4810ed352733",
+    "photo-1488477181946-6428a0291777",
+  ],
+  snack_3: [
     "photo-1613478223719-0ab772a0e7c8",
     "photo-1606312619070-d48aeb4cdbf6",
     "photo-1590301157890-4810ed352733",
@@ -72,6 +86,8 @@ export function recipeImageGradient(recipe: Recipe): string {
     lunch: "from-emerald-100 via-teal-50 to-cyan-100",
     dinner: "from-indigo-100 via-violet-50 to-purple-100",
     snack: "from-rose-100 via-pink-50 to-fuchsia-100",
+    snack_2: "from-rose-100 via-pink-50 to-fuchsia-100",
+    snack_3: "from-rose-100 via-pink-50 to-fuchsia-100",
   };
   return gradients[slot];
 }

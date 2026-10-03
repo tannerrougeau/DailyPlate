@@ -30,7 +30,9 @@ export function RecipesScreen() {
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
-  const [mealPrepRecipe, setMealPrepRecipe] = useState<Recipe | null>(null);
+  const [mealPrep, setMealPrep] = useState<{ recipe: Recipe; variationId?: string } | null>(
+    null,
+  );
   const recipesNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.recipes);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
   const favoriteIds = useAppStore((s) => s.favoriteIds);
@@ -68,10 +70,14 @@ export function RecipesScreen() {
         <RecipeDetail
           recipe={selected}
           onBack={() => setSelected(null)}
-          onMealPrep={() => setMealPrepRecipe(selected)}
+          onMealPrep={(variationId) => setMealPrep({ recipe: selected, variationId })}
         />
-        {mealPrepRecipe && (
-          <MealPrepSheet recipe={mealPrepRecipe} onClose={() => setMealPrepRecipe(null)} />
+        {mealPrep && (
+          <MealPrepSheet
+            recipe={mealPrep.recipe}
+            variationId={mealPrep.variationId}
+            onClose={() => setMealPrep(null)}
+          />
         )}
       </>
     );
@@ -125,14 +131,14 @@ export function RecipesScreen() {
 
       {!recipesNoteDismissed && (
         <UsageNote
-          text="Browse by meal type — Drinks has Milk, Fat-free milk, and Sweetened drink. Search is A–Z by any word."
+          text="Browse by meal type. Search is A–Z by any word."
           onDismiss={() => dismissUsageNote("recipes")}
         />
       )}
 
       {/* Meal category */}
       <section aria-label="Meal category" className="mb-3 card-surface p-1.5">
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           {RECIPE_CATEGORY_TABS.map((tab) => (
             <button
               key={tab.id}
@@ -255,11 +261,6 @@ export function RecipesScreen() {
                         Yours
                       </span>
                     )}
-                    {recipe.tags.includes("beverage") && (
-                      <span className="ml-1 inline-block rounded bg-sky-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-sky-800">
-                        Drink
-                      </span>
-                    )}
                     {isMealPrepFriendly(recipe) && (
                       <span className="ml-1 inline-block rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase text-violet-800">
                         Prep
@@ -299,13 +300,14 @@ function RecipeDetail({
 }: {
   recipe: Recipe;
   onBack: () => void;
-  onMealPrep: () => void;
+  onMealPrep: (variationId?: string) => void;
 }) {
   const [variationId, setVariationId] = useState<string | undefined>(
     recipe.variationDetails?.[0]?.id,
   );
   const [carbVariationId, setCarbVariationId] = useState<CarbVariationId>("white-rice");
   const [fatVariationId, setFatVariationId] = useState<FatVariationId>("olive-oil");
+  const canMealPrep = isMealPrepFriendly(recipe, variationId);
 
   return (
     <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
@@ -320,20 +322,22 @@ function RecipeDetail({
             {recipe.cuisine} · {proteinSourceLabel(getProteinSource(recipe))} · Prep{" "}
             {recipe.prepMinutes} min · Cook {recipe.cookMinutes} min
           </p>
-          {isMealPrepFriendly(recipe) && (
+          {canMealPrep && (
             <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-900">
               <ChefHat className="h-3.5 w-3.5" aria-hidden />
               Meal prep friendly
             </span>
           )}
-          <button
-            type="button"
-            onClick={onMealPrep}
-            className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-violet-200 bg-violet-50 px-4 text-sm font-semibold text-violet-950"
-          >
-            <ChefHat className="h-5 w-5" aria-hidden />
-            Cook as Meal Prep (Make Leftovers)
-          </button>
+          {canMealPrep && (
+            <button
+              type="button"
+              onClick={() => onMealPrep(variationId)}
+              className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-violet-200 bg-violet-50 px-4 text-sm font-semibold text-violet-950"
+            >
+              <ChefHat className="h-5 w-5" aria-hidden />
+              Cook as Meal Prep (Make Leftovers)
+            </button>
+          )}
 
           <section className="mt-6">
             <RecipeDetailsBody

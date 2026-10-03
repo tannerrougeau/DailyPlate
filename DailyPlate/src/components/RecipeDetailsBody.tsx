@@ -1,28 +1,24 @@
 import { formatQty } from "@/utils/grocery";
 import {
-  formatHouseholdServingSplit,
-  resolveHouseholdCounts,
+  formatHouseholdServesLine,
   type HouseholdDayCounts,
 } from "@/utils/household";
 import {
-  assembledServingGuidance,
   carbVariationLabels,
   fatVariationLabels,
-  formatPersonServingWeights,
   getVariationDetail,
-  mixedPersonServingWeights,
-  platingNoteForHousehold,
   recipeFiberGrams,
-  recipeIsMixedBatch,
   resolveRecipeInstructions,
   resolveRecipeMacros,
   scaledIngredientsForMeal,
   shouldShowProteinAdjustNote,
-  variationLabels,
 } from "@/utils/recipeDisplay";
 import { NutritionDetails } from "@/components/NutritionDetails";
 import { MicronutrientDetails } from "@/components/MicronutrientDetails";
 import { notableMicronutrients } from "@/utils/micronutrients";
+import { variationIsMealPrep } from "@/utils/mealPrep";
+import { profileAvoidLists, visibleVariationLabels } from "@/utils/variationPrefs";
+import { useAppStore } from "@/store/useAppStore";
 import type { CarbVariationId, FatVariationId, PlannedMeal, Recipe } from "@/types";
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
@@ -39,7 +35,7 @@ export function RecipeDetailsBody({
   householdMult = 1,
   userProfile,
   countsOverride,
-  targets,
+  targets: _targets,
   meal,
   showSaveVariation,
   onSaveVariation,
@@ -60,8 +56,13 @@ export function RecipeDetailsBody({
   showSaveVariation?: boolean;
   onSaveVariation?: () => void;
 }) {
-  const labels = variationLabels(recipe);
-  const selectedId = variationId ?? labels[0]?.id;
+  const storedProfile = useAppStore((s) => s.userProfile);
+  const profile = userProfile ?? storedProfile;
+  const avoids = profileAvoidLists(profile);
+  const labels = visibleVariationLabels(recipe, avoids.chips, avoids.custom);
+  const selectedId =
+    (variationId && labels.some((v) => v.id === variationId) ? variationId : labels[0]?.id) ??
+    variationId;
   const carbLabels = carbVariationLabels(recipe, selectedId);
   const selectedCarbId = carbVariationId ?? "white-rice";
   const fatLabels = fatVariationLabels(recipe, selectedId);
@@ -73,7 +74,7 @@ export function RecipeDetailsBody({
     selectedId,
     mealScale,
     householdMult,
-    userProfile?.prioritizeMinProtein === true,
+    profile?.prioritizeMinProtein === true,
     selectedCarbId,
     selectedFatId,
   );
@@ -83,32 +84,10 @@ export function RecipeDetailsBody({
     selectedCarbId,
     selectedFatId,
   );
-  const mixedBatch = recipeIsMixedBatch(recipe);
-  const { children: childCount } = resolveHouseholdCounts(userProfile, countsOverride);
-  const platingNote = mixedBatch ? platingNoteForHousehold(userProfile, countsOverride) : null;
-  const servingGuide = assembledServingGuidance(recipe, {
-    variationId: selectedId,
-    carbVariationId: selectedCarbId,
-    fatVariationId: selectedFatId,
-    mealScale,
-    profile: userProfile,
-    countsOverride,
-  });
   const fiber = Math.round(recipeFiberGrams(recipe, selectedId, selectedCarbId) * mealScale);
-  const personWeights = mixedBatch
-    ? mixedPersonServingWeights(recipe, {
-        meal,
-        variationId: selectedId,
-        carbVariationId: selectedCarbId,
-        mealScale,
-        profile: userProfile,
-        countsOverride,
-        targets,
-      })
-    : null;
-  const weightLine = formatPersonServingWeights(personWeights);
+  const serveLine = formatHouseholdServesLine(profile, countsOverride);
   const proteinNote =
-    meal && shouldShowProteinAdjustNote(userProfile ?? null, meal);
+    meal && shouldShowProteinAdjustNote(profile ?? null, meal);
   const micros = notableMicronutrients(recipe, selectedId, mealScale);
 
   return (
@@ -194,17 +173,9 @@ export function RecipeDetailsBody({
         </div>
       )}
 
-      {weightLine && (
-        <p className="mt-3 whitespace-pre-line text-sm text-slate-600">{weightLine}</p>
+      {serveLine && (
+        <p className="mt-3 text-sm font-medium text-slate-800">{serveLine}</p>
       )}
-
-      {servingGuide && (
-        <p className="mt-3 text-sm leading-relaxed text-slate-700">{servingGuide}</p>
-      )}
-
-      <p className="mt-3 text-sm font-medium text-slate-800">
-        {formatHouseholdServingSplit(userProfile, countsOverride)}
-      </p>
 
       {proteinNote && (
         <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold leading-snug text-blue-950">
@@ -230,13 +201,12 @@ export function RecipeDetailsBody({
       </ul>
 
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
-        {platingNote && childCount > 0 && <li>{platingNote}</li>}
         {instructions.map((step, idx) => (
           <li key={idx}>{step}</li>
         ))}
       </ol>
 
-      {recipe.mealPrepNotes && (
+      {recipe.mealPrepNotes && variationIsMealPrep(recipe, selectedId) && (
         <p className="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-xs leading-relaxed text-violet-900">
           <span className="font-semibold">Meal prep:</span> {recipe.mealPrepNotes}
         </p>

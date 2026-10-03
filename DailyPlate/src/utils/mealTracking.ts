@@ -5,13 +5,8 @@ import type {
   MealTrackingStatus,
   PlannedMeal,
 } from "@/types";
+import { mealMacrosWithBeverage } from "@/utils/beverages";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
-import {
-  effectiveCarbVariationId,
-  effectiveVariationId,
-  recipeFiberGrams,
-  resolveRecipeMacros,
-} from "@/utils/recipeDisplay";
 
 export function mealsForDateKey(
   dateKey: string,
@@ -19,7 +14,8 @@ export function mealsForDateKey(
   plannedMeals: PlannedMeal[],
   todayDateKey: string,
 ): PlannedMeal[] {
-  return dailyPlans[dateKey] ?? (dateKey === todayDateKey ? plannedMeals : []);
+  const raw = dailyPlans[dateKey] ?? (dateKey === todayDateKey ? plannedMeals : []);
+  return raw.filter((m) => !m.recipe.tags.includes("beverage") && !m.recipe.id.startsWith("bev-"));
 }
 
 export function trackingMultiplier(status: MealTrackingStatus): number {
@@ -35,18 +31,7 @@ export function trackingMultiplier(status: MealTrackingStatus): number {
 }
 
 export function macrosForMeal(meal: PlannedMeal): DailyTargets {
-  const m = resolveRecipeMacros(
-    meal.recipe,
-    effectiveVariationId(meal),
-    effectiveCarbVariationId(meal),
-  );
-  return {
-    calories: m.calories * meal.scale,
-    protein: m.protein * meal.scale,
-    carbs: m.carbs * meal.scale,
-    fat: m.fat * meal.scale,
-    fiber: recipeFiberGrams(meal.recipe, effectiveVariationId(meal), effectiveCarbVariationId(meal)) * meal.scale,
-  };
+  return mealMacrosWithBeverage(meal);
 }
 
 export function sumTrackedMacros(

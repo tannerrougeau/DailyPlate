@@ -1,19 +1,42 @@
-import type { BiologicalSex, HouseholdMember, HouseholdMemberKind, PersonSize } from "@/types/profile";
+import type {
+  BiologicalSex,
+  ChildAgeBand,
+  HouseholdMember,
+  HouseholdMemberKind,
+  OtherAdultSize,
+  UserProfile,
+} from "@/types/profile";
+import { computeDailyTargets, computeFormulaTdee } from "@/utils/tdee";
+import { DISLIKED_FOOD_CHIPS } from "@/utils/chipMatching";
 
-/** Child plate as a fraction of the owner's adult serving when the child has no extra details. */
-const CHILD_FRACTION_OF_ADULT = 0.45;
-
-const ADULT_SIZE_MULT: Record<PersonSize, number> = {
-  small: 0.85,
-  medium: 1,
-  large: 1.2,
+const OTHER_ADULT_FACTOR: Record<OtherAdultSize, number> = {
+  smaller: 0.8,
+  similar: 1,
+  larger: 1.25,
 };
 
-const CHILD_SIZE_MULT: Record<PersonSize, number> = {
-  small: 0.45,
-  medium: 0.6,
-  large: 0.75,
+const CHILD_AGE_FACTOR: Record<ChildAgeBand, number> = {
+  "1_3": 0.4,
+  "4_8": 0.6,
+  "9_13": 0.8,
+  "14_18": 1,
 };
+
+export const OTHER_ADULT_SIZE_OPTIONS: { id: OtherAdultSize; label: string }[] = [
+  { id: "smaller", label: "Smaller" },
+  { id: "similar", label: "Similar to me" },
+  { id: "larger", label: "Larger" },
+];
+
+export const CHILD_AGE_BAND_OPTIONS: { id: ChildAgeBand; label: string }[] = [
+  { id: "1_3", label: "1–3" },
+  { id: "4_8", label: "4–8" },
+  { id: "9_13", label: "9–13" },
+  { id: "14_18", label: "14–18" },
+];
+
+export const DEFAULT_OTHER_ADULT_SIZE: OtherAdultSize = "similar";
+export const DEFAULT_CHILD_AGE_BAND: ChildAgeBand = "4_8";
 
 export const HOUSEHOLD_ADULTS_MIN = 1;
 export const HOUSEHOLD_ADULTS_MAX = 8;
@@ -47,6 +70,8 @@ export type HouseholdProfileFields = {
   householdPreset?: HouseholdPreset | null;
   householdCustomCount?: number | null;
   householdMembers?: HouseholdMember[] | null;
+  householdFoodAvoidChips?: string[] | null;
+  householdFoodAvoidCustom?: string | null;
   age?: number | null;
   sex?: BiologicalSex | null;
   heightCm?: number | null;
@@ -115,74 +140,100 @@ export function resolveHouseholdCounts(
   return countsFromLegacyPreset(profile.householdPreset, profile.householdCustomCount);
 }
 
-export function defaultSizeForKind(kind: HouseholdMemberKind): PersonSize {
-  return kind === "child" ? "small" : "medium";
+export function resolveOtherAdultSize(member: HouseholdMember | null | undefined): OtherAdultSize {
+  return member?.adultSize ?? DEFAULT_OTHER_ADULT_SIZE;
 }
 
-export function memberHasExtraDetails(member: HouseholdMember | null | undefined): boolean {
-  if (!member) return false;
-  return member.size != null || member.age != null || member.sex != null;
+export function resolveChildAgeBand(member: HouseholdMember | null | undefined): ChildAgeBand {
+  return member?.childAgeBand ?? DEFAULT_CHILD_AGE_BAND;
 }
 
-function sizeFromAge(kind: HouseholdMemberKind, age: number | null | undefined): PersonSize | null {
-  if (age == null || !Number.isFinite(age)) return null;
-  if (kind === "child") {
-    if (age < 7) return "small";
-    if (age < 12) return "medium";
-    return "large";
-  }
-  if (age < 16) return "small";
+export function childAgeBandLabel(band: ChildAgeBand): string {
+  return CHILD_AGE_BAND_OPTIONS.find((o) => o.id === band)?.label ?? "4–8";
+}
+
+function adultSizeFromLegacy(member: HouseholdMember): OtherAdultSize | null {
+  if (member.adultSize) return member.adultSize;
+  if (member.size === "small") return "smaller";
+  if (member.size === "large") return "larger";
+  if (member.size === "medium") return "similar";
   return null;
 }
 
-/** Profile owner's adult plate. Other adults copy this unless they have extra details. */
-export function ownerAdultSizeFromProfile(
-  profile: HouseholdProfileFields | null | undefined,
-): PersonSize {
-  const owner = (profile?.householdMembers ?? []).find((m) => m.kind === "adult");
-  if (owner?.size) return owner.size;
-  const kg = profile?.weightKg;
-  if (kg != null && Number.isFinite(kg)) {
-    if (kg < 58) return "small";
-    if (kg > 85) return "large";
+function childAgeBandFromLegacy(member: HouseholdMember): ChildAgeBand | null {
+  if (member.childAgeBand) return member.childAgeBand;
+  const age = member.age;
+  if (age != null && Number.isFinite(age)) {
+    if (age <= 3) return "1_3";
+    if (age <= 8) return "4_8";
+    if (age <= 13) return "9_13";
+    return "14_18";
   }
-  const cm = profile?.heightCm;
-  if (cm != null && Number.isFinite(cm)) {
-    if (cm < 163) return "small";
-    if (cm > 180) return "large";
-  }
-  return "medium";
+  if (member.size === "small") return "1_3";
+  if (member.size === "large") return "9_13";
+  return null;
 }
 
-export function ownerAdultMultiplier(
+/** Drop sex/size/age after mapping onto the new fields. */
+export function migrateHouseholdMember(member: HouseholdMember): HouseholdMember {
+  if (member.kind === "child") {
+    return { kind: "child", childAgeBand: childAgeBandFromLegacy(member) };
+  }
+  return { kind: "adult", adultSize: adultSizeFromLegacy(member) };
+}
+
+export function migrateHouseholdMembers(members: HouseholdMember[] | null | undefined): HouseholdMember[] {
+  return (members ?? []).map(migrateHouseholdMember);
+}
+
+/** Maintenance TDEE ÷ goal-adjusted target. Other people scale from maintenance, not the user's cut/surplus. */
+export function maintenanceToTargetRatio(
   profile: HouseholdProfileFields | null | undefined,
 ): number {
-  return ADULT_SIZE_MULT[ownerAdultSizeFromProfile(profile)];
+  if (
+    !profile ||
+    profile.age == null ||
+    !Number.isFinite(profile.age) ||
+    profile.heightCm == null ||
+    !Number.isFinite(profile.heightCm) ||
+    profile.weightKg == null ||
+    !Number.isFinite(profile.weightKg)
+  ) {
+    return 1;
+  }
+  const asProfile = profile as UserProfile;
+  if (!asProfile.goal) return 1;
+  const userKcal = computeDailyTargets(asProfile).calories;
+  const baseKcal =
+    asProfile.knownTdeeKcal != null && asProfile.knownTdeeKcal > 0
+      ? asProfile.knownTdeeKcal
+      : computeFormulaTdee(asProfile);
+  if (!(userKcal > 0) || !(baseKcal > 0)) return 1;
+  return baseKcal / userKcal;
+}
+
+/** User plate is always 1 of their own target-sized meal. */
+export function ownerAdultMultiplier(
+  _profile?: HouseholdProfileFields | null,
+): number {
+  return 1;
 }
 
 export function portionMultiplierForMember(
   member: HouseholdMember,
-  ctx: { ownerMult: number; isOwner: boolean } = { ownerMult: 1, isOwner: false },
+  ctx: { baseRatio: number; isOwner: boolean } = { baseRatio: 1, isOwner: false },
 ): number {
   if (member.kind === "adult") {
-    if (ctx.isOwner) return ctx.ownerMult;
-    if (memberHasExtraDetails(member)) {
-      const size =
-        member.size ?? sizeFromAge("adult", member.age) ?? defaultSizeForKind("adult");
-      return ADULT_SIZE_MULT[size];
-    }
-    return ctx.ownerMult;
+    if (ctx.isOwner) return 1;
+    return OTHER_ADULT_FACTOR[resolveOtherAdultSize(member)] * ctx.baseRatio;
   }
-  if (memberHasExtraDetails(member)) {
-    const size =
-      member.size ?? sizeFromAge("child", member.age) ?? defaultSizeForKind("child");
-    return CHILD_SIZE_MULT[size];
-  }
-  return ctx.ownerMult * CHILD_FRACTION_OF_ADULT;
+  return CHILD_AGE_FACTOR[resolveChildAgeBand(member)] * ctx.baseRatio;
 }
 
 export function defaultHouseholdMember(kind: HouseholdMemberKind): HouseholdMember {
-  return { kind, size: null, age: null, sex: null };
+  return kind === "child"
+    ? { kind: "child", childAgeBand: null }
+    : { kind: "adult", adultSize: null };
 }
 
 /** Keep members in sync with adult/child counts without dropping saved sizes. */
@@ -196,11 +247,13 @@ export function syncHouseholdMembers(
   const prevAdults = (existing ?? []).filter((m) => m.kind === "adult");
   const prevChildren = (existing ?? []).filter((m) => m.kind === "child");
   const nextAdults = Array.from({ length: adultN }, (_, i) =>
-    prevAdults[i] ? { ...prevAdults[i]!, kind: "adult" as const } : defaultHouseholdMember("adult"),
+    prevAdults[i]
+      ? migrateHouseholdMember({ ...prevAdults[i]!, kind: "adult" })
+      : defaultHouseholdMember("adult"),
   );
   const nextChildren = Array.from({ length: childN }, (_, i) =>
     prevChildren[i]
-      ? { ...prevChildren[i]!, kind: "child" as const }
+      ? migrateHouseholdMember({ ...prevChildren[i]!, kind: "child" })
       : defaultHouseholdMember("child"),
   );
   return [...nextAdults, ...nextChildren];
@@ -224,14 +277,13 @@ export function householdPresetFromCounts(adults: number, children: number): Hou
 }
 
 export function householdPortionFromCounts(adults: number, children: number): number {
-  const ownerMult = ADULT_SIZE_MULT.medium;
   return resolveHouseholdMembers({
     householdAdults: adults,
     householdChildren: children,
   }).reduce((sum, m, i) => {
     return (
       sum +
-      portionMultiplierForMember(m, { ownerMult, isOwner: m.kind === "adult" && i === 0 })
+      portionMultiplierForMember(m, { baseRatio: 1, isOwner: m.kind === "adult" && i === 0 })
     );
   }, 0);
 }
@@ -240,13 +292,15 @@ export function householdMultiplierFor(
   profile: HouseholdProfileFields | null | undefined,
   countsOverride?: HouseholdDayCounts | null,
 ): number {
+  const { adults, children } = resolveHouseholdCounts(profile, countsOverride);
+  if (adults <= 1 && children <= 0) return 1;
   const members = resolveHouseholdMembers(profile, countsOverride);
-  const ownerMult = ownerAdultMultiplier(profile);
+  const baseRatio = maintenanceToTargetRatio(profile);
   let adultIndex = 0;
   return members.reduce((sum, m) => {
     const isOwner = m.kind === "adult" && adultIndex === 0;
     if (m.kind === "adult") adultIndex += 1;
-    return sum + portionMultiplierForMember(m, { ownerMult, isOwner });
+    return sum + portionMultiplierForMember(m, { baseRatio, isOwner });
   }, 0);
 }
 
@@ -273,10 +327,10 @@ export function childPortionMultiplier(
   const children = resolveHouseholdMembers(profile, countsOverride).filter(
     (m) => m.kind === "child",
   );
-  const ownerMult = ownerAdultMultiplier(profile);
-  if (children.length === 0) return ownerMult * CHILD_FRACTION_OF_ADULT;
+  const baseRatio = maintenanceToTargetRatio(profile);
+  if (children.length === 0) return CHILD_AGE_FACTOR[DEFAULT_CHILD_AGE_BAND] * baseRatio;
   const total = children.reduce(
-    (sum, m) => sum + portionMultiplierForMember(m, { ownerMult, isOwner: false }),
+    (sum, m) => sum + portionMultiplierForMember(m, { baseRatio, isOwner: false }),
     0,
   );
   return total / children.length;
@@ -309,7 +363,7 @@ export function householdPersonPortions(
   countsOverride?: HouseholdDayCounts | null,
 ): PersonPortion[] {
   const members = resolveHouseholdMembers(profile, countsOverride);
-  const ownerMult = ownerAdultMultiplier(profile);
+  const baseRatio = maintenanceToTargetRatio(profile);
   let adultIndex = 0;
   let childIndex = 0;
   return members.map((m) => {
@@ -321,7 +375,7 @@ export function householdPersonPortions(
       kind: m.kind,
       index,
       label: m.kind === "adult" ? `Adult ${index}` : `Child ${index}`,
-      multiplier: portionMultiplierForMember(m, { ownerMult, isOwner }),
+      multiplier: portionMultiplierForMember(m, { baseRatio, isOwner }),
     };
   });
 }
@@ -355,14 +409,52 @@ export function formatHouseholdServingSplit(
   profile: HouseholdProfileFields | null | undefined,
   countsOverride?: HouseholdDayCounts | null,
 ): string {
+  return formatHouseholdServesLine(profile, countsOverride) ?? "Serves you";
+}
+
+/** Meal-card line, e.g. "Serves you + 1 adult + 1 child". Null when cooking only for the user. */
+export function formatHouseholdServesLine(
+  profile: HouseholdProfileFields | null | undefined,
+  countsOverride?: HouseholdDayCounts | null,
+): string | null {
   const { adults, children } = resolveHouseholdCounts(profile, countsOverride);
-  if (children <= 0) {
-    return adults === 1 ? "1 adult serving" : `${adults} adult servings`;
+  if (adults <= 1 && children <= 0) return null;
+  const extras: string[] = [];
+  const otherAdults = Math.max(0, adults - 1);
+  if (otherAdults === 1) extras.push("1 adult");
+  else if (otherAdults > 1) extras.push(`${otherAdults} adults`);
+  if (children === 1) extras.push("1 child");
+  else if (children > 1) extras.push(`${children} children`);
+  if (extras.length === 0) return null;
+  return `Serves you + ${extras.join(" + ")}`;
+}
+
+export function householdCardSummary(
+  profile: HouseholdProfileFields | null | undefined,
+  extra?: { avoidChips?: string[]; avoidCustom?: string },
+): string {
+  const { adults, children } = resolveHouseholdCounts(profile);
+  const members = resolveHouseholdMembers(profile);
+  const parts: string[] = [];
+  parts.push(adults === 1 ? "1 adult" : `${adults} adults`);
+  if (children > 0) {
+    const bands = members
+      .filter((m) => m.kind === "child")
+      .map((m) => childAgeBandLabel(resolveChildAgeBand(m)));
+    const unique = [...new Set(bands)];
+    const childWord = children === 1 ? "1 child" : `${children} children`;
+    parts.push(unique.length === 1 ? `${childWord} (${unique[0]})` : childWord);
   }
-  const adultPart = adults === 1 ? "1 adult serving" : `${adults} adult servings`;
-  const childPart =
-    children === 1 ? "1 smaller child serving" : `${children} smaller child servings`;
-  return `${adultPart} + ${childPart}`;
+  const chips = extra?.avoidChips ?? profile?.householdFoodAvoidChips ?? [];
+  const custom = extra?.avoidCustom ?? profile?.householdFoodAvoidCustom ?? "";
+  const avoidLabels = [
+    ...chips
+      .filter((id) => id !== "none")
+      .map((id) => DISLIKED_FOOD_CHIPS.find((c) => c.id === id)?.label ?? id),
+    ...custom.split(",").map((s) => s.trim()).filter(Boolean),
+  ];
+  if (avoidLabels.length) parts.push(`avoids ${avoidLabels.slice(0, 2).join(", ").toLowerCase()}`);
+  return parts.join(" · ");
 }
 
 /** One-line label for Plan screen (e.g. "Planning for 2 adults"). */
@@ -383,14 +475,3 @@ export function formatHouseholdCookingLine(
   return `Cooking for ${peopleLabel(adults, children)}`;
 }
 
-/** Map size to a body estimate when height/weight were not collected. */
-export function sizeToBodyDefaults(size: PersonSize): { heightCm: number; weightKg: number } {
-  switch (size) {
-    case "small":
-      return { heightCm: 160, weightKg: 55 };
-    case "large":
-      return { heightCm: 183, weightKg: 88 };
-    default:
-      return { heightCm: 170, weightKg: 70 };
-  }
-}

@@ -1,6 +1,7 @@
 import type { DayMealTracking, MealSlotId, PlannedMeal, Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { CheckInEntry } from "@/types/tdeeFeedback";
+import { checkInScale, isHighScore, isMidLowScore } from "@/utils/checkInScale";
 import { addDays, fromDateKey, toDateKey } from "@/utils/date";
 
 export const CUISINE_OPTIONS = [
@@ -171,15 +172,18 @@ export function deriveAdaptiveProfileUpdates(
   }
 
   if (entry) {
-    if (entry.proteinAdherence <= 5 && !profile.prioritizeMinProtein) {
+    const protein = checkInScale(entry, "proteinAdherence");
+    const ease = checkInScale(entry, "planEaseOfUse");
+    const enjoyment = checkInScale(entry, "recipeEnjoyment");
+    if (isMidLowScore(protein) && !profile.prioritizeMinProtein) {
       updates.prioritizeMinProtein = true;
     }
-    if (entry.planEaseOfUse <= 5 && !profile.weeklyMealPrepEnabled) {
+    if (isMidLowScore(ease) && !profile.weeklyMealPrepEnabled) {
       updates.weeklyMealPrepEnabled = true;
       updates.weeklyMealPrepSlot = profile.weeklyMealPrepSlot ?? "dinner";
       updates.weeklyMealPrepRepeatCount = profile.weeklyMealPrepRepeatCount ?? 3;
     }
-    if (entry.recipeEnjoyment <= 5 && !profile.prioritizeMinimalPrep && entry.planEaseOfUse <= 6) {
+    if (isMidLowScore(enjoyment) && !profile.prioritizeMinimalPrep && isMidLowScore(ease)) {
       updates.prioritizeMinimalPrep = true;
     }
   }
@@ -227,12 +231,12 @@ export function buildPersonalizationInsights(input: {
   }
 
   if (entry && source === "check_in") {
-    if (entry.mealVarietySatisfaction <= 5) {
+    if (isMidLowScore(checkInScale(entry, "mealVarietySatisfaction"))) {
       messages.push(
         "Meals felt repetitive — we’ll rotate recipes more and lean on your favorites and cuisine preferences.",
       );
     }
-    if (entry.recipeEnjoyment >= 8 && favoriteIds.length > 0) {
+    if (isHighScore(checkInScale(entry, "recipeEnjoyment")) && favoriteIds.length > 0) {
       messages.push(
         "Recipes you marked as favorites are weighted higher in upcoming meal suggestions.",
       );

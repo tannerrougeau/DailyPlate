@@ -1,4 +1,5 @@
 import type { GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
+import { groceryItemForBeverage, plannedMealFoodScale, resolveBeverage } from "@/utils/beverages";
 import {
   formatPracticalQty,
   roundIngredientQuantity,
@@ -17,6 +18,16 @@ export function groceriesFromMeals(
   const countedBatches = new Set<string>();
 
   for (const meal of meals) {
+    const drinkItem = groceryItemForBeverage(
+      resolveBeverage(meal.beverageId),
+      householdMultiplier,
+    );
+    if (drinkItem) {
+      const existingDrink = map.get(drinkItem.key);
+      if (existingDrink) existingDrink.quantity += drinkItem.quantity;
+      else map.set(drinkItem.key, { ...drinkItem });
+    }
+
     if (meal.mealPrep) {
       if (countedBatches.has(meal.mealPrep.batchId)) continue;
       countedBatches.add(meal.mealPrep.batchId);
@@ -26,7 +37,7 @@ export function groceriesFromMeals(
     const ingredients = scaledIngredientsForMeal(
       meal.recipe,
       effectiveVariationId(meal),
-      meal.scale * portionMult,
+      plannedMealFoodScale(meal) * portionMult,
       householdMultiplier,
       prioritizeMinProtein,
       effectiveCarbVariationId(meal),
@@ -34,6 +45,7 @@ export function groceriesFromMeals(
     );
 
     for (const ing of ingredients) {
+      if (/^(water|ice)$/i.test(ing.name.trim())) continue;
       const key = `${ing.category}::${ing.name.toLowerCase()}::${ing.unit}`;
       const quantity = ing.quantity;
       const existing = map.get(key);

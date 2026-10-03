@@ -3,11 +3,22 @@ import type { Recipe } from "@/types";
 export type FoodChip = { id: string; label: string };
 
 function recipeText(recipe: Recipe): string {
+  const variationNames = [
+    ...(recipe.variations ?? []),
+    ...(recipe.variationDetails ?? []).flatMap((v) => [
+      v.label,
+      ...v.ingredients.map((i) => i.name),
+      ...v.instructions,
+    ]),
+  ];
   const parts = [
     recipe.name,
+    ...(recipe.searchAliases ?? []),
     recipe.cuisine,
     ...recipe.tags,
     ...recipe.ingredients.map((i) => i.name),
+    ...recipe.instructions,
+    ...variationNames,
   ];
   return parts.join(" ").toLowerCase();
 }
@@ -34,7 +45,7 @@ const FAVORITE_MATCHERS: Record<string, RegExp[]> = {
   garlic_onion: [/garlic|onion|shallot|olive oil/i],
 };
 
-const DISLIKE_MATCHERS: Record<string, RegExp[]> = {
+export const DISLIKE_MATCHERS: Record<string, RegExp[]> = {
   cilantro: [/cilantro|coriander leaf/i],
   spicy: [/spicy|chili|jalape|sriracha|hot sauce|cayenne/i],
   shellfish: [/shrimp|shellfish|crab|lobster|scallop/i],
@@ -52,7 +63,7 @@ const DISLIKE_MATCHERS: Record<string, RegExp[]> = {
   msg_processed: [/msg|monosodium|processed cheese|hot dog|deli meat/i],
 };
 
-function customTokens(raw: string): string[] {
+export function customTokens(raw: string): string[] {
   return raw
     .split(/[,;\n]+/)
     .map((t) => t.trim().toLowerCase())
@@ -102,6 +113,39 @@ export function recipeExcludedByDislikeChips(
   dislikedCustom = "",
 ): boolean {
   if (dislikedChips.includes("none")) return false;
+  if (recipe.variationDetails?.length) {
+    return !recipe.variationDetails.some((variation) => {
+      const ingredients = variation.replaceBase
+        ? variation.ingredients
+        : [...recipe.ingredients, ...variation.ingredients];
+      const steps = variation.replaceBase
+        ? variation.instructions
+        : [...recipe.instructions, ...variation.instructions];
+      const text = [
+        recipe.name,
+        ...recipe.tags,
+        variation.label,
+        ...ingredients.map((i) => i.name),
+        ...steps,
+      ]
+        .join(" ")
+        .toLowerCase();
+      for (const chip of dislikedChips) {
+        const patterns = DISLIKE_MATCHERS[chip];
+        if (patterns && matchesAny(text, patterns)) return false;
+      }
+      if (
+        customTokens(dislikedCustom).some((t) => {
+          if (text.includes(t)) return true;
+          const stem = t.endsWith("s") && t.length > 3 ? t.slice(0, -1) : t;
+          return stem.length >= 3 && text.includes(stem);
+        })
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }
   const text = recipeText(recipe);
   for (const chip of dislikedChips) {
     const patterns = DISLIKE_MATCHERS[chip];
@@ -109,6 +153,25 @@ export function recipeExcludedByDislikeChips(
   }
   if (recipeMatchesCustomTokens(recipe, customTokens(dislikedCustom))) return true;
   return false;
+}
+
+export function mergeFoodAvoidLists(
+  userChips: string[] | null | undefined,
+  userCustom: string | null | undefined,
+  householdChips: string[] | null | undefined,
+  householdCustom: string | null | undefined,
+): { chips: string[]; custom: string } {
+  const chips = [
+    ...(userChips ?? []).filter((id) => id !== "none"),
+    ...(householdChips ?? []).filter((id) => id !== "none"),
+  ].filter((id, i, arr) => arr.indexOf(id) === i);
+  const custom = [userCustom ?? "", householdCustom ?? ""]
+    .flatMap((s) => s.split(","))
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((v, i, arr) => arr.indexOf(v) === i)
+    .join(", ");
+  return { chips, custom };
 }
 
 /** Whole foods + common recipe building blocks */

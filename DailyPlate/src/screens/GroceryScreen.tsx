@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Package,
   RotateCcw,
-  X,
 } from "lucide-react";
 import { UsageNote } from "@/components/UsageNote";
 import { RollingWeekCalendar } from "@/components/RollingWeekCalendar";
@@ -23,10 +22,8 @@ import {
   householdMultiplierFor,
 } from "@/utils/household";
 import { mealsForDateKey } from "@/utils/mealTracking";
-import { mealDisplayName } from "@/utils/recipeDisplay";
-import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { PantrySheet } from "@/components/PantrySheet";
-import type { GroceryItem, IngredientCategory, PlannedMeal } from "@/types";
+import type { GroceryItem, IngredientCategory } from "@/types";
 
 const CATEGORY_ORDER: IngredientCategory[] = [
   "Produce",
@@ -73,7 +70,6 @@ export function GroceryScreen() {
   const togglePantryChecked = useAppStore((s) => s.togglePantryItemChecked);
   const [pantrySheetOpen, setPantrySheetOpen] = useState(false);
   const [pantrySectionOpen, setPantrySectionOpen] = useState(true);
-  const [peekDateKey, setPeekDateKey] = useState<string | null>(null);
   const [extraFutureWeeks, setExtraFutureWeeks] = useState(0);
   const initialWeekDefaultApplied = useRef(false);
   const prevOwnedCount = useRef(0);
@@ -232,25 +228,22 @@ export function GroceryScreen() {
         Update pantry if this isn’t accurate.
       </p>
 
+      {selectedRangeLabel && (
+        <div className="mb-2 flex items-center justify-center gap-2">
+          <p className="text-xs font-medium text-slate-600">{selectedRangeLabel}</p>
+          <ClearDatesButton onClear={() => setGrocerySelectedDateKeys([])} />
+        </div>
+      )}
       <RollingWeekCalendar
         todayDateKey={todayDateKey}
         selectedDateKeys={selectedDateSet}
-        showChecks
-        onWeekClick={toggleWeek}
-        onViewDay={(key) => setPeekDateKey(key)}
-        onToggleHighlight={(key) => toggleGroceryDateSelected(key)}
+        selectMode
+        onDayClick={(key) => toggleGroceryDateSelected(key)}
+        onSelectWeek={toggleWeek}
         extraFutureWeeks={extraFutureWeeks}
         onLoadMoreDates={() => setExtraFutureWeeks((n) => n + 4)}
         dayHasMeals={(key) =>
           mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey).length > 0
-        }
-        caption={
-          selectedRangeLabel ? (
-            <div className="mb-2 flex items-center justify-center gap-2">
-              <p className="text-xs font-medium text-slate-600">{selectedRangeLabel}</p>
-              <ClearDatesButton onClear={() => setGrocerySelectedDateKeys([])} />
-            </div>
-          ) : null
         }
       />
 
@@ -366,14 +359,6 @@ export function GroceryScreen() {
         </div>
       )}
 
-      {peekDateKey && (
-        <GroceryDayMealsSheet
-          dateKey={peekDateKey}
-          meals={mealsForDateKey(peekDateKey, dailyPlans, plannedMeals, todayDateKey)}
-          included={selectedDateSet.has(peekDateKey)}
-          onClose={() => setPeekDateKey(null)}
-        />
-      )}
       {pantrySheetOpen && (
         <PantrySheet
           items={items}
@@ -384,77 +369,6 @@ export function GroceryScreen() {
           onClose={() => setPantrySheetOpen(false)}
         />
       )}
-    </div>
-  );
-}
-
-function slotTitle(slot: PlannedMeal["slot"]): string {
-  return slot === "snack" ? "Snack" : slot.charAt(0).toUpperCase() + slot.slice(1);
-}
-
-function GroceryDayMealsSheet({
-  dateKey,
-  meals,
-  included,
-  onClose,
-}: {
-  dateKey: string;
-  meals: PlannedMeal[];
-  included: boolean;
-  onClose: () => void;
-}) {
-  useOverlayBack(true, onClose);
-  return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
-      <button
-        type="button"
-        aria-label="Close meal preview"
-        className="absolute inset-0 bg-slate-900/40"
-        onClick={onClose}
-      />
-      <section className="relative z-[81] max-h-[80dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-4 shadow-2xl sm:rounded-3xl">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {fromDateKey(dateKey).toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-50"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <p className="mb-3 text-xs text-slate-500">
-          {included
-            ? "This day is included in your grocery list."
-            : "This day is not highlighted for shopping."}
-        </p>
-        {meals.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-            No meals on this day.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {meals.map((meal) => (
-              <li
-                key={meal.slot}
-                className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5"
-              >
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  {slotTitle(meal.slot)}
-                </p>
-                <p className="text-sm font-semibold text-slate-900">{mealDisplayName(meal)}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { DailyTargets, DayMealTracking, MealSlotId, MealTrackingEntry, PlannedMeal, Recipe } from "@/types";
+import type { BeverageId, DailyTargets, DayMealTracking, MealSlotId, MealTrackingEntry, PlannedMeal, Recipe, RecipeMealSlotId } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import { allRecipes, findRecipe } from "@/recipes/recipePool";
 import {
@@ -12,6 +12,8 @@ import {
   sumPlannedMacros,
 } from "@/utils/generateDayPlan";
 import { isMealLocked, mealLockKey } from "@/utils/mealLocks";
+import { withPlanningDefaults } from "@/utils/planningPrefs";
+import { CHECK_IN_SCALE_MAX, normalizeCheckInHistory } from "@/utils/checkInScale";
 import type {
   CalorieRecommendation,
   CheckInEntry,
@@ -36,7 +38,15 @@ import {
 } from "@/utils/lowComplexityPlan";
 import { applyMacroRedistribution } from "@/utils/macroRedistribution";
 import { createPlannedMeal, resolveVariationId } from "@/utils/recipeDisplay";
+import {
+  applySlotBeverageDefaults,
+  canonicalBeverageSlot,
+  defaultBeverageForSlot,
+} from "@/utils/beverages";
 import { effectiveMinimumProteinGrams } from "@/utils/proteinMinimum";
+import { mergeFoodAvoidLists } from "@/utils/chipMatching";
+import { migratePlannedMeals, migrateRecipeIdList } from "@/utils/recipeMigration";
+import { pickPreferredVariationId } from "@/utils/variationPrefs";
 import {
   analyzePersonalizationSignals,
   buildPersonalizationInsights,
@@ -71,7 +81,8 @@ function mealsForDate(
   s: Pick<AppState, "dailyPlans" | "plannedMeals" | "todayDateKey">,
   dateKey: string,
 ): PlannedMeal[] {
-  return s.dailyPlans[dateKey] ?? (dateKey === s.todayDateKey ? s.plannedMeals : []);
+  const raw = s.dailyPlans[dateKey] ?? (dateKey === s.todayDateKey ? s.plannedMeals : []);
+  return raw.filter((m) => !m.recipe.tags.includes("beverage") && !m.recipe.id.startsWith("bev-"));
 }
 
 function recipesFor(s: Pick<AppState, "userRecipes">): Recipe[] {
@@ -169,6 +180,7 @@ function buildSlotReplacementMeals(
     | "dislikedIds"
     | "mealTracking"
     | "userRecipes"
+    | "lastBeverageBySlot"
   >,
   dateKey: string,
   slot: MealSlotId,
@@ -183,11 +195,23 @@ function buildSlotReplacementMeals(
       .filter((m) => isMealLocked(state.lockedMeals, dateKey, m.slot))
       .map((m) => m.slot),
   );
+  const prior = base.find((m) => m.slot === slot);
   const draft = [
     ...others,
-    createPlannedMeal(slot, recipe, { scale: 1, mealPrep: undefined }),
+    createPlannedMeal(slot, recipe, {
+      scale: 1,
+      mealPrep: undefined,
+      beverageId: prior?.beverageId ?? defaultBeverageForSlot(state.lastBeverageBySlot, slot),
+      selectedVariationId: pickPreferredVariationId(
+        recipe,
+        slot,
+        opts.dislikedChips,
+        opts.dislikedCustom,
+        opts.snackStyle,
+      ),
+    }),
   ];
-  const order = slotsForMealsPerDay(state.userProfile!.mealsPerDay);
+  const order = slotsForMealsPerDay(state.userProfile!);
   const sorted = draft.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
   return applyMacroRedistribution(sorted, state.targets, opts, recipesFor(state), lockedSlots);
 }
@@ -218,6 +242,7 @@ function buildDayPlanRespectingLocks(
     | "todayDateKey"
     | "mealTracking"
     | "userRecipes"
+    | "lastBeverageBySlot"
   >,
   dateKey: string,
   overrides?: GenerateOverrides,
@@ -263,7 +288,10 @@ function buildDayPlanRespectingLocks(
     library,
     lockedSlots,
   );
-  return { meals, redistributed };
+  return {
+    meals: applySlotBeverageDefaults(meals, state.lastBeverageBySlot, preserved),
+    redistributed,
+  };
 }
 
 function buildGenerateOptions(
@@ -289,18 +317,30 @@ function buildGenerateOptions(
   });
   const lowComplexity =
     overrides?.lowComplexity ?? s.userProfile.lowComplexityEnabled === true;
+  const avoids = mergeFoodAvoidLists(
+    s.userProfile.dislikedFoodChips,
+    s.userProfile.dislikedFoodCustom,
+    s.userProfile.householdFoodAvoidChips,
+    s.userProfile.householdFoodAvoidCustom,
+  );
   return {
     dislikedIds: s.dislikedIds,
-    dislikedChips: s.userProfile.dislikedFoodChips,
-    dislikedCustom: s.userProfile.dislikedFoodCustom ?? "",
+    dislikedChips: avoids.chips,
+    dislikedCustom: avoids.custom,
     favoriteIds: s.favoriteIds,
     favoriteChips: s.userProfile.favoriteFoodChips,
     favoriteCustom: s.userProfile.favoriteFoodCustom ?? "",
-    slots: slotsForMealsPerDay(s.userProfile.mealsPerDay),
+    slots: slotsForMealsPerDay(s.userProfile),
     mealTiming: s.userProfile.mealTiming,
-    prioritizeMinProtein: s.userProfile.prioritizeMinProtein === true,
+    prioritizeMinProtein: s.userProfile.prioritizeMinProtein !== false,
     minimumProteinGrams,
     lowComplexity,
+    snackStyle: s.userProfile.snackStyle ?? "both",
+    maxPrepMinutes: s.userProfile.maxPrepMinutes,
+    preferredProteinSources: s.userProfile.preferredProteinSources ?? [],
+    avoidedProteinSources: s.userProfile.avoidedProteinSources ?? [],
+    kitchenEquipment: s.userProfile.kitchenEquipment,
+    ingredientVariety: s.userProfile.ingredientVariety ?? "minimal",
     personalization: {
       profile: s.userProfile,
       signals,
@@ -374,9 +414,16 @@ export interface AppState {
   adaptiveTdeeEstimate: number | null;
   macroRedistributionNotices: string[];
   personalizationInsight: PersonalizationInsight | null;
+  /** Last drink chosen per meal slot; used as the default on new plans. */
+  lastBeverageBySlot: Partial<Record<RecipeMealSlotId, BeverageId>>;
+  /** Transient flag so onboarding can open Settings after “Save your account”. */
+  openSettingsOnStart: boolean;
+  requestOpenSettings: () => void;
+  consumeOpenSettingsRequest: () => void;
   setNav: (tab: NavTab) => void;
   setTargets: (t: Partial<DailyTargets>) => void;
   setUserProfile: (p: UserProfile) => void;
+  normalizeProfileDefaults: () => void;
   login: (email: string, password: string) => Promise<LoginResult>;
   logout: () => void;
   registerAccount: (email: string, password: string) => Promise<RegisterResult>;
@@ -414,6 +461,7 @@ export interface AppState {
     slot: PlannedMeal["slot"],
     carbVariationId: import("@/types").CarbVariationId,
   ) => void;
+  setMealBeverage: (dateKey: string, slot: PlannedMeal["slot"], beverageId: BeverageId) => void;
   setMealFatVariation: (
     dateKey: string,
     slot: PlannedMeal["slot"],
@@ -453,6 +501,7 @@ export interface AppState {
     portionsCooked: number;
     dateKeys: string[];
     scale?: number;
+    selectedVariationId?: string;
   }) => void;
 }
 
@@ -484,6 +533,7 @@ export const useAppStore = create<AppState>()(
       pantryCheckedKeys: [],
       userRecipes: [],
       todayHouseholdOverride: null,
+      lastBeverageBySlot: {},
       mealTracking: {},
       dismissedUsageNotes: {
         today: false,
@@ -500,6 +550,9 @@ export const useAppStore = create<AppState>()(
       adaptiveTdeeEstimate: null,
       macroRedistributionNotices: [],
       personalizationInsight: null,
+      openSettingsOnStart: false,
+      requestOpenSettings: () => set({ openSettingsOnStart: true }),
+      consumeOpenSettingsRequest: () => set({ openSettingsOnStart: false }),
 
       setNav: (tab) => set({ nav: tab }),
 
@@ -509,9 +562,39 @@ export const useAppStore = create<AppState>()(
         })),
 
       setUserProfile: (p) => {
-        set({ userProfile: p });
+        set({ userProfile: withPlanningDefaults(p) });
         const insight = computePersonalizationInsight(get(), "profile");
         if (insight) set({ personalizationInsight: insight });
+      },
+
+      /** Backfills fields older saves predate, so every profile behaves like a new one. */
+      normalizeProfileDefaults: () => {
+        const state = get();
+        const profile = state.userProfile;
+        const history = normalizeCheckInHistory(state.tdeeFeedbackHistory);
+        const nextProfile = profile ? withPlanningDefaults(profile) : profile;
+        const dailyPlans = Object.fromEntries(
+          Object.entries(state.dailyPlans).map(([key, meals]) => [
+            key,
+            migratePlannedMeals(meals, state.userRecipes),
+          ]),
+        );
+        const plannedMeals = migratePlannedMeals(
+          dailyPlans[state.todayDateKey] ?? state.plannedMeals,
+          state.userRecipes,
+        );
+        set({
+          lastBeverageBySlot: state.lastBeverageBySlot ?? {},
+          userProfile: nextProfile,
+          tdeeFeedbackHistory: history,
+          dailyPlans,
+          plannedMeals,
+          favoriteIds: migrateRecipeIdList(state.favoriteIds),
+          dislikedIds: migrateRecipeIdList(state.dislikedIds),
+          targets: nextProfile
+            ? targetsWithCalories(nextProfile, state.targets.calories)
+            : state.targets,
+        });
       },
 
       login: async (email, password) => {
@@ -524,6 +607,7 @@ export const useAppStore = create<AppState>()(
           ...savedStateToPatch(account.state),
           authSession: { email: normalized },
         });
+        get().normalizeProfileDefaults();
         return "ok";
       },
 
@@ -544,6 +628,7 @@ export const useAppStore = create<AppState>()(
           pantryCheckedKeys: [],
           userRecipes: [],
           todayHouseholdOverride: null,
+          lastBeverageBySlot: {},
           mealTracking: {},
           favoriteIds: [],
           dislikedIds: [],
@@ -692,6 +777,13 @@ export const useAppStore = create<AppState>()(
             state.targets.calories,
           );
         }
+        nextDailyPlans = {
+          ...nextDailyPlans,
+          [targetDateKey]: applySlotBeverageDefaults(
+            nextDailyPlans[targetDateKey] ?? built.meals,
+            state.lastBeverageBySlot,
+          ),
+        };
         const finalMeals = nextDailyPlans[targetDateKey] ?? built.meals;
         set((s) => ({
           plannedMeals: targetDateKey === s.todayDateKey ? finalMeals : s.plannedMeals,
@@ -743,6 +835,14 @@ export const useAppStore = create<AppState>()(
           state.targets.calories,
           library,
         );
+        for (const key of keys) {
+          if (nextDailyPlans[key]) {
+            nextDailyPlans[key] = applySlotBeverageDefaults(
+              nextDailyPlans[key]!,
+              state.lastBeverageBySlot,
+            );
+          }
+        }
         set((s) => ({
           dailyPlans: nextDailyPlans,
           plannedMeals: nextDailyPlans[s.todayDateKey] ?? s.plannedMeals,
@@ -798,6 +898,14 @@ export const useAppStore = create<AppState>()(
             state.targets.calories,
             library,
           );
+        }
+        for (const key of keys) {
+          if (nextDailyPlans[key]) {
+            nextDailyPlans[key] = applySlotBeverageDefaults(
+              nextDailyPlans[key]!,
+              state.lastBeverageBySlot,
+            );
+          }
         }
         set((s) => ({
           dailyPlans: nextDailyPlans,
@@ -927,6 +1035,14 @@ export const useAppStore = create<AppState>()(
             state.targets.calories,
             library,
           );
+        }
+        for (const key of monthKeys) {
+          if (nextDailyPlans[key]) {
+            nextDailyPlans[key] = applySlotBeverageDefaults(
+              nextDailyPlans[key]!,
+              state.lastBeverageBySlot,
+            );
+          }
         }
         set((s) => ({
           dailyPlans: nextDailyPlans,
@@ -1080,6 +1196,28 @@ export const useAppStore = create<AppState>()(
           dailyPlans: nextDaily,
           plannedMeals:
             dateKey === s.todayDateKey ? updateMeals(s.plannedMeals) : s.plannedMeals,
+        }));
+        void get().syncAccountSnapshot();
+      },
+
+      setMealBeverage: (dateKey, slot, beverageId) => {
+        const state = get();
+        const meal = mealsForDate(state, dateKey).find((m) => m.slot === slot);
+        if (!meal) return;
+        const updateMeals = (meals: PlannedMeal[]) =>
+          meals.map((m) => (m.slot === slot ? { ...m, beverageId } : m));
+        const nextDaily = { ...state.dailyPlans };
+        if (nextDaily[dateKey]) {
+          nextDaily[dateKey] = updateMeals(nextDaily[dateKey]!);
+        }
+        set((s) => ({
+          dailyPlans: nextDaily,
+          plannedMeals:
+            dateKey === s.todayDateKey ? updateMeals(s.plannedMeals) : s.plannedMeals,
+          lastBeverageBySlot: {
+            ...s.lastBeverageBySlot,
+            [canonicalBeverageSlot(slot)]: beverageId,
+          },
         }));
         void get().syncAccountSnapshot();
       },
@@ -1324,6 +1462,7 @@ export const useAppStore = create<AppState>()(
             experience: { suggestions: [], profileUpdates: {} },
             entry: {
               ...partial,
+              scaleMax: CHECK_IN_SCALE_MAX,
               id: crypto.randomUUID(),
               submittedAt: new Date().toISOString(),
               periodDays: 14,
@@ -1341,6 +1480,7 @@ export const useAppStore = create<AppState>()(
 
         const entry: CheckInEntry = {
           ...partial,
+          scaleMax: CHECK_IN_SCALE_MAX,
           id: crypto.randomUUID(),
           submittedAt,
           periodDays: Math.min(28, Math.max(1, periodDays)),
@@ -1357,7 +1497,7 @@ export const useAppStore = create<AppState>()(
             null,
         };
 
-        const history = [...state.tdeeFeedbackHistory, entry];
+        const history = normalizeCheckInHistory([...state.tdeeFeedbackHistory, entry]);
         const calorie = buildCalorieRecommendation(
           mergedProfile,
           history,
@@ -1373,11 +1513,11 @@ export const useAppStore = create<AppState>()(
         const experience = buildExperienceRecommendations(entry, mergedProfile, signals);
 
         const adaptiveFromLogs = deriveAdaptiveProfileUpdates(mergedProfile, signals, entry);
-        const finalProfile: UserProfile = {
+        const finalProfile: UserProfile = withPlanningDefaults({
           ...mergedProfile,
           ...experience.profileUpdates,
           ...adaptiveFromLogs,
-        };
+        });
 
         const personalizationInsight = computePersonalizationInsight(
           {
@@ -1417,7 +1557,14 @@ export const useAppStore = create<AppState>()(
         void get().syncAccountSnapshot();
       },
 
-      assignMealPrepBatch: ({ recipe, slot, portionsCooked, dateKeys, scale = 1 }) => {
+      assignMealPrepBatch: ({
+        recipe,
+        slot,
+        portionsCooked,
+        dateKeys,
+        scale = 1,
+        selectedVariationId,
+      }) => {
         const state = get();
         const batchId = crypto.randomUUID();
         const keys = dateKeys.slice(0, portionsCooked);
@@ -1425,7 +1572,7 @@ export const useAppStore = create<AppState>()(
         if (portions === 0) return;
 
         const order = state.userProfile
-          ? slotsForMealsPerDay(state.userProfile.mealsPerDay)
+          ? slotsForMealsPerDay(state.userProfile)
           : (["breakfast", "lunch", "dinner", "snack"] as MealSlotId[]);
 
         const nextDailyPlans = { ...state.dailyPlans };
@@ -1434,6 +1581,7 @@ export const useAppStore = create<AppState>()(
           const existing = mealsForDate(state, dateKey).filter((m) => m.slot !== slot);
           const meal = createPlannedMeal(slot, recipe, {
             scale,
+            selectedVariationId,
             mealPrep: {
               batchId,
               portionsCooked: portions,
@@ -1472,6 +1620,7 @@ export const useAppStore = create<AppState>()(
         pantryCheckedKeys: s.pantryCheckedKeys,
         userRecipes: s.userRecipes,
         todayHouseholdOverride: s.todayHouseholdOverride,
+        lastBeverageBySlot: s.lastBeverageBySlot,
         mealTracking: s.mealTracking,
         dismissedUsageNotes: s.dismissedUsageNotes,
         favoriteIds: s.favoriteIds,
@@ -1484,6 +1633,7 @@ export const useAppStore = create<AppState>()(
         personalizationInsight: s.personalizationInsight,
       }),
       onRehydrateStorage: () => (state) => {
+        state?.normalizeProfileDefaults();
         state?.ensureTodaySynced();
       },
     },

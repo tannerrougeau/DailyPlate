@@ -4,18 +4,14 @@ import { RecipeImage } from "@/components/RecipeImage";
 import { fromDateKey } from "@/utils/date";
 import { allRecipes } from "@/recipes/recipePool";
 import { useAppStore } from "@/store/useAppStore";
-import type { MealSlotId, PlannedMeal } from "@/types";
+import type { PlannedMeal } from "@/types";
 import { mealDisplayName } from "@/utils/recipeDisplay";
 import { recipeMatchesSearch } from "@/utils/recipeProteinSource";
-import { isBeverageRecipe } from "@/utils/generateDayPlan";
+import { isBeverageRecipe, recipeFitsSlot } from "@/utils/generateDayPlan";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
+import { SLOT_LABELS } from "@/utils/planningPrefs";
 
-const slotLabel: Record<MealSlotId, string> = {
-  breakfast: "Breakfast",
-  lunch: "Lunch",
-  dinner: "Dinner",
-  snack: "Snack",
-};
+const slotLabel = SLOT_LABELS;
 
 export function ReplaceMealSheet({
   meal,
@@ -36,16 +32,10 @@ export function ReplaceMealSheet({
 
   const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const library = allRecipes(userRecipes);
-    const beverages = library.filter(isBeverageRecipe);
+    const library = allRecipes(userRecipes).filter((r) => !isBeverageRecipe(r));
     let pool = library.filter(
-      (r) => r.mealSlots.includes(meal.slot) && r.id !== meal.recipe.id,
+      (r) => recipeFitsSlot(r, meal.slot) && r.id !== meal.recipe.id,
     );
-    for (const drink of beverages) {
-      if (drink.id !== meal.recipe.id && !pool.some((r) => r.id === drink.id)) {
-        pool.push(drink);
-      }
-    }
     pool = [...pool].sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     );

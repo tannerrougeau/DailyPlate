@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { X } from "lucide-react";
+import { AccountSignupSection } from "@/components/AccountSignupSection";
 import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { HouseholdPicker } from "@/components/HouseholdPicker";
-import { HouseholdMembersEditor } from "@/components/HouseholdMembersEditor";
+import { HouseholdDetailsSection } from "@/components/HouseholdDetailsSection";
 import { applyProfileToTargets, useAppStore } from "@/store/useAppStore";
-import type { HouseholdMember, MacroSplitPreference, MealTimingPreference, UserProfile } from "@/types/profile";
+import { MealPatternSection } from "@/components/MealPatternSection";
+import { ProteinPreferenceSection } from "@/components/ProteinPreferenceSection";
+import { PlanningPrefsSection, type PlanningPrefsValue } from "@/components/PlanningPrefsSection";
+import { CookingShoppingSection } from "@/components/CookingShoppingSection";
+import type { RecipeMealSlotId } from "@/types";
+import type { HouseholdMember, MacroSplitPreference, MealTimingPreference, ProteinPreference, UserProfile } from "@/types/profile";
 import {
   clampAdults,
   clampChildren,
@@ -16,15 +22,31 @@ import {
   syncHouseholdMembers,
 } from "@/utils/household";
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
-import { proteinGramsFromPreset } from "@/utils/proteinMinimum";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import { MealTimingPreferenceSection } from "@/components/MealTimingPreferenceSection";
-import { WeeklyMealPrepSection } from "@/components/WeeklyMealPrepSection";
-import { MinimalPrepPreferenceSection } from "@/components/MinimalPrepPreferenceSection";
-import { LowComplexityPreferenceSection } from "@/components/LowComplexityPreferenceSection";
 import { CuisinePreferenceSection } from "@/components/CuisinePreferenceSection";
-import type { MealSlotId } from "@/types";
-import type { WeeklyMealPrepRepeatCount } from "@/types/profile";
+import {
+  DEFAULT_COOKING_EVENTS,
+  DEFAULT_EATEN_MEALS,
+  DEFAULT_INGREDIENT_VARIETY,
+  DEFAULT_KITCHEN_EQUIPMENT,
+  DEFAULT_LEFTOVER_STREAK,
+  DEFAULT_MAX_PREP_MINUTES,
+  DEFAULT_PROTEIN_PREFERENCE,
+  DEFAULT_SHOPPING_TRIPS,
+  DEFAULT_SNACK_STYLE,
+  DEFAULT_SNACKS_PER_DAY,
+  DEFAULT_WEEKLY_PREP_SLOT,
+  deriveCookingFlags,
+  mealsPerDayFromSelections,
+  resolveEatenMeals,
+  resolveSnacksPerDay,
+} from "@/utils/planningPrefs";
+import {
+  goalLinkedProteinGrams,
+  isCustomProteinOverride,
+  migrateProteinPreference,
+} from "@/utils/proteinMinimum";
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const userProfile = useAppStore((s) => s.userProfile);
@@ -37,20 +59,33 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const [adults, setAdults] = useState(2);
   const [childrenCount, setChildrenCount] = useState(0);
   const [members, setMembers] = useState<HouseholdMember[]>([]);
+  const [householdAvoidChips, setHouseholdAvoidChips] = useState<string[]>([]);
+  const [householdAvoidCustom, setHouseholdAvoidCustom] = useState("");
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const lastFeedbackSubmittedAt = useAppStore((s) => s.lastFeedbackSubmittedAt);
   const adaptiveTdeeEstimate = useAppStore((s) => s.adaptiveTdeeEstimate);
-  const [prioritizeProtein, setPrioritizeProtein] = useState(false);
   const [minProteinGrams, setMinProteinGrams] = useState("");
   const [macroSplitPreference, setMacroSplitPreference] =
     useState<MacroSplitPreference>("balanced");
   const [mealTiming, setMealTiming] = useState<MealTimingPreference | null>(null);
-  const [prioritizeMinimalPrep, setPrioritizeMinimalPrep] = useState(false);
-  const [lowComplexityEnabled, setLowComplexityEnabled] = useState(false);
   const [preferredCuisines, setPreferredCuisines] = useState<string[]>([]);
-  const [weeklyPrepEnabled, setWeeklyPrepEnabled] = useState(false);
-  const [weeklyPrepSlot, setWeeklyPrepSlot] = useState<MealSlotId>("dinner");
-  const [weeklyPrepRepeat, setWeeklyPrepRepeat] = useState<WeeklyMealPrepRepeatCount>(3);
+  const [proteinPreference, setProteinPreference] =
+    useState<ProteinPreference>(DEFAULT_PROTEIN_PREFERENCE);
+  const [eatenMeals, setEatenMeals] = useState<RecipeMealSlotId[]>(() => [...DEFAULT_EATEN_MEALS]);
+  const [snacksPerDay, setSnacksPerDay] = useState(DEFAULT_SNACKS_PER_DAY);
+  const [planningPrefs, setPlanningPrefs] = useState<PlanningPrefsValue>({
+    shoppingTripsPerWeek: DEFAULT_SHOPPING_TRIPS,
+    cookingEventsPerWeek: DEFAULT_COOKING_EVENTS,
+    maxLeftoverStreakDays: DEFAULT_LEFTOVER_STREAK,
+    ingredientVariety: DEFAULT_INGREDIENT_VARIETY,
+    maxPrepMinutes: DEFAULT_MAX_PREP_MINUTES,
+    weeklyMealPrepSlot: DEFAULT_WEEKLY_PREP_SLOT,
+    snackStyle: DEFAULT_SNACK_STYLE,
+    preferredProteinSources: [],
+    avoidedProteinSources: [],
+    foodsToAvoid: "",
+    kitchenEquipment: [...DEFAULT_KITCHEN_EQUIPMENT],
+  });
   useOverlayBack(userProfile != null, onClose);
 
   useEffect(() => {
@@ -59,20 +94,41 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
     setAdults(counts.adults);
     setChildrenCount(counts.children);
     setMembers(resolveHouseholdMembers(userProfile));
-    setPrioritizeProtein(userProfile.prioritizeMinProtein === true);
+    setHouseholdAvoidChips(userProfile.householdFoodAvoidChips ?? []);
+    setHouseholdAvoidCustom(userProfile.householdFoodAvoidCustom ?? "");
+    const preference = migrateProteinPreference(userProfile.proteinPreference);
     setMinProteinGrams(
-      userProfile.minimumProteinGrams != null
+      isCustomProteinOverride(userProfile.minimumProteinGrams, {
+        goal: userProfile.goal,
+        preference,
+        weightKg: userProfile.weightKg,
+        heightCm: userProfile.heightCm,
+      })
         ? String(userProfile.minimumProteinGrams)
-        : String(proteinGramsFromPreset(userProfile.weightKg, 1.8)),
+        : "",
     );
     setMacroSplitPreference(userProfile.macroSplitPreference ?? "balanced");
     setMealTiming(userProfile.mealTiming ?? null);
-    setPrioritizeMinimalPrep(userProfile.prioritizeMinimalPrep === true);
-    setLowComplexityEnabled(userProfile.lowComplexityEnabled === true);
     setPreferredCuisines(userProfile.preferredCuisines ?? []);
-    setWeeklyPrepEnabled(userProfile.weeklyMealPrepEnabled ?? false);
-    setWeeklyPrepSlot(userProfile.weeklyMealPrepSlot ?? "dinner");
-    setWeeklyPrepRepeat(userProfile.weeklyMealPrepRepeatCount ?? 3);
+    setProteinPreference(preference);
+    setEatenMeals(resolveEatenMeals(userProfile));
+    setSnacksPerDay(resolveSnacksPerDay(userProfile));
+    setPlanningPrefs({
+      shoppingTripsPerWeek: userProfile.shoppingTripsPerWeek ?? DEFAULT_SHOPPING_TRIPS,
+      cookingEventsPerWeek: userProfile.cookingEventsPerWeek ?? DEFAULT_COOKING_EVENTS,
+      maxLeftoverStreakDays: userProfile.maxLeftoverStreakDays ?? DEFAULT_LEFTOVER_STREAK,
+      ingredientVariety: userProfile.ingredientVariety ?? DEFAULT_INGREDIENT_VARIETY,
+      maxPrepMinutes:
+        userProfile.maxPrepMinutes === undefined
+          ? DEFAULT_MAX_PREP_MINUTES
+          : userProfile.maxPrepMinutes,
+      weeklyMealPrepSlot: userProfile.weeklyMealPrepSlot ?? DEFAULT_WEEKLY_PREP_SLOT,
+      snackStyle: userProfile.snackStyle ?? DEFAULT_SNACK_STYLE,
+      preferredProteinSources: userProfile.preferredProteinSources ?? [],
+      avoidedProteinSources: userProfile.avoidedProteinSources ?? [],
+      foodsToAvoid: "",
+      kitchenEquipment: userProfile.kitchenEquipment ?? [...DEFAULT_KITCHEN_EQUIPMENT],
+    });
   }, [userProfile]);
 
   if (!userProfile) return null;
@@ -86,21 +142,43 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       householdAdults: nextAdults,
       householdChildren: nextChildren,
       householdMembers: syncHouseholdMembers(nextAdults, nextChildren, members),
+      householdFoodAvoidChips: householdAvoidChips,
+      householdFoodAvoidCustom: householdAvoidCustom,
       householdPreset: householdPresetFromCounts(nextAdults, nextChildren),
       householdCustomCount: null,
-      prioritizeMinProtein: prioritizeProtein,
-      minimumProteinGrams:
-        prioritizeProtein && Number.isFinite(parsedProtein) && parsedProtein > 0
-          ? Math.round(parsedProtein)
-          : null,
+      prioritizeMinProtein: userProfile.prioritizeMinProtein ?? true,
       macroSplitPreference,
       mealTiming,
-      prioritizeMinimalPrep,
-      lowComplexityEnabled,
       preferredCuisines,
-      weeklyMealPrepEnabled: weeklyPrepEnabled,
-      weeklyMealPrepSlot: weeklyPrepEnabled ? weeklyPrepSlot : null,
-      weeklyMealPrepRepeatCount: weeklyPrepRepeat,
+      ...deriveCookingFlags(planningPrefs),
+      proteinPreference,
+      eatenMeals,
+      snacksPerDay,
+      mealsPerDay: mealsPerDayFromSelections(eatenMeals, snacksPerDay),
+      shoppingTripsPerWeek: planningPrefs.shoppingTripsPerWeek,
+      cookingEventsPerWeek: planningPrefs.cookingEventsPerWeek,
+      maxLeftoverStreakDays: planningPrefs.maxLeftoverStreakDays,
+      ingredientVariety: planningPrefs.ingredientVariety,
+      maxPrepMinutes: planningPrefs.maxPrepMinutes,
+      snackStyle: planningPrefs.snackStyle,
+      preferredProteinSources: planningPrefs.preferredProteinSources,
+      avoidedProteinSources: planningPrefs.avoidedProteinSources,
+      kitchenEquipment: planningPrefs.kitchenEquipment,
+      dislikedFoodCustom: [userProfile.dislikedFoodCustom ?? "", planningPrefs.foodsToAvoid]
+        .flatMap((s) => s.split(","))
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((v, i, arr) => arr.indexOf(v) === i)
+        .join(", "),
+      minimumProteinGrams:
+        minProteinGrams.trim() !== "" && Number.isFinite(parsedProtein) && parsedProtein > 0
+          ? Math.round(parsedProtein)
+          : goalLinkedProteinGrams({
+              goal: userProfile.goal,
+              preference: proteinPreference,
+              weightKg: userProfile.weightKg,
+              heightCm: userProfile.heightCm,
+            }),
     };
     setUserProfile(next);
     setTargets(applyProfileToTargets(next));
@@ -136,7 +214,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {authSession && (
+        {authSession ? (
           <section className="space-y-2 border-b border-slate-100 pb-5">
             <h3 className="text-base font-semibold text-slate-900">Account</h3>
             <p className="text-sm text-slate-600">Signed in as {authSession.email}</p>
@@ -152,16 +230,56 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
               Log out
             </button>
           </section>
+        ) : (
+          <div className="border-b border-slate-100 pb-5">
+            <AccountSignupSection />
+          </div>
         )}
 
         <MinimumProteinSettings
-          profile={userProfile}
-          enabled={prioritizeProtein}
+          derivedGrams={goalLinkedProteinGrams({
+            goal: userProfile.goal,
+            preference: proteinPreference,
+            weightKg: userProfile.weightKg,
+            heightCm: userProfile.heightCm,
+          })}
+          weightKg={userProfile.weightKg}
+          heightCm={userProfile.heightCm}
+          goal={userProfile.goal}
+          preference={proteinPreference}
           proteinGrams={minProteinGrams}
-          onEnabledChange={setPrioritizeProtein}
           onProteinGramsChange={setMinProteinGrams}
-          onApplyPreset={(grams) => setMinProteinGrams(String(grams))}
         />
+
+        <section className="space-y-4 border-b border-slate-100 pb-5">
+          <ProteinPreferenceSection
+            value={proteinPreference}
+            onChange={setProteinPreference}
+            goal={userProfile.goal}
+            weightKg={userProfile.weightKg}
+            heightCm={userProfile.heightCm}
+            eatenMeals={eatenMeals}
+            snacksPerDay={snacksPerDay}
+          />
+        </section>
+
+        <section className="space-y-4 border-b border-slate-100 pb-5">
+          <MealPatternSection
+            eatenMeals={eatenMeals}
+            snacksPerDay={snacksPerDay}
+            onEatenMealsChange={setEatenMeals}
+            onSnacksPerDayChange={setSnacksPerDay}
+            compact
+          />
+        </section>
+
+        <section className="space-y-4 border-b border-slate-100 pb-5">
+          <CookingShoppingSection value={planningPrefs} onChange={setPlanningPrefs} />
+        </section>
+
+        <section className="space-y-4 border-b border-slate-100 pb-5">
+          <PlanningPrefsSection value={planningPrefs} onChange={setPlanningPrefs} />
+        </section>
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">
@@ -193,36 +311,15 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="space-y-4 border-b border-slate-100 pb-5">
-          <MealTimingPreferenceSection value={mealTiming} onChange={setMealTiming} />
-        </section>
-
-        <section className="space-y-4 border-b border-slate-100 pb-5">
-          <MinimalPrepPreferenceSection
-            enabled={prioritizeMinimalPrep}
-            onChange={setPrioritizeMinimalPrep}
-          />
-        </section>
-
-        <section className="space-y-4 border-b border-slate-100 pb-5">
-          <LowComplexityPreferenceSection
-            enabled={lowComplexityEnabled}
-            onChange={setLowComplexityEnabled}
+          <MealTimingPreferenceSection
+            value={mealTiming}
+            onChange={setMealTiming}
+            eatenMeals={eatenMeals}
           />
         </section>
 
         <section className="space-y-4 border-b border-slate-100 pb-5">
           <CuisinePreferenceSection selected={preferredCuisines} onChange={setPreferredCuisines} />
-        </section>
-
-        <section className="space-y-4 border-b border-slate-100 pb-5">
-          <WeeklyMealPrepSection
-            enabled={weeklyPrepEnabled}
-            slot={weeklyPrepSlot}
-            repeatCount={weeklyPrepRepeat}
-            onEnabledChange={setWeeklyPrepEnabled}
-            onSlotChange={setWeeklyPrepSlot}
-            onRepeatCountChange={setWeeklyPrepRepeat}
-          />
         </section>
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
@@ -261,7 +358,16 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             }}
             compact
           />
-          <HouseholdMembersEditor members={members} onChange={setMembers} />
+          {adults + childrenCount > 1 && (
+            <HouseholdDetailsSection
+              members={members}
+              onMembersChange={setMembers}
+              avoidChips={householdAvoidChips}
+              avoidCustom={householdAvoidCustom}
+              onAvoidChipsChange={setHouseholdAvoidChips}
+              onAvoidCustomChange={setHouseholdAvoidCustom}
+            />
+          )}
         </section>
 
         <div className="mt-6 flex gap-3">

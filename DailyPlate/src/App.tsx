@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { BottomNav } from "@/components/BottomNav";
 import { GroceryScreen } from "@/screens/GroceryScreen";
 import { PlanScreen } from "@/screens/PlanScreen";
@@ -28,6 +29,7 @@ export default function App() {
   if (showLogin && onboardingComplete !== true) {
     return (
       <div className="min-h-dvh bg-cream">
+        <AddToHomeScreenBanner />
         <LoginScreen
           onBack={() => setShowLogin(false)}
           onCreateAccount={() => setShowLogin(false)}
@@ -39,6 +41,7 @@ export default function App() {
   if (onboardingComplete !== true) {
     return (
       <div className="min-h-dvh bg-cream">
+        <AddToHomeScreenBanner />
         <OnboardingFlow onLogin={() => setShowLogin(true)} />
       </div>
     );
@@ -46,6 +49,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-cream">
+      <AddToHomeScreenBanner />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:shadow"

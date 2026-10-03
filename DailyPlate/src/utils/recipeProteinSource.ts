@@ -1,7 +1,7 @@
-import type { MealSlotId, Recipe } from "@/types";
+import type { Recipe, RecipeMealSlotId } from "@/types";
 import { isBeverageRecipe } from "@/utils/beverages";
 
-export type RecipeCategory = MealSlotId | "drink";
+export type RecipeCategory = RecipeMealSlotId;
 export type ProteinSourceFilter =
   | "all"
   | "chicken"
@@ -17,7 +17,6 @@ export const RECIPE_CATEGORY_TABS: { id: RecipeCategory; label: string }[] = [
   { id: "lunch", label: "Lunch" },
   { id: "dinner", label: "Dinner" },
   { id: "snack", label: "Snacks" },
-  { id: "drink", label: "Drinks" },
 ];
 
 export const PROTEIN_SOURCE_FILTERS: { id: ProteinSourceFilter; label: string; shortLabel: string }[] = [
@@ -32,13 +31,14 @@ export const PROTEIN_SOURCE_FILTERS: { id: ProteinSourceFilter; label: string; s
 ];
 
 function recipeSearchText(recipe: Recipe): string {
-  return `${recipe.name} ${recipe.ingredients.map((i) => i.name).join(" ")}`.toLowerCase();
+  return `${recipe.name} ${(recipe.searchAliases ?? []).join(" ")} ${recipe.ingredients.map((i) => i.name).join(" ")}`.toLowerCase();
 }
 
 function recipeNameSearchText(recipe: Recipe): string {
   const variationLabels = [
     ...(recipe.variations ?? []),
     ...(recipe.variationDetails?.map((v) => v.label) ?? []),
+    ...(recipe.searchAliases ?? []),
   ];
   return [recipe.name, ...variationLabels].join(" ");
 }
@@ -112,10 +112,7 @@ export function filterRecipesForLibrary(
 ): Recipe[] {
   const q = query.trim().toLowerCase();
 
-  let list =
-    category === "drink"
-      ? recipes.filter(isBeverageRecipe)
-      : recipes.filter((r) => r.mealSlots.includes(category));
+  let list = recipes.filter((r) => !isBeverageRecipe(r) && r.mealSlots.includes(category));
 
   if (proteinSource !== "all") {
     list = list.filter((r) => getProteinSource(r) === proteinSource);
@@ -132,10 +129,7 @@ export function countRecipesByProtein(
   recipes: Recipe[],
   category: RecipeCategory,
 ): Record<ProteinSourceFilter, number> {
-  const inCategory =
-    category === "drink"
-      ? recipes.filter(isBeverageRecipe)
-      : recipes.filter((r) => r.mealSlots.includes(category));
+  const inCategory = recipes.filter((r) => !isBeverageRecipe(r) && r.mealSlots.includes(category));
   const counts: Record<ProteinSourceFilter, number> = {
     all: inCategory.length,
     chicken: 0,

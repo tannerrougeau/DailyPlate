@@ -1,6 +1,12 @@
 import type { UserProfile } from "@/types/profile";
 import type { CheckInEntry, ExperienceRecommendation } from "@/types/tdeeFeedback";
 import {
+  checkInScale,
+  isLowScore,
+  isMaxScore,
+  isMidLowScore,
+} from "@/utils/checkInScale";
+import {
   analyzePersonalizationSignals,
   buildPersonalizationInsights,
   deriveAdaptiveProfileUpdates,
@@ -23,56 +29,84 @@ export function buildExperienceRecommendations(
     });
 
   const profileUpdates = deriveAdaptiveProfileUpdates(profile, logSignals, entry);
+  const variety = checkInScale(entry, "mealVarietySatisfaction");
+  const ease = checkInScale(entry, "planEaseOfUse");
+  const enjoyment = checkInScale(entry, "recipeEnjoyment");
+  const hunger = checkInScale(entry, "hungerManagement");
+  const protein = checkInScale(entry, "proteinAdherence");
+  const sleep = checkInScale(entry, "sleepQuality");
 
-  if (entry.mealVarietySatisfaction <= 5) {
+  if (isMidLowScore(variety)) {
     suggestions.push(
       "Meals felt repetitive — update cuisines and food preferences, then regenerate your week for more variety.",
     );
   }
 
-  if (entry.planEaseOfUse <= 5) {
+  if (isMidLowScore(ease)) {
     suggestions.push(
       "Following the plan felt hard — batch-cooking one lunch or dinner and locking meals you like can simplify your week.",
     );
   }
 
-  if (entry.recipeEnjoyment <= 5) {
+  if (isMidLowScore(enjoyment)) {
     suggestions.push(
       "Suggested meals weren't hitting the mark — refine food preferences in check-in and mark dislikes on recipe cards.",
     );
   }
 
-  if (entry.hungerManagement <= 4) {
+  if (isLowScore(hunger)) {
     suggestions.push(
       "You reported often feeling too hungry — a modest calorie increase may improve satiety (see calorie suggestions).",
     );
-  } else if (entry.hungerManagement >= 9 && profile.goal === "lose") {
+  } else if (isMaxScore(hunger) && profile.goal === "lose") {
     suggestions.push(
       "Hunger was well managed — you're in a good spot to stay consistent without feeling deprived.",
     );
   }
 
-  if (entry.proteinAdherence <= 5 && !profile.prioritizeMinProtein && !profileUpdates.prioritizeMinProtein) {
+  if (isMidLowScore(protein) && !profile.prioritizeMinProtein && !profileUpdates.prioritizeMinProtein) {
     suggestions.push(
       "Protein was a struggle — enable “Prioritize minimum protein target” in Settings to build more protein-forward plans.",
     );
   }
 
-  if (entry.mealVarietySatisfaction <= 6 && !profile.weeklyMealPrepEnabled && !profileUpdates.weeklyMealPrepEnabled) {
+  if (isMidLowScore(variety) && !profile.weeklyMealPrepEnabled && !profileUpdates.weeklyMealPrepEnabled) {
     suggestions.push(
       "Batch-cooking one lunch or dinner for a few days can reduce decision fatigue while keeping variety elsewhere.",
     );
   }
 
-  if (entry.planEaseOfUse <= 6 && !profile.prioritizeMinimalPrep && !profileUpdates.prioritizeMinimalPrep) {
+  if (isMidLowScore(ease) && !profile.prioritizeMinimalPrep && !profileUpdates.prioritizeMinimalPrep) {
     suggestions.push(
       "Enable quick & minimal prep in Settings if you want more no-cook and under-30-minute meals.",
     );
   }
 
-  if (entry.sleepQuality <= 4) {
+  if (isLowScore(sleep)) {
     suggestions.push(
       "Sleep was low — recovery affects hunger and training. Avoid aggressive calorie cuts until sleep improves.",
+    );
+  }
+
+  if (entry.leftoversFeltRepetitive === "yes") {
+    suggestions.push(
+      "Leftovers felt repetitive this week — shorten the leftover streak or add one more cooking day.",
+    );
+  } else if (entry.leftoversFeltRepetitive === "somewhat") {
+    suggestions.push(
+      "Leftovers were a bit repetitive — a little more variety or one extra cook can help.",
+    );
+  }
+
+  if ((entry.timesShoppedThisWeek ?? 0) >= 4) {
+    suggestions.push(
+      "You shopped several times — batching one meal can cut extra grocery trips.",
+    );
+  }
+
+  if ((entry.timesCookedThisWeek ?? 0) >= 6 && entry.leftoversFeltRepetitive !== "no") {
+    suggestions.push(
+      "Lots of cooking this week — leftover days or a batch slot can lighten the load.",
     );
   }
 

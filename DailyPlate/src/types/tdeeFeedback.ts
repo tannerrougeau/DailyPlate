@@ -9,6 +9,7 @@ export const MIN_WEEKS_FOR_ADAPTIVE = 4;
 
 export type WeightChangeDirection = "lost" | "gained" | "same";
 export type ActivityChangeOption = "none" | "more" | "less" | "other";
+export type LeftoversFeltRepetitive = "yes" | "somewhat" | "no";
 
 /** Saved check-in response (persisted per user / account). */
 export interface CheckInEntry {
@@ -19,6 +20,8 @@ export interface CheckInEntry {
   weightChangeDirection: WeightChangeDirection;
   weightChangeAmount: number | null;
   weightChangeUnit: WeightUnit;
+  /** 5 for current check-ins; missing or 10 means convert from the old 1–10 scale. */
+  scaleMax?: 5 | 10;
   energyLevel: number;
   calorieAdherence: number;
   proteinAdherence: number;
@@ -27,12 +30,15 @@ export interface CheckInEntry {
   sleepQuality: number;
   strengthProgress: number;
   strengthNotes: string;
-  /** User experience refinement (1–10 scales). */
+  /** User experience refinement (1–5 scales; older rows may still be 1–10). */
   mealVarietySatisfaction: number;
   planEaseOfUse: number;
   recipeEnjoyment: number;
   hungerManagement: number;
   experienceNotes: string;
+  timesShoppedThisWeek?: number;
+  timesCookedThisWeek?: number;
+  leftoversFeltRepetitive?: LeftoversFeltRepetitive;
 }
 
 /** @deprecated Use CheckInEntry */

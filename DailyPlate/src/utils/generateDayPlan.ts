@@ -1,5 +1,11 @@
-import type { DailyTargets, PlannedMeal, Recipe, MealSlotId } from "@/types";
-import type { MealTimingPreference } from "@/types/profile";
+import type { DailyTargets, KitchenEquipmentId, PlannedMeal, Recipe, MealSlotId } from "@/types";
+import type {
+  IngredientVariety,
+  MealTimingPreference,
+  MealsPerDay,
+  SnackStyle,
+  UserProfile,
+} from "@/types/profile";
 import { recipeExcludedByDislikeChips, recipeFavoriteBoost } from "@/utils/chipMatching";
 import type { PersonalizationSignals } from "@/utils/personalizationEngine";
 import { recipePersonalizationBoost } from "@/utils/personalizationEngine";
@@ -10,28 +16,31 @@ import {
   RECIPE_SCALE_MIN,
 } from "@/utils/macroRedistribution";
 import {
+  isSnackPlanSlot,
+  recipeFitsSlot,
+  recipeMatchesEquipment,
+  recipeMatchesSnackStyle,
+  recipeAvoidedByProteinSources,
+  slotsForLegacyMealsPerDay,
+  slotsForProfile,
+} from "@/utils/planningPrefs";
+import { getProteinSource } from "@/utils/recipeProteinSource";
+import {
   createPlannedMeal,
   defaultVariationId,
-  effectiveCarbVariationId,
   resolveRecipeMacros,
 } from "@/utils/recipeDisplay";
-import { isBeverageRecipe } from "@/utils/beverages";
+import { pickPreferredVariationId } from "@/utils/variationPrefs";
+import { isBeverageRecipe, mealMacrosWithBeverage } from "@/utils/beverages";
 
 export { isBeverageRecipe } from "@/utils/beverages";
+export { recipeFitsSlot } from "@/utils/planningPrefs";
 
 export function slotsForMealsPerDay(
-  m: "two" | "three" | "three_snack" | "flexible",
+  m: MealsPerDay | UserProfile | undefined | null,
 ): MealSlotId[] {
-  switch (m) {
-    case "two":
-      return ["lunch", "dinner"];
-    case "three":
-      return ["breakfast", "lunch", "dinner"];
-    case "three_snack":
-    case "flexible":
-    default:
-      return ["breakfast", "lunch", "dinner", "snack"];
-  }
+  if (m && typeof m === "object") return slotsForProfile(m);
+  return slotsForLegacyMealsPerDay(m ?? "three");
 }
 
 function timingBoost(
@@ -79,6 +88,29 @@ function recipeWeight(
     if (recipe.tags.includes("batch_friendly")) w += 16;
     if (recipe.prepMinutes + recipe.cookMinutes <= 30) w += 8;
   }
+  if (options.maxPrepMinutes != null) {
+    const total = recipe.prepMinutes + recipe.cookMinutes;
+    if (total <= options.maxPrepMinutes) w += 16;
+    else w -= 20;
+  }
+  if (isSnackPlanSlot(slot) && options.snackStyle && options.snackStyle !== "both") {
+    if (recipeMatchesSnackStyle(recipe, options.snackStyle)) w += 24;
+    else w -= 30;
+  }
+  const preferred = options.preferredProteinSources ?? [];
+  if (preferred.length > 0 && preferred.includes(getProteinSource(recipe))) {
+    w += 28;
+  }
+  if (options.ingredientVariety === "minimal" && options.pickedIngredientNames?.size) {
+    const names = recipe.ingredients.map((i) => i.name.toLowerCase());
+    const overlap = names.filter((n) => options.pickedIngredientNames!.has(n)).length;
+    w += overlap * 8;
+  }
+  if (options.ingredientVariety === "varied" && options.pickedIngredientNames?.size) {
+    const names = recipe.ingredients.map((i) => i.name.toLowerCase());
+    const overlap = names.filter((n) => options.pickedIngredientNames!.has(n)).length;
+    w -= overlap * 4;
+  }
   return Math.max(1, w);
 }
 
@@ -99,10 +131,30 @@ function isRecipeAllowed(
   dislikedIds: Set<string>,
   dislikedChips: string[],
   dislikedCustom: string,
+  options?: GenerateOptions,
+  slot?: MealSlotId,
 ): boolean {
   if (isBeverageRecipe(recipe)) return false;
   if (dislikedIds.has(recipe.id)) return false;
   if (recipeExcludedByDislikeChips(recipe, dislikedChips, dislikedCustom)) return false;
+  if (options && recipeAvoidedByProteinSources(recipe, options.avoidedProteinSources)) return false;
+  if (options && !recipeMatchesEquipment(recipe, options.kitchenEquipment)) return false;
+  if (
+    options &&
+    slot &&
+    isSnackPlanSlot(slot) &&
+    options.snackStyle &&
+    options.snackStyle !== "both" &&
+    !recipeMatchesSnackStyle(recipe, options.snackStyle)
+  ) {
+    return false;
+  }
+  if (options?.maxPrepMinutes != null) {
+    const total = recipe.prepMinutes + recipe.cookMinutes;
+    if (total > options.maxPrepMinutes && !recipe.tags.includes("packaged")) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -119,6 +171,13 @@ export interface GenerateOptions {
   minimumProteinGrams: number | null;
   /** When true, prefer simpler recipes and plan leftovers across the week. */
   lowComplexity?: boolean;
+  snackStyle?: SnackStyle;
+  maxPrepMinutes?: number | null;
+  preferredProteinSources?: string[];
+  avoidedProteinSources?: string[];
+  kitchenEquipment?: KitchenEquipmentId[];
+  ingredientVariety?: IngredientVariety;
+  pickedIngredientNames?: Set<string>;
   personalization?: {
     profile: import("@/types/profile").UserProfile;
     signals: PersonalizationSignals;
@@ -132,16 +191,19 @@ function calorieScaleLimits(prioritizeMinProtein: boolean): { min: number; max: 
   return { min: 0.75, max: 1.5 };
 }
 
-function recipeCaloriesAtDefault(recipe: Recipe): number {
-  return resolveRecipeMacros(recipe, defaultVariationId(recipe)).calories;
+function recipeCaloriesAtDefault(recipe: Recipe, variationId?: string): number {
+  return resolveRecipeMacros(recipe, variationId ?? defaultVariationId(recipe)).calories;
 }
 
 function scaleMealsForCalories(
-  raw: { slot: MealSlotId; recipe: Recipe }[],
+  raw: { slot: MealSlotId; recipe: Recipe; variationId?: string }[],
   calorieTarget: number,
   prioritizeMinProtein: boolean,
 ): PlannedMeal[] {
-  const baseTotal = raw.reduce((s, x) => s + recipeCaloriesAtDefault(x.recipe), 0);
+  const baseTotal = raw.reduce(
+    (s, x) => s + recipeCaloriesAtDefault(x.recipe, x.variationId),
+    0,
+  );
   const { min, max } = calorieScaleLimits(prioritizeMinProtein);
   let scale = 1;
   if (baseTotal > 0) {
@@ -152,8 +214,8 @@ function scaleMealsForCalories(
   if (prioritizeMinProtein) {
     scale = clampRecipeScale(scale);
   }
-  return raw.map(({ slot, recipe }) =>
-    createPlannedMeal(slot, recipe, { scale }),
+  return raw.map(({ slot, recipe, variationId }) =>
+    createPlannedMeal(slot, recipe, { scale, selectedVariationId: variationId }),
   );
 }
 
@@ -165,34 +227,65 @@ export function generateDayPlan(
   targets: DailyTargets,
   options: GenerateOptions,
 ): PlannedMeal[] {
-  const dislike = new Set(options.dislikedIds);
   const used = new Set<string>();
-  const raw: { slot: MealSlotId; recipe: Recipe }[] = [];
+  const raw: { slot: MealSlotId; recipe: Recipe; variationId?: string }[] = [];
 
-  for (const slot of options.slots) {
-    let pool = recipes.filter(
-      (r) =>
-        r.mealSlots.includes(slot) &&
-        isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom) &&
-        !used.has(r.id),
-    );
-    if (pool.length === 0) {
-      pool = recipes.filter(
-        (r) =>
-          isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom) &&
-          !used.has(r.id),
-      );
-    }
-    if (pool.length === 0) {
-      pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
-    }
-    const recipe = weightedPick(pool, (r) => recipeWeight(r, slot, options));
+  const live: GenerateOptions = {
+    ...options,
+    pickedIngredientNames: new Set(options.pickedIngredientNames),
+  };
+
+  for (const slot of live.slots) {
+    const recipe = pickSlotRecipe(recipes, slot, live, used);
     if (!recipe) continue;
     used.add(recipe.id);
-    raw.push({ slot, recipe });
+    rememberIngredients(live, recipe);
+    raw.push({
+      slot,
+      recipe,
+      variationId: pickPreferredVariationId(
+        recipe,
+        slot,
+        live.dislikedChips,
+        live.dislikedCustom,
+        live.snackStyle,
+      ),
+    });
   }
 
-  return scaleMealsForCalories(raw, targets.calories, options.prioritizeMinProtein);
+  return scaleMealsForCalories(raw, targets.calories, live.prioritizeMinProtein);
+}
+
+function rememberIngredients(options: GenerateOptions, recipe: Recipe) {
+  const names = options.pickedIngredientNames ?? new Set<string>();
+  for (const ing of recipe.ingredients) names.add(ing.name.toLowerCase());
+  options.pickedIngredientNames = names;
+}
+
+function pickSlotRecipe(
+  recipes: Recipe[],
+  slot: MealSlotId,
+  options: GenerateOptions,
+  used: Set<string>,
+): Recipe | undefined {
+  const dislike = new Set(options.dislikedIds);
+  let pool = recipes.filter(
+    (r) =>
+      recipeFitsSlot(r, slot) &&
+      isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom, options, slot) &&
+      !used.has(r.id),
+  );
+  if (pool.length === 0) {
+    pool = recipes.filter(
+      (r) =>
+        isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom, options, slot) &&
+        !used.has(r.id),
+    );
+  }
+  if (pool.length === 0) {
+    pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
+  }
+  return weightedPick(pool, (r) => recipeWeight(r, slot, options));
 }
 
 /**
@@ -208,34 +301,32 @@ export function generateSlotsPlan(
 ): PlannedMeal[] {
   if (slots.length === 0) return [];
 
-  const dislike = new Set(options.dislikedIds);
   const used = new Set(usedRecipeIds);
-  const raw: { slot: MealSlotId; recipe: Recipe }[] = [];
+  const raw: { slot: MealSlotId; recipe: Recipe; variationId?: string }[] = [];
+  const live: GenerateOptions = {
+    ...options,
+    pickedIngredientNames: new Set(options.pickedIngredientNames),
+  };
 
   for (const slot of slots) {
-    let pool = recipes.filter(
-      (r) =>
-        r.mealSlots.includes(slot) &&
-        isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom) &&
-        !used.has(r.id),
-    );
-    if (pool.length === 0) {
-      pool = recipes.filter(
-        (r) =>
-          isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom) &&
-          !used.has(r.id),
-      );
-    }
-    if (pool.length === 0) {
-      pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
-    }
-    const recipe = weightedPick(pool, (r) => recipeWeight(r, slot, options));
+    const recipe = pickSlotRecipe(recipes, slot, live, used);
     if (!recipe) continue;
     used.add(recipe.id);
-    raw.push({ slot, recipe });
+    rememberIngredients(live, recipe);
+    raw.push({
+      slot,
+      recipe,
+      variationId: pickPreferredVariationId(
+        recipe,
+        slot,
+        live.dislikedChips,
+        live.dislikedCustom,
+        live.snackStyle,
+      ),
+    });
   }
 
-  return scaleMealsForCalories(raw, calorieBudget, options.prioritizeMinProtein);
+  return scaleMealsForCalories(raw, calorieBudget, live.prioritizeMinProtein);
 }
 
 /** Pick one replacement recipe for a slot (used by Regenerate). */
@@ -245,48 +336,21 @@ export function pickRecipeForSlot(
   options: GenerateOptions,
   excludeIds: Set<string>,
 ): Recipe | undefined {
-  let pool = recipes.filter(
-    (r) =>
-      r.mealSlots.includes(slot) &&
-      isRecipeAllowed(
-        r,
-        new Set(options.dislikedIds),
-        options.dislikedChips,
-        options.dislikedCustom,
-      ) && !excludeIds.has(r.id),
-  );
-  if (pool.length === 0) {
-    pool = recipes.filter(
-      (r) =>
-        isRecipeAllowed(
-          r,
-          new Set(options.dislikedIds),
-          options.dislikedChips,
-          options.dislikedCustom,
-        ) && !excludeIds.has(r.id),
-    );
-  }
-  if (pool.length === 0) {
-    pool = recipes.filter((r) => !options.dislikedIds.includes(r.id) && !excludeIds.has(r.id) && !isBeverageRecipe(r));
-  }
-  return weightedPick(pool, (r) => recipeWeight(r, slot, options));
+  return pickSlotRecipe(recipes, slot, options, excludeIds);
 }
 
 export function sumPlannedMacros(meals: PlannedMeal[]): DailyTargets {
   return meals.reduce(
     (acc, m) => {
-      const macros = resolveRecipeMacros(
-        m.recipe,
-        m.selectedVariationId,
-        effectiveCarbVariationId(m),
-      );
+      const macros = mealMacrosWithBeverage(m);
       return {
-        calories: acc.calories + macros.calories * m.scale,
-        protein: acc.protein + macros.protein * m.scale,
-        carbs: acc.carbs + macros.carbs * m.scale,
-        fat: acc.fat + macros.fat * m.scale,
+        calories: acc.calories + macros.calories,
+        protein: acc.protein + macros.protein,
+        carbs: acc.carbs + macros.carbs,
+        fat: acc.fat + macros.fat,
+        fiber: (acc.fiber ?? 0) + (macros.fiber ?? 0),
       };
     },
-    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
   );
 }

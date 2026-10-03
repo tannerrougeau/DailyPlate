@@ -1,5 +1,6 @@
 import { recipeLibrary } from "@/recipes/recipeLibrary";
 import type { Recipe } from "@/types";
+import { RECIPE_MIGRATIONS } from "@/utils/recipeMigration";
 
 export function allRecipes(userRecipes: Recipe[] | null | undefined): Recipe[] {
   if (!userRecipes?.length) return recipeLibrary;
@@ -10,5 +11,6 @@ export function findRecipe(
   recipeId: string,
   userRecipes: Recipe[] | null | undefined,
 ): Recipe | undefined {
-  return userRecipes?.find((r) => r.id === recipeId) ?? recipeLibrary.find((r) => r.id === recipeId);
+  const targetId = RECIPE_MIGRATIONS[recipeId]?.recipeId ?? recipeId;
+  return userRecipes?.find((r) => r.id === targetId) ?? recipeLibrary.find((r) => r.id === targetId);
 }
