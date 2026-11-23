@@ -26,7 +26,10 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       { name: "Chopped walnuts or hazelnuts", quantity: 1, unit: "tbsp", category: "Pantry" },
       { name: "Chocolate protein powder (or vanilla)", quantity: 0.5, unit: "scoop", category: "Pantry" },
     ],
+    // The chocolate half scoop replaces half the vanilla scoop: 1 scoop total.
+    baseQuantities: { "Vanilla protein powder": 0.5 },
     instructions: [
+      "Use ½ scoop vanilla and ½ scoop chocolate protein powder in the base (1 scoop total).",
       "Mash half the banana into the oat base; layer remaining slices on top.",
       "Fold in chocolate chips and nuts before sealing jars.",
       "Stir before eating so chocolate melts slightly into the oats.",
@@ -74,7 +77,10 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       { name: "Strawberry jam (low sugar)", quantity: 1, unit: "tbsp", category: "Pantry" },
       { name: "Strawberry protein powder (or vanilla)", quantity: 0.5, unit: "scoop", category: "Pantry" },
     ],
+    // The strawberry half scoop replaces half the vanilla scoop: 1 scoop total.
+    baseQuantities: { "Vanilla protein powder": 0.5 },
     instructions: [
+      "Use ½ scoop vanilla and ½ scoop strawberry protein powder in the base (1 scoop total).",
       "Stir jam into the oat base for a ribbon effect.",
       "Fold in diced strawberries before sealing jars.",
       "Top with extra strawberry pieces when serving if desired.",
@@ -429,7 +435,8 @@ export const highProteinSmoothie: Recipe = {
   searchAliases: ["protein smoothie", "high protein smoothie"],
   cuisine: "american",
   tags: ["high_protein", "quick", "breakfast_friendly"],
-  mealSlots: ["breakfast", "snack"],
+  // Snack or drink alongside a meal (see BEVERAGES), not a main meal by itself.
+  mealSlots: ["snack"],
   calories: 118,
   protein: 23,
   carbs: 3,

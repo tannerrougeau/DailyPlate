@@ -9,12 +9,7 @@ import type {
 import { recipeExcludedByDislikeChips, recipeFavoriteBoost } from "@/utils/chipMatching";
 import type { PersonalizationSignals } from "@/utils/personalizationEngine";
 import { recipePersonalizationBoost } from "@/utils/personalizationEngine";
-import {
-  clampRecipeScale,
-  proteinDensity,
-  RECIPE_SCALE_MAX,
-  RECIPE_SCALE_MIN,
-} from "@/utils/macroRedistribution";
+import { proteinDensity, recipeFitForTarget } from "@/utils/macroRedistribution";
 import {
   isSnackPlanSlot,
   recipeFitsSlot,
@@ -25,11 +20,7 @@ import {
   slotsForProfile,
 } from "@/utils/planningPrefs";
 import { getProteinSource } from "@/utils/recipeProteinSource";
-import {
-  createPlannedMeal,
-  defaultVariationId,
-  resolveRecipeMacros,
-} from "@/utils/recipeDisplay";
+import { createPlannedMeal } from "@/utils/recipeDisplay";
 import { pickPreferredVariationId } from "@/utils/variationPrefs";
 import { isBeverageRecipe, mealMacrosWithBeverage } from "@/utils/beverages";
 
@@ -111,6 +102,11 @@ function recipeWeight(
     const overlap = names.filter((n) => options.pickedIngredientNames!.has(n)).length;
     w -= overlap * 4;
   }
+  // Prefer recipes whose portions can reach this slot's target; misses stay possible for small pools.
+  const slotTarget = options.slotTargets?.[slot];
+  if (slotTarget && !recipeFitForTarget(recipe, slotTarget).fits) {
+    return Math.max(1, w) * 0.08;
+  }
   return Math.max(1, w);
 }
 
@@ -182,41 +178,18 @@ export interface GenerateOptions {
     profile: import("@/types/profile").UserProfile;
     signals: PersonalizationSignals;
   };
+  /** Per-slot meal targets; picks that can be portioned to fit are preferred. */
+  slotTargets?: Partial<Record<MealSlotId, DailyTargets>>;
 }
 
-function calorieScaleLimits(prioritizeMinProtein: boolean): { min: number; max: number } {
-  if (prioritizeMinProtein) {
-    return { min: RECIPE_SCALE_MIN, max: RECIPE_SCALE_MAX };
-  }
-  return { min: 0.75, max: 1.5 };
-}
-
-function recipeCaloriesAtDefault(recipe: Recipe, variationId?: string): number {
-  return resolveRecipeMacros(recipe, variationId ?? defaultVariationId(recipe)).calories;
-}
-
-function scaleMealsForCalories(
+/** Goal portions are applied when the day is saved (see applyGoalPortions), so picks start at scale 1. */
+function toPlannedMeals(
   raw: { slot: MealSlotId; recipe: Recipe; variationId?: string }[],
-  calorieTarget: number,
-  prioritizeMinProtein: boolean,
 ): PlannedMeal[] {
-  const baseTotal = raw.reduce(
-    (s, x) => s + recipeCaloriesAtDefault(x.recipe, x.variationId),
-    0,
-  );
-  const { min, max } = calorieScaleLimits(prioritizeMinProtein);
-  let scale = 1;
-  if (baseTotal > 0) {
-    scale = calorieTarget / baseTotal;
-    scale = Math.min(max, Math.max(min, scale));
-    scale = Math.round(scale * 10) / 10;
-  }
-  if (prioritizeMinProtein) {
-    scale = clampRecipeScale(scale);
-  }
-  return raw.map(({ slot, recipe, variationId }) =>
-    createPlannedMeal(slot, recipe, { scale, selectedVariationId: variationId }),
-  );
+  return raw.map(({ slot, recipe, variationId }) => ({
+    ...createPlannedMeal(slot, recipe, { scale: 1, selectedVariationId: variationId }),
+    generated: true,
+  }));
 }
 
 /**
@@ -224,7 +197,6 @@ function scaleMealsForCalories(
  */
 export function generateDayPlan(
   recipes: Recipe[],
-  targets: DailyTargets,
   options: GenerateOptions,
 ): PlannedMeal[] {
   const used = new Set<string>();
@@ -253,7 +225,7 @@ export function generateDayPlan(
     });
   }
 
-  return scaleMealsForCalories(raw, targets.calories, live.prioritizeMinProtein);
+  return toPlannedMeals(raw);
 }
 
 function rememberIngredients(options: GenerateOptions, recipe: Recipe) {
@@ -290,11 +262,9 @@ function pickSlotRecipe(
 
 /**
  * Fill only the given slots; excludes recipe ids already used (e.g. locked meals).
- * Scales picks to fit calorieBudget.
  */
 export function generateSlotsPlan(
   recipes: Recipe[],
-  calorieBudget: number,
   options: GenerateOptions,
   slots: MealSlotId[],
   usedRecipeIds: Set<string>,
@@ -326,7 +296,7 @@ export function generateSlotsPlan(
     });
   }
 
-  return scaleMealsForCalories(raw, calorieBudget, live.prioritizeMinProtein);
+  return toPlannedMeals(raw);
 }
 
 /** Pick one replacement recipe for a slot (used by Regenerate). */

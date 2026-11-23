@@ -34,13 +34,13 @@ add({
   query: "Beef, ground, 93% lean meat / 7% fat, raw",
   per100g: { calories: 152, protein: 20.85, carbs: 0, fat: 7, fiber: 0 },
   grams: g(null, null, null, OZ, null),
-  aliases: ["Lean ground beef (93%)", "Lean beef strips"],
+  aliases: ["Lean ground beef (93%)"],
 });
 
 add({
   id: "chicken-breast-raw",
   name: "chicken breast, boneless skinless, raw",
-  fdcId: 171477,
+  fdcId: 171077,
   query: "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
   per100g: { calories: 120, protein: 22.5, carbs: 0, fat: 2.62, fiber: 0 },
   grams: g(null, null, null, OZ, null),
@@ -74,6 +74,11 @@ add({
   query: "Chicken, broilers or fryers, thigh, meat and skin, raw",
   per100g: { calories: 221, protein: 16.5, carbs: 0, fat: 16.6, fiber: 0 },
   grams: g(null, null, null, OZ, 116, { medium: 116 }),
+  edible: {
+    fraction: 0.79,
+    source:
+      "Approximate share of bone-in thigh weight that is meat and skin (bone ~21%, typical of USDA SR Legacy refuse for this cut). Verify.",
+  },
   aliases: ["Chicken thighs (bone-in, skin-on)"],
 });
 
@@ -84,7 +89,7 @@ add({
   query: "Beef, top sirloin, separable lean only, trimmed to 1/8 inch fat, raw",
   per100g: { calories: 157, protein: 21.8, carbs: 0, fat: 7.4, fiber: 0 },
   grams: g(null, null, null, OZ, null),
-  aliases: ["Sirloin steak"],
+  aliases: ["Sirloin steak", "Lean beef strips"],
 });
 
 add({
@@ -94,7 +99,17 @@ add({
   query: "Fish, salmon, Atlantic, farmed, raw",
   per100g: { calories: 208, protein: 20.42, carbs: 0, fat: 13.42, fiber: 0 },
   grams: g(null, null, null, OZ, null),
-  aliases: ["Salmon fillet", "Cooked salmon or tuna"],
+  aliases: ["Salmon fillet"],
+});
+
+add({
+  id: "salmon-cooked",
+  name: "salmon, Atlantic, farmed, cooked",
+  fdcId: 175168,
+  query: "Fish, salmon, Atlantic, farmed, cooked, dry heat",
+  per100g: { calories: 206, protein: 22.1, carbs: 0, fat: 12.35, fiber: 0 },
+  grams: g(null, null, null, OZ, null),
+  aliases: ["Cooked salmon or tuna"],
 });
 
 add({
@@ -139,8 +154,9 @@ add({
 
 add({
   id: "turkey-bacon",
-  name: "turkey bacon, cooked",
+  name: "turkey bacon, as packaged (precooked)",
   fdcId: null,
+  skipUsda: "Slices are weighed as packaged; USDA's only match is microwaved turkey bacon (drier, 368 kcal per 100 g). Typed as-packaged label values.",
   query: "Turkey bacon, cooked",
   per100g: { calories: 218, protein: 16.5, carbs: 1.5, fat: 16.8, fiber: 0 },
   grams: g(null, null, null, OZ, 15, { slice: 15, slices: 15 }),
@@ -150,7 +166,7 @@ add({
 add({
   id: "ham-deli",
   name: "ham, sliced, extra lean",
-  fdcId: null,
+  fdcId: 173863,
   query: "Ham, sliced, extra lean",
   per100g: { calories: 118, protein: 18.5, carbs: 1.5, fat: 3.8, fiber: 0 },
   grams: g(140, null, null, OZ, 28, { slice: 28, slices: 28 }),
@@ -158,11 +174,21 @@ add({
 });
 
 add({
-  id: "turkey-patty-cooked",
-  name: "ground turkey 93% lean, cooked",
-  fdcId: 174492,
-  query: "Turkey, ground, 93% lean, 7% fat, patties, broiled",
-  per100g: { calories: 196, protein: 27.4, carbs: 0, fat: 9.4, fiber: 0 },
+  id: "turkey-deli",
+  name: "turkey breast, sliced, prepackaged (deli)",
+  fdcId: 172941,
+  query: "Turkey breast, sliced, prepackaged",
+  per100g: { calories: 104, protein: 17.07, carbs: 4.21, fat: 1.66, fiber: 0.5 },
+  grams: g(null, null, null, OZ, 28, { slice: 28 }),
+  aliases: ["Sliced turkey", "Sliced turkey breast", "Diced turkey breast or deli turkey"],
+});
+
+add({
+  id: "turkey-patty-raw",
+  name: "turkey burger patty, 93% lean, raw",
+  fdcId: 172850,
+  query: "Turkey, ground, 93% lean, 7% fat, raw",
+  per100g: { calories: 150, protein: 18.73, carbs: 0, fat: 8.34, fiber: 0 },
   grams: g(null, null, null, OZ, 112, { large: 112 }),
   aliases: ["Turkey burger patty"],
 });
@@ -171,6 +197,7 @@ add({
   id: "chicken-sausage",
   name: "chicken sausage, cooked",
   fdcId: null,
+  skipUsda: "USDA's closest entry (chicken or turkey Italian sausage, FDC 173880) has an atypical 14 g carbs per 100 g; typed label values.",
   query: "Chicken sausage, cooked",
   per100g: { calories: 179, protein: 16.5, carbs: 2, fat: 11.5, fiber: 0 },
   grams: g(null, null, null, OZ, null),
@@ -189,10 +216,11 @@ add({
 
 add({
   id: "meat-stick",
-  name: "beef stick, smoked",
+  name: "meat stick, lean (packaged)",
   fdcId: null,
+  skipUsda: "Packaged product; typed values for a lean meat stick (USDA's smoked beef stick is a fattier style).",
   query: "Snacks, beef sticks, smoked",
-  per100g: { calories: 413, protein: 21.4, carbs: 6.5, fat: 33.2, fiber: 0 },
+  per100g: { calories: 290, protein: 30, carbs: 1, fat: 18, fiber: 0 },
   grams: g(null, null, null, OZ, 28, { stick: 28 }),
   aliases: ["Beef or turkey meat stick"],
 });
@@ -231,6 +259,7 @@ add({
   id: "protein-pasta-dry",
   name: "chickpea pasta, dry",
   fdcId: null,
+  skipUsda: "No chickpea pasta in USDA Foundation/SR Legacy; typed package-label values.",
   query: "Pasta, gluten-free, chickpea, dry",
   per100g: { calories: 352, protein: 21, carbs: 59, fat: 6, fiber: 11 },
   grams: g(91, null, null, OZ, null),
@@ -280,27 +309,27 @@ add({
 add({
   id: "tortilla-flour",
   name: "tortilla, flour, 10-inch",
-  fdcId: null,
+  fdcId: 175037,
   query: "Tortillas, ready-to-bake or -fry, flour",
   per100g: { calories: 312, protein: 8.2, carbs: 51.6, fat: 8, fiber: 3.1 },
-  grams: g(null, null, null, OZ, 72, { large: 72 }),
-  aliases: ["10-inch flour tortilla"],
+  grams: g(null, null, null, OZ, 72, { large: 72, small: 32 }),
+  aliases: ["10-inch flour tortilla", "6-inch flour tortillas"],
 });
 
 add({
   id: "tortilla-wheat",
   name: "tortilla, whole wheat",
-  fdcId: null,
+  fdcId: 174081,
   query: "Tortillas, ready-to-bake or -fry, whole wheat",
   per100g: { calories: 310, protein: 9.8, carbs: 50, fat: 7.5, fiber: 6.4 },
-  grams: g(null, null, null, OZ, 70, { large: 70 }),
-  aliases: ["Whole wheat or spinach tortilla"],
+  grams: g(null, null, null, OZ, 70, { large: 70, small: 32 }),
+  aliases: ["Whole wheat or spinach tortilla", "6-inch whole wheat tortillas"],
 });
 
 add({
   id: "tortilla-corn",
   name: "tortilla, corn, 6-inch",
-  fdcId: null,
+  fdcId: 175036,
   query: "Tortillas, ready-to-bake or -fry, corn",
   per100g: { calories: 218, protein: 5.7, carbs: 44.6, fat: 2.85, fiber: 6.3 },
   grams: g(null, null, null, OZ, 24, { small: 24 }),
@@ -335,8 +364,6 @@ add({
   per100g: { calories: 35, protein: 2.38, carbs: 7.18, fat: 0.41, fiber: 3.3 },
   grams: g(156, 9.8, 3.3, OZ, null, { cups: 156 }),
   aliases: [
-    "Broccoli",
-    "Broccoli florets",
     "Steamed broccoli",
     "Steamed broccoli florets, chopped",
     "Broccoli, cooked",
@@ -397,6 +424,7 @@ add({
   id: "whey",
   name: "whey protein powder",
   fdcId: null,
+  skipUsda: "USDA SR Legacy whey isolate (FDC 173177) lists 58 g protein and 29 g carbs per 100 g, unlike typical isolate; typed label values kept.",
   query: "Beverages, Whey protein powder isolate",
   per100g: { calories: 381, protein: 74.2, carbs: 9, fat: 3.2, fiber: 0 },
   grams: g(null, null, null, OZ, 31, { scoop: 31 }),
@@ -508,13 +536,15 @@ add({
   aliases: ["Salt", "Pinch of salt"],
 });
 
-function spice(id, name, query, aliases, tsp = 2.3) {
+const SPICE_PLACEHOLDER = { calories: 250, protein: 8, carbs: 50, fat: 6, fiber: 20 };
+
+function spice(id, name, query, aliases, tsp = 2.3, per100g = SPICE_PLACEHOLDER) {
   add({
     id,
     name,
     fdcId: null,
     query,
-    per100g: { calories: 250, protein: 8, carbs: 50, fat: 6, fiber: 20 },
+    per100g,
     grams: g(null, tsp * 3, tsp, OZ, null),
     aliases,
   });
@@ -523,9 +553,16 @@ function spice(id, name, query, aliases, tsp = 2.3) {
 spice("chili-powder", "chili powder", "Spices, chili powder", ["Chili powder", "Mild chili seasoning"], 2.7);
 spice("cinnamon", "cinnamon, ground", "Spices, cinnamon, ground", ["Cinnamon"], 2.6);
 spice("cumin", "cumin, ground", "Spices, cumin seed", ["Cumin"], 2.1);
-spice("garlic-powder", "garlic powder", "Spices, garlic powder", ["Garlic powder"], 3.1);
-spice("italian-herbs", "italian seasoning, dried", "Spices, poultry seasoning", ["Dried Italian herbs", "Dried oregano", "Italian herbs"], 1);
-spice("paprika", "paprika, smoked", "Spices, paprika", ["Smoked paprika"], 2.3);
+spice("garlic-powder", "garlic powder", "Spices, garlic powder", ["Garlic powder"], 3.1, {
+  calories: 331, protein: 16.55, carbs: 72.73, fat: 0.73, fiber: 9,
+});
+spice("italian-herbs", "italian seasoning, dried", "Spices, poultry seasoning", ["Dried Italian herbs", "Italian herbs"], 1);
+spice("oregano", "oregano, dried", "Spices, oregano, dried", ["Dried oregano"], 1, {
+  calories: 265, protein: 9, carbs: 68.92, fat: 4.28, fiber: 42.5,
+});
+spice("paprika", "paprika, smoked", "Spices, paprika", ["Smoked paprika"], 2.3, {
+  calories: 282, protein: 14.14, carbs: 53.99, fat: 12.89, fiber: 34.9,
+});
 spice("ranch", "ranch seasoning mix", "Spices, onion powder", ["Ranch seasoning mix"], 2);
 spice("ginger", "ginger, fresh", "Ginger root, raw", ["Ginger (fresh)"], 2);
 
@@ -639,17 +676,19 @@ add({
 });
 add({
   id: "hash-brown",
-  name: "hash brown potatoes, cooked",
-  fdcId: null,
-  query: "Potatoes, hashed brown, home-prepared",
-  per100g: { calories: 265, protein: 3, carbs: 35, fat: 12, fiber: 3 },
-  grams: g(156, null, null, OZ, null),
+  // Measured frozen, before cooking in the recipe's own measured oil: plain, no added fat.
+  name: "hash brown potatoes, frozen, plain, unprepared",
+  fdcId: 170043,
+  query: "Potatoes, hash brown, frozen, plain, unprepared",
+  per100g: { calories: 82, protein: 2.06, carbs: 17.72, fat: 0.62, fiber: 1.7 },
+  // Loosely measured frozen shreds; USDA's ½ cup = 105 g portion is packed.
+  grams: g(85, null, null, OZ, null),
   aliases: ["Shredded hash browns (cooked)"],
 });
 add({
   id: "sweet-potato-raw",
   name: "sweet potato, raw",
-  fdcId: null,
+  fdcId: 168482,
   query: "Sweet potato, raw, unprepared",
   per100g: { calories: 86, protein: 1.57, carbs: 20.12, fat: 0.05, fiber: 3 },
   grams: g(133, null, null, OZ, 130, { medium: 130, cups: 133 }),
@@ -687,8 +726,17 @@ add({
     "Bell pepper strips",
     "Bell peppers (optional)",
     "Diced bell pepper",
-    "Roasted red peppers, diced",
   ],
+});
+
+add({
+  id: "peppers-roasted-jarred",
+  name: "red peppers, roasted, jarred (canned)",
+  fdcId: 168546,
+  query: "Peppers, sweet, red, canned, solids and liquids",
+  per100g: { calories: 18, protein: 0.8, carbs: 3.8, fat: 0.3, fiber: 1.2 },
+  grams: g(null, null, null, OZ, null),
+  aliases: ["Roasted red peppers, diced"],
 });
 add({
   id: "berries",
@@ -728,7 +776,7 @@ add({
 add({
   id: "chickpeas",
   name: "chickpeas, canned, drained",
-  fdcId: null,
+  fdcId: 173800,
   query: "Chickpeas, canned, drained solids",
   per100g: { calories: 139, protein: 7.05, carbs: 22.53, fat: 2.77, fiber: 6.4 },
   grams: g(152, null, null, OZ, null),
@@ -923,11 +971,11 @@ add({
 add({
   id: "broccoli-raw",
   name: "broccoli, raw",
-  fdcId: null,
+  fdcId: 170379,
   query: "Broccoli, raw",
   per100g: { calories: 34, protein: 2.82, carbs: 6.64, fat: 0.37, fiber: 2.6 },
-  grams: g(90, null, null, OZ, null),
-  aliases: ["Riced broccoli"],
+  grams: g(91, null, null, OZ, null, { cups: 91 }),
+  aliases: ["Riced broccoli", "Broccoli", "Broccoli florets"],
 });
 add({
   id: "broth",
@@ -954,11 +1002,37 @@ add({
     "Shredded cheese",
     "Shredded cheese (optional)",
     "Sliced cheddar or American cheese",
-    "Pepper Jack cheese, shredded",
-    "Gruyère cheese, shredded",
-    "Shredded mozzarella or Gruyère",
-    "Swiss cheese, shredded",
   ],
+});
+
+add({
+  id: "pepper-jack",
+  name: "pepper jack cheese",
+  fdcId: null,
+  query: "Cheese, pepper jack",
+  per100g: { calories: 373, protein: 24.48, carbs: 0.68, fat: 30.28, fiber: 0 },
+  grams: g(113, 7, 2.3, OZ, 21, { slice: 21 }),
+  aliases: ["Pepper Jack cheese, shredded"],
+});
+
+add({
+  id: "gruyere",
+  name: "gruyere cheese",
+  fdcId: null,
+  query: "Cheese, gruyere",
+  per100g: { calories: 413, protein: 29.81, carbs: 0.36, fat: 32.34, fiber: 0 },
+  grams: g(108, 6.8, 2.3, OZ, null),
+  aliases: ["Gruyère cheese, shredded"],
+});
+
+add({
+  id: "swiss",
+  name: "swiss cheese",
+  fdcId: null,
+  query: "Cheese, swiss",
+  per100g: { calories: 393, protein: 26.96, carbs: 1.44, fat: 30.99, fiber: 0 },
+  grams: g(108, 6.8, 2.3, OZ, 28, { slice: 28 }),
+  aliases: ["Swiss cheese, shredded"],
 });
 add({
   id: "mozzarella",
@@ -967,7 +1041,7 @@ add({
   query: "Cheese, mozzarella, part skim milk",
   per100g: { calories: 254, protein: 24.26, carbs: 2.77, fat: 15.92, fiber: 0 },
   grams: g(112, 7, 2.3, OZ, 28, { stick: 28 }),
-  aliases: ["Mozzarella pearls", "Mozzarella string cheese"],
+  aliases: ["Mozzarella pearls", "Mozzarella string cheese", "Shredded mozzarella or Gruyère"],
 });
 add({
   id: "babybel",
@@ -998,10 +1072,10 @@ add({
 });
 add({
   id: "cream-cheese",
-  name: "cream cheese, light",
+  name: "cream cheese, low fat (light)",
   fdcId: null,
-  query: "Cheese, cream, fat free",
-  per100g: { calories: 105, protein: 15.69, carbs: 7.66, fat: 1, fiber: 0 },
+  query: "Cheese, cream, low fat",
+  per100g: { calories: 201, protein: 7.85, carbs: 8.13, fat: 15.28, fiber: 0 },
   grams: g(232, 14.5, 4.8, OZ, null),
   aliases: ["Light cream cheese"],
 });
@@ -1027,8 +1101,9 @@ add({
   id: "caesar",
   name: "caesar dressing, light",
   fdcId: null,
+  skipUsda: "USDA's 'low calorie' Caesar is close to fat-free; typed values from a typical light Caesar label.",
   query: "Salad dressing, caesar, low calorie",
-  per100g: { calories: 160, protein: 1.5, carbs: 6, fat: 14, fiber: 0.4 },
+  per100g: { calories: 200, protein: 1, carbs: 9, fat: 18, fiber: 0 },
   grams: g(240, 15, 5, OZ, null),
   aliases: ["Light Caesar dressing"],
 });
@@ -1176,7 +1251,6 @@ add({
   grams: g(60, 3.8, 1.3, OZ, 0.5, { leaves: 0.5 }),
   aliases: [
     "Fresh basil",
-    "Fresh chives, chopped",
     "Fresh cilantro",
     "Fresh dill or parsley (optional)",
     "Fresh herbs (parsley or cilantro)",
@@ -1185,6 +1259,16 @@ add({
     "Fresh thyme (optional)",
     "Parsley",
   ],
+});
+
+add({
+  id: "chives",
+  name: "chives, raw",
+  fdcId: null,
+  query: "Chives, raw",
+  per100g: { calories: 30, protein: 3.27, carbs: 4.35, fat: 0.73, fiber: 2.5 },
+  grams: g(48, 3, 1, OZ, null),
+  aliases: ["Fresh chives, chopped"],
 });
 add({
   id: "capers",
@@ -1197,9 +1281,9 @@ add({
 });
 add({
   id: "olives",
-  name: "olives, ripe, canned",
-  fdcId: null,
-  query: "Olives, ripe, canned",
+  name: "olives, ripe, canned (small-extra large)",
+  fdcId: 169094,
+  query: "Olives, ripe, canned (small-extra large)",
   per100g: { calories: 115, protein: 0.84, carbs: 6.26, fat: 10.68, fiber: 3.2 },
   grams: g(134, 8.4, 2.8, OZ, null),
   aliases: ["Kalamata olives (pitted, halved)", "Kalamata olives (pitted)"],
@@ -1253,6 +1337,7 @@ add({
   id: "protein-bar",
   name: "snack, protein bar",
   fdcId: null,
+  skipUsda: "Packaged product; typed label values.",
   query: "Snacks, protein bar",
   per100g: { calories: 404, protein: 23, carbs: 40, fat: 15, fiber: 6 },
   grams: g(null, null, null, OZ, 52, { bar: 52 }),
@@ -1262,6 +1347,7 @@ add({
   id: "protein-chips",
   name: "snack, protein chips",
   fdcId: null,
+  skipUsda: "Packaged product; typed label values.",
   query: "Snacks, tortilla chips, plain, white corn",
   per100g: { calories: 438, protein: 56, carbs: 22, fat: 16, fiber: 3 },
   grams: g(null, null, null, OZ, 32, { bag: 32 }),
@@ -1271,6 +1357,7 @@ add({
   id: "rtd-shake",
   name: "protein shake, ready-to-drink",
   fdcId: null,
+  skipUsda: "Packaged product; typed label values.",
   query: "Beverages, Protein powder soy based, prepared with water",
   per100g: { calories: 50, protein: 7.65, carbs: 2.35, fat: 1.47, fiber: 0.3 },
   grams: g(null, null, null, null, 340, { bottle: 340, "fl oz": FLOZ }),
@@ -1289,6 +1376,7 @@ add({
   id: "diet-drink",
   name: "carbonated beverage, diet",
   fdcId: null,
+  skipUsda: "USDA search returns regular cola; diet cola is zero-calorie.",
   query: "Beverages, carbonated, cola, diet",
   per100g: zero,
   grams: g(237, null, null, null, null, { "fl oz": FLOZ }),
@@ -1313,6 +1401,134 @@ add({
   grams: g(null, 7, 2.3, OZ, null),
   aliases: ["Black pepper"],
 });
+
+/*
+ * Portion roles, measuring state, and cooked/raw yields.
+ * role:  protein | carb | fat | vegetable | flavor — default for goal-based portions (recipes can override).
+ * state: raw | dry | cooked | as-sold — how the recipe amount is measured.
+ * yield: cookedPerRaw = cooked weight ÷ weight as measured (raw or dry). Cooked-state foods
+ *        keep the factor so the dry amount can be shown (dry = cooked ÷ cookedPerRaw);
+ *        dryCupGrams gives the household measure for that dry amount.
+ */
+const MEAT_YIELD_SOURCE =
+  "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut.";
+const VEG_YIELD_SOURCE =
+  "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together.";
+
+const ROLE_GROUPS = {
+  protein: [
+    "turkey-ground-93-raw", "beef-ground-93-raw", "chicken-breast-raw", "chicken-ground-raw",
+    "chicken-breast-roasted", "chicken-thigh-raw-skin", "sirloin-raw", "salmon-raw",
+    "tuna-canned-water", "egg-whole-raw", "egg-white-raw", "bacon-cooked", "turkey-bacon",
+    "ham-deli", "turkey-patty-raw", "chicken-sausage", "beef-jerky", "meat-stick", "whey",
+    "greek-nonfat", "greek-cup", "cottage-lowfat", "cottage-cup", "edamame", "smoked-salmon",
+    "protein-bar", "protein-chips", "rtd-shake", "salmon-cooked", "turkey-deli",
+  ],
+  carb: [
+    "rice-white-cooked", "oats-dry", "pasta-dry", "protein-pasta-dry", "bread-wheat", "bagel",
+    "croissant", "biscuit", "tortilla-flour", "tortilla-wheat", "tortilla-corn", "apple-raw",
+    "banana-raw", "potato-raw", "hash-brown", "sweet-potato-raw", "berries", "strawberries",
+    "black-beans", "chickpeas", "corn", "pineapple", "mango", "granola", "honey", "maple", "jam",
+    "sugar", "croutons", "almond-milk", "milk-2", "milk-fat-free",
+  ],
+  fat: [
+    "olive-oil", "butter", "chia", "almond-butter", "peanut-butter", "almonds", "peanuts",
+    "cashews", "pecans", "walnuts", "avocado-raw", "cheddar", "mozzarella", "babybel", "feta",
+    "parmesan", "cream-cheese", "sour-cream", "mayo", "caesar", "hummus", "coconut",
+    "pepper-jack", "gruyere", "swiss",
+  ],
+  vegetable: [
+    "broccoli-cooked", "green-beans-cooked", "asparagus-raw", "spinach-raw", "lettuce-raw",
+    "pepper-raw", "brussels", "carrot-raw", "celery-raw", "tomato-raw", "tomato-canned",
+    "cucumber-raw", "onion-raw", "zucchini-raw", "mushroom-raw", "cauliflower-raw",
+    "broccoli-raw", "frozen-veg", "peppers-roasted-jarred",
+  ],
+};
+
+const STATE_BY_ID = {
+  "chicken-breast-roasted": "cooked",
+  "salmon-cooked": "cooked",
+  "bacon-cooked": "cooked",
+  "chicken-sausage": "cooked",
+  "rice-white-cooked": "cooked",
+  "broccoli-cooked": "cooked",
+  "green-beans-cooked": "cooked",
+  "edamame": "cooked",
+  "corn": "cooked",
+  "frozen-veg": "cooked",
+  "oats-dry": "dry",
+  "pasta-dry": "dry",
+  "protein-pasta-dry": "dry",
+};
+
+const RAW_IDS = new Set([
+  "turkey-ground-93-raw", "beef-ground-93-raw", "chicken-breast-raw", "chicken-ground-raw",
+  "chicken-thigh-raw-skin", "sirloin-raw", "salmon-raw", "egg-whole-raw", "egg-white-raw",
+  "brussels", "berries", "strawberries", "pineapple", "mango", "ginger", "jalapeno", "herbs-fresh",
+]);
+
+const YIELD_BY_ID = {
+  "turkey-ground-93-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "turkey-patty-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "beef-ground-93-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "chicken-ground-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "chicken-breast-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "chicken-thigh-raw-skin": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "sirloin-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "salmon-raw": { cookedPerRaw: 0.8, source: MEAT_YIELD_SOURCE },
+  "rice-white-cooked": {
+    cookedPerRaw: 2.6,
+    dryCupGrams: 185,
+    source:
+      "Derived from USDA FoodData Central portion weights: 1 cup dry long-grain rice ≈ 185 g yields ≈ 3 cups cooked at 158 g.",
+  },
+  "pasta-dry": {
+    cookedPerRaw: 2.5,
+    source:
+      "Derived from USDA FoodData Central portion weights: 56 g (2 oz) dry yields ≈ 1 cup cooked at 140 g.",
+  },
+  "protein-pasta-dry": {
+    cookedPerRaw: 2.5,
+    source: "Assumed same as wheat pasta (USDA FoodData Central portion weights).",
+  },
+  "oats-dry": {
+    cookedPerRaw: 1,
+    source:
+      "Recipes list the soaking/cooking liquid separately, so oats add their dry weight only (avoids double counting).",
+  },
+  "spinach-raw": { cookedPerRaw: 0.3, source: VEG_YIELD_SOURCE },
+  "mushroom-raw": { cookedPerRaw: 0.6, source: VEG_YIELD_SOURCE },
+  "onion-raw": { cookedPerRaw: 0.75, source: VEG_YIELD_SOURCE },
+  "zucchini-raw": { cookedPerRaw: 0.8, source: VEG_YIELD_SOURCE },
+  "pepper-raw": { cookedPerRaw: 0.85, source: VEG_YIELD_SOURCE },
+};
+
+const roleById = new Map();
+for (const [role, ids] of Object.entries(ROLE_GROUPS)) {
+  for (const id of ids) roleById.set(id, role);
+}
+
+for (const f of foods) {
+  f.role = roleById.get(f.id) ?? "flavor";
+  f.state = STATE_BY_ID[f.id] ?? (RAW_IDS.has(f.id) || f.id.endsWith("-raw") ? "raw" : "as-sold");
+  f.yield = YIELD_BY_ID[f.id] ?? null;
+}
+
+// Keep values fetched from USDA (scripts/fetchUsda.ts) so a rebuild does not undo them.
+// Change the typed entry's query or fdcId and re-run the fetch to pick a different USDA food.
+const previous = fs.existsSync("src/data/ingredients.json")
+  ? new Map(JSON.parse(fs.readFileSync("src/data/ingredients.json", "utf8")).map((f) => [f.id, f]))
+  : new Map();
+for (const f of foods) {
+  const old = previous.get(f.id);
+  if (f.skipUsda || !old?.usda || old.query !== f.query || (f.fdcId != null && f.fdcId !== old.fdcId)) continue;
+  f.fdcId = old.fdcId;
+  f.per100g = old.per100g;
+  f.usda = old.usda;
+  for (const [unit, grams] of Object.entries(old.grams ?? {})) {
+    if (grams != null && f.grams[unit] == null) f.grams[unit] = grams;
+  }
+}
 
 const clean = foods.map((f) => {
   const grams = {

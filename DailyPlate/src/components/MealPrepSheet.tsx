@@ -74,7 +74,6 @@ export function MealPrepSheet({
     prepVariationId,
     portionsCooked,
     householdMult,
-    userProfile?.prioritizeMinProtein === true,
   );
   const profileSlots = userProfile
     ? slotsForMealsPerDay(userProfile)

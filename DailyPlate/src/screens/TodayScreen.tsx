@@ -12,7 +12,6 @@ import { TodayMealRow, UndoToast } from "@/components/TodayMealRow";
 import { TodayProgressCard } from "@/components/TodayProgressCard";
 import { UsageNote } from "@/components/UsageNote";
 import { PersonalizationInsightBanner } from "@/components/PersonalizationInsightBanner";
-import { MacroRedistributionNotice } from "@/components/MacroRedistributionNotice";
 import { useAppStore } from "@/store/useAppStore";
 import { slotsForMealsPerDay } from "@/utils/generateDayPlan";
 import { fromDateKey } from "@/utils/date";
@@ -65,10 +64,6 @@ export function TodayScreen() {
   const setMealTracking = useAppStore((s) => s.setMealTracking);
   const todayNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.today);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
-  const macroRedistributionNotices = useAppStore((s) => s.macroRedistributionNotices);
-  const dismissMacroRedistributionNotice = useAppStore(
-    (s) => s.dismissMacroRedistributionNotice,
-  );
   const personalizationInsight = useAppStore((s) => s.personalizationInsight);
   const dismissPersonalizationInsight = useAppStore((s) => s.dismissPersonalizationInsight);
 
@@ -175,12 +170,6 @@ export function TodayScreen() {
             Adjusted based on your recent check-in
           </SmartAdjustmentBadge>
         </div>
-      )}
-
-      {macroRedistributionNotices.includes(todayDateKey) && (
-        <MacroRedistributionNotice
-          onDismiss={() => dismissMacroRedistributionNotice(todayDateKey)}
-        />
       )}
 
       {personalizationInsight && (

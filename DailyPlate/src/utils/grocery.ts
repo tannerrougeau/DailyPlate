@@ -1,10 +1,11 @@
 import type { GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
-import { groceryItemForBeverage, plannedMealFoodScale, resolveBeverage } from "@/utils/beverages";
+import { groceryItemForBeverage, resolveBeverage } from "@/utils/beverages";
+import { batchServings, mealPortionLines } from "@/utils/mealPortions";
+import { sideLines } from "@/utils/mealSides";
 import {
   formatPracticalQty,
   roundIngredientQuantity,
 } from "@/utils/practicalScaling";
-import { effectiveCarbVariationId, effectiveFatVariationId, effectiveVariationId, scaledIngredientsForMeal } from "@/utils/recipeDisplay";
 
 const TINY_SEASONING =
   /salt|pepper|paprika|cumin|oregano|chili|herb|zest|garlic powder|onion powder|pinch|seasoning|spice/i;
@@ -12,7 +13,6 @@ const TINY_SEASONING =
 export function groceriesFromMeals(
   meals: PlannedMeal[],
   householdMultiplier = 1,
-  prioritizeMinProtein = false,
 ): GroceryItem[] {
   const map = new Map<string, GroceryItem>();
   const countedBatches = new Set<string>();
@@ -28,21 +28,17 @@ export function groceriesFromMeals(
       else map.set(drinkItem.key, { ...drinkItem });
     }
 
-    if (meal.mealPrep) {
-      if (countedBatches.has(meal.mealPrep.batchId)) continue;
-      countedBatches.add(meal.mealPrep.batchId);
-    }
+    // Sides belong to each day's serving, so they are counted before batch de-duplication.
+    const sides = sideLines(meal.sides).map((line) => line.ingredient);
 
-    const portionMult = meal.mealPrep?.portionsCooked ?? 1;
-    const ingredients = scaledIngredientsForMeal(
-      meal.recipe,
-      effectiveVariationId(meal),
-      plannedMealFoodScale(meal) * portionMult,
-      householdMultiplier,
-      prioritizeMinProtein,
-      effectiveCarbVariationId(meal),
-      effectiveFatVariationId(meal),
-    );
+    let ingredients: RecipeIngredient[] = sides;
+    if (!meal.mealPrep || !countedBatches.has(meal.mealPrep.batchId)) {
+      if (meal.mealPrep) countedBatches.add(meal.mealPrep.batchId);
+      ingredients = [
+        ...mealPortionLines(meal, batchServings(meal, householdMultiplier)).map((line) => line.ingredient),
+        ...sides,
+      ];
+    }
 
     for (const ing of ingredients) {
       if (/^(water|ice)$/i.test(ing.name.trim())) continue;

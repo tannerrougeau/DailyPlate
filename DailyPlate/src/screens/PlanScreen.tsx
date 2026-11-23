@@ -3,7 +3,6 @@ import { Lock, X } from "lucide-react";
 import { MealCard } from "@/components/MealCard";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import type { PlannedMeal, Recipe } from "@/types";
-import { MacroRedistributionNotice } from "@/components/MacroRedistributionNotice";
 import { RollingWeekCalendar } from "@/components/RollingWeekCalendar";
 import { useAppStore } from "@/store/useAppStore";
 import {
@@ -48,10 +47,6 @@ export function PlanScreen() {
   const dailyPlans = useAppStore((s) => s.dailyPlans);
   const lockedDays = useAppStore((s) => s.lockedDays);
   const toggleDayLock = useAppStore((s) => s.toggleDayLock);
-  const macroRedistributionNotices = useAppStore((s) => s.macroRedistributionNotices);
-  const dismissMacroRedistributionNotice = useAppStore(
-    (s) => s.dismissMacroRedistributionNotice,
-  );
 
   const selectedDateSet = useMemo(() => new Set(selectedKeys), [selectedKeys]);
   const visibleDays = useMemo(
@@ -207,7 +202,6 @@ export function PlanScreen() {
           dateKey={selectedDateKey}
           meals={selectedMeals}
           locked={lockedDays.includes(selectedDateKey)}
-          showMacroNotice={macroRedistributionNotices.includes(selectedDateKey)}
           calories={Math.round(sumPlannedMacros(selectedMeals).calories)}
           protein={Math.round(sumPlannedMacros(selectedMeals).protein)}
           targetCalories={targets.calories}
@@ -229,9 +223,6 @@ export function PlanScreen() {
             if (!ok) return;
             clearDayMeals(selectedDateKey);
           }}
-          onDismissMacroNotice={() =>
-            dismissMacroRedistributionNotice(selectedDateKey)
-          }
           onMealPrep={(recipe, variationId) => setMealPrep({ recipe, variationId })}
         />
       )}
@@ -252,7 +243,6 @@ function DayDetailSheet({
   dateKey,
   meals,
   locked,
-  showMacroNotice,
   calories,
   protein,
   targetCalories,
@@ -263,13 +253,11 @@ function DayDetailSheet({
   onToggleLock,
   onRegenerate,
   onClearDay,
-  onDismissMacroNotice,
   onMealPrep,
 }: {
   dateKey: string;
   meals: PlannedMeal[];
   locked: boolean;
-  showMacroNotice: boolean;
   calories: number;
   protein: number;
   targetCalories: number;
@@ -280,7 +268,6 @@ function DayDetailSheet({
   onToggleLock: () => void;
   onRegenerate: () => void;
   onClearDay: () => void;
-  onDismissMacroNotice: () => void;
   onMealPrep: (recipe: Recipe, variationId?: string) => void;
 }) {
   useOverlayBack(true, onClose);
@@ -374,9 +361,6 @@ function DayDetailSheet({
             </button>
           )}
         </div>
-        {showMacroNotice && (
-          <MacroRedistributionNotice onDismiss={onDismissMacroNotice} />
-        )}
         {meals.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-5">
             <p className="text-sm text-slate-500">No meals yet</p>

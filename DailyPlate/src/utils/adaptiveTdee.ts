@@ -9,6 +9,7 @@ import {
   isLowScore,
   isMidLowScore,
 } from "@/utils/checkInScale";
+import { splitRemainingMacros } from "@/utils/macroSplit";
 import { computeDailyTargets, computeFormulaTdee } from "@/utils/tdee";
 
 const KCAL_PER_KG = 7700;
@@ -247,14 +248,14 @@ export function targetsWithCalories(
 ): ReturnType<typeof computeDailyTargets> {
   const base = computeDailyTargets(profile);
   if (base.calories === calories) return base;
-  const proteinKcal = base.protein * 4;
-  const fatKcal = base.fat * 9;
-  const carbKcal = Math.max(0, calories - proteinKcal - fatKcal);
+  // Keep protein; re-split the rest by the chosen carb/fat ratio at the new calorie level.
+  const remainingKcal = Math.max(0, calories - base.protein * 4);
+  const { carbKcal, fatKcal } = splitRemainingMacros(remainingKcal, profile.macroSplitPreference);
   return {
     calories,
     protein: base.protein,
     carbs: Math.round(carbKcal / 4),
-    fat: base.fat,
+    fat: Math.round(fatKcal / 9),
     fiber: Math.round((calories / 1000) * 14),
   };
 }

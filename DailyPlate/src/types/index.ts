@@ -26,11 +26,16 @@ export type IngredientCategory =
   | "Grains"
   | "Spices";
 
+/** How an ingredient scales in goal-based portions. Default comes from ingredients.json. */
+export type IngredientRole = "protein" | "carb" | "fat" | "vegetable" | "flavor";
+
 export interface RecipeIngredient {
   name: string;
   quantity: number;
   unit: string;
   category: IngredientCategory;
+  /** Per-recipe override of the ingredients.json role. */
+  role?: IngredientRole;
 }
 
 export interface RecipeVariationDetail {
@@ -45,6 +50,8 @@ export interface RecipeVariationDetail {
   fiber?: number;
   /** When true, this variation replaces recipe.ingredients/instructions instead of adding to them. */
   replaceBase?: boolean;
+  /** Change base ingredient amounts for this build, by ingredient name (e.g. half the vanilla whey). */
+  baseQuantities?: Record<string, number>;
   /** Slot tags for this build. Omitted = inherit the recipe's mealSlots. */
   mealSlots?: RecipeMealSlotId[];
   /** When set, overrides recipe-level meal-prep eligibility for this build. */
@@ -70,6 +77,8 @@ export interface Recipe {
   fiber?: number;
   prepMinutes: number;
   cookMinutes: number;
+  /** How many servings the ingredient list makes (default 1). Stored macros are per serving. */
+  servings?: number;
   ingredients: RecipeIngredient[];
   instructions: string[];
   /** @deprecated Use variationDetails — labels only. */
@@ -115,6 +124,7 @@ export type BeverageId =
   | "milk"
   | "fat_free_milk"
   | "sweetened"
+  | "protein_drink"
   | "none";
 
 export interface PlannedMeal {
@@ -130,6 +140,33 @@ export interface PlannedMeal {
   selectedFatVariationId?: FatVariationId;
   /** Drink on this meal card. Default water. */
   beverageId?: BeverageId;
+  /** Goal-based role multipliers for the user's own serving (vs. the recipe's base serving). */
+  portion?: GoalPortion;
+  /** User chose Keep on the "doesn't fit" notice for this meal. */
+  kept?: boolean;
+  /** Actual cooked batch weight the user entered (g). Shared by every day of the same batch. */
+  weighedBatchGrams?: number;
+  /** Whole-food sides added to reach the meal target (user's serving only). */
+  sides?: RecipeIngredient[];
+  /** Set by plan generation until goal portions (and any automatic side) are applied. */
+  generated?: boolean;
+}
+
+export interface RoleMultipliers {
+  protein: number;
+  carb: number;
+  fat: number;
+  vegetable: number;
+}
+
+export interface GoalPortion {
+  multipliers: RoleMultipliers;
+  /** Meal targets this portion was sized for. */
+  target: DailyTargets;
+  /** Calories after rounding minus target (negative = under). */
+  kcalGap: number;
+  /** Within 10% of target calories with protein at target. */
+  fits: boolean;
 }
 
 export interface DailyTargets {

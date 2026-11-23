@@ -1,5 +1,5 @@
 import catalogJson from "@/data/ingredients.json";
-import type { RecipeIngredient } from "@/types";
+import type { IngredientCategory, IngredientRole, RecipeIngredient } from "@/types";
 
 export type NutrientVector = {
   calories: number;
@@ -17,7 +17,18 @@ export type IngredientRecord = {
   per100g: NutrientVector;
   grams: Record<string, number | null>;
   aliases: string[];
+  role?: IngredientRole;
+  /** How recipe amounts are measured: raw, dry, cooked, or as sold. */
+  state?: IngredientState;
+  /** cookedPerRaw = cooked weight ÷ measured weight, with its source. */
+  yield?: { cookedPerRaw: number; source: string; dryCupGrams?: number } | null;
+  /** Bone-in cuts: share of the bought weight that is eaten (nutrition uses only this part). */
+  edible?: { fraction: number; source: string } | null;
+  /** Set by scripts/fetchUsda.ts: the USDA food the values came from. */
+  usda?: { description: string; dataType?: string } | null;
 };
+
+export type IngredientState = "raw" | "dry" | "cooked" | "as-sold";
 
 const catalog = catalogJson as unknown as IngredientRecord[];
 
@@ -103,7 +114,7 @@ export function nutritionFromIngredients(
     const food = matchIngredient(ing.name);
     const grams = gramsForIngredient(ing);
     if (!food || grams == null) return null;
-    const factor = grams / 100;
+    const factor = (grams * edibleFraction(food)) / 100;
     totals.calories += food.per100g.calories * factor;
     totals.protein += food.per100g.protein * factor;
     totals.carbs += food.per100g.carbs * factor;
@@ -122,3 +133,77 @@ export function nutritionFromIngredients(
 export function ingredientCatalog(): IngredientRecord[] {
   return catalog;
 }
+
+const CATEGORY_ROLE: Partial<Record<IngredientCategory, IngredientRole>> = {
+  Protein: "protein",
+  Grains: "carb",
+  Spices: "flavor",
+  Produce: "vegetable",
+};
+
+/** Recipe override, then ingredients.json default, then category, then flavor. */
+export function ingredientRole(ing: Pick<RecipeIngredient, "name" | "category" | "role">): IngredientRole {
+  if (ing.role) return ing.role;
+  const food = matchIngredient(ing.name);
+  if (food?.role) return food.role;
+  return CATEGORY_ROLE[ing.category] ?? "flavor";
+}
+
+export function ingredientState(name: string): IngredientState {
+  return matchIngredient(name)?.state ?? "as-sold";
+}
+
+/** Cooked weight ÷ measured weight; 1 when the food does not change weight. */
+export function cookedPerMeasured(name: string): number {
+  const y = matchIngredient(name)?.yield?.cookedPerRaw;
+  return y != null && Number.isFinite(y) && y > 0 ? y : 1;
+}
+
+/** Grams of the food in the state ingredients.json measures it, from a cooked weight. */
+export function measuredGramsFromCooked(name: string, cookedGrams: number): number {
+  return cookedGrams / cookedPerMeasured(name);
+}
+
+/** Cooked weight from grams in the measured (raw or dry) state. */
+export function cookedGramsFromMeasured(name: string, measuredGrams: number): number {
+  return measuredGrams * cookedPerMeasured(name);
+}
+
+function edibleFraction(food: IngredientRecord): number {
+  const f = food.edible?.fraction;
+  return f != null && f > 0 && f <= 1 ? f : 1;
+}
+
+/** Nutrients for a gram amount (as bought) of a matched food; bone-in cuts count only the edible part. */
+export function nutritionForGrams(name: string, grams: number): NutrientVector | null {
+  const food = matchIngredient(name);
+  if (!food || !Number.isFinite(grams)) return null;
+  const f = (grams * edibleFraction(food)) / 100;
+  return {
+    calories: food.per100g.calories * f,
+    protein: food.per100g.protein * f,
+    carbs: food.per100g.carbs * f,
+    fat: food.per100g.fat * f,
+    fiber: food.per100g.fiber * f,
+  };
+}
+
+/** Grams per one of the given unit for a food, or null when unknown. */
+export function gramsPerUnit(name: string, unit: string): number | null {
+  const food = matchIngredient(name);
+  if (!food) return null;
+  const per = food.grams[normalizeUnit(unit)];
+  return per != null && Number.isFinite(per) && per > 0 ? per : null;
+}
+
+export function addNutrients(a: NutrientVector, b: NutrientVector, times = 1): NutrientVector {
+  return {
+    calories: a.calories + b.calories * times,
+    protein: a.protein + b.protein * times,
+    carbs: a.carbs + b.carbs * times,
+    fat: a.fat + b.fat * times,
+    fiber: a.fiber + b.fiber * times,
+  };
+}
+
+export const ZERO_NUTRIENTS: NutrientVector = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };

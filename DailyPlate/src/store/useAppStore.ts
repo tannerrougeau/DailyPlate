@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { BeverageId, DailyTargets, DayMealTracking, MealSlotId, MealTrackingEntry, PlannedMeal, Recipe, RecipeMealSlotId } from "@/types";
+import type { BeverageId, DailyTargets, DayMealTracking, MealSlotId, MealTrackingEntry, PlannedMeal, Recipe, RecipeIngredient, RecipeMealSlotId } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import { allRecipes, findRecipe } from "@/recipes/recipePool";
 import {
@@ -37,7 +37,8 @@ import {
   applyLowComplexityFromDay,
   applyLowComplexityToPlans,
 } from "@/utils/lowComplexityPlan";
-import { applyMacroRedistribution } from "@/utils/macroRedistribution";
+import { applyGoalPortions, samePortions } from "@/utils/mealPortions";
+import { splitMealTargets } from "@/utils/mealTargets";
 import { createPlannedMeal, resolveVariationId } from "@/utils/recipeDisplay";
 import {
   applySlotBeverageDefaults,
@@ -191,11 +192,6 @@ function buildSlotReplacementMeals(
   if (!opts) return null;
   const base = mealsForDate(state, dateKey);
   const others = base.filter((m) => m.slot !== slot);
-  const lockedSlots = new Set(
-    base
-      .filter((m) => isMealLocked(state.lockedMeals, dateKey, m.slot))
-      .map((m) => m.slot),
-  );
   const prior = base.find((m) => m.slot === slot);
   const draft = [
     ...others,
@@ -214,7 +210,26 @@ function buildSlotReplacementMeals(
   ];
   const order = slotsForMealsPerDay(state.userProfile!);
   const sorted = draft.sort((a, b) => order.indexOf(a.slot) - order.indexOf(b.slot));
-  return applyMacroRedistribution(sorted, state.targets, opts, recipesFor(state), lockedSlots);
+  return { meals: sorted, redistributed: false };
+}
+
+/** Patch one meal's fields in dailyPlans (and plannedMeals when the day is today). */
+function patchMealInDay(
+  set: (fn: (s: AppState) => Partial<AppState>) => void,
+  get: () => AppState,
+  dateKey: string,
+  slot: MealSlotId,
+  patch: Partial<PlannedMeal>,
+) {
+  if (!mealsForDate(get(), dateKey).some((m) => m.slot === slot)) return;
+  const update = (meals: PlannedMeal[]) =>
+    meals.map((m) => (m.slot === slot ? { ...m, ...patch } : m));
+  set((s) => ({
+    dailyPlans: s.dailyPlans[dateKey]
+      ? { ...s.dailyPlans, [dateKey]: update(s.dailyPlans[dateKey]!) }
+      : s.dailyPlans,
+    plannedMeals: dateKey === s.todayDateKey ? update(s.plannedMeals) : s.plannedMeals,
+  }));
 }
 
 export type DayPlanBuildResult = {
@@ -264,14 +279,11 @@ function buildDayPlanRespectingLocks(
   let merged: PlannedMeal[];
   if (preserved.length === 0) {
     // Full day replacement — discard any existing unlocked meals.
-    merged = generateDayPlan(library, state.targets, opts);
+    merged = generateDayPlan(library, opts);
   } else {
-    const preservedCals = sumPlannedMacros(preserved).calories;
-    const calorieBudget = Math.max(300, state.targets.calories - preservedCals);
     const usedIds = new Set(preserved.map((m) => m.recipe.id));
     const fresh = generateSlotsPlan(
       library,
-      calorieBudget,
       opts,
       slotsToFill,
       usedIds,
@@ -282,22 +294,16 @@ function buildDayPlanRespectingLocks(
     );
   }
 
-  const { meals, redistributed } = applyMacroRedistribution(
-    merged,
-    state.targets,
-    opts,
-    library,
-    lockedSlots,
-  );
   return {
-    meals: applySlotBeverageDefaults(meals, state.lastBeverageBySlot, preserved),
-    redistributed,
+    meals: applySlotBeverageDefaults(merged, state.lastBeverageBySlot, preserved),
+    redistributed: false,
   };
 }
 
 function buildGenerateOptions(
   s: Pick<
     AppState,
+    | "targets"
     | "favoriteIds"
     | "dislikedIds"
     | "userProfile"
@@ -346,6 +352,11 @@ function buildGenerateOptions(
       profile: s.userProfile,
       signals,
     },
+    slotTargets: splitMealTargets({
+      daily: s.targets,
+      slots: slotsForMealsPerDay(s.userProfile).map((slot) => ({ slot, kind: "cooked" as const })),
+      timing: s.userProfile.mealTiming,
+    }),
   };
 }
 
@@ -463,6 +474,14 @@ export interface AppState {
     carbVariationId: import("@/types").CarbVariationId,
   ) => void;
   setMealBeverage: (dateKey: string, slot: PlannedMeal["slot"], beverageId: BeverageId) => void;
+  /** Keep a meal that cannot fit its target: use the closest fit and stop showing the notice. */
+  keepMeal: (dateKey: string, slot: MealSlotId) => void;
+  /** Actual cooked batch weight (g) for a meal and every day of the same batch; null clears it. */
+  setWeighedBatch: (dateKey: string, slot: MealSlotId, grams: number | null) => void;
+  /** Add whole-food sides to a meal (from the "Add side" suggestion). */
+  addMealSides: (dateKey: string, slot: MealSlotId, sides: RecipeIngredient[]) => void;
+  /** Remove one side from a meal. */
+  removeMealSide: (dateKey: string, slot: MealSlotId, index: number) => void;
   setMealFatVariation: (
     dateKey: string,
     slot: PlannedMeal["slot"],
@@ -1229,6 +1248,49 @@ export const useAppStore = create<AppState>()(
         void get().syncAccountSnapshot();
       },
 
+      keepMeal: (dateKey, slot) => {
+        patchMealInDay(set, get, dateKey, slot, { kept: true });
+        void get().syncAccountSnapshot();
+      },
+
+      setWeighedBatch: (dateKey, slot, grams) => {
+        const value = grams != null && Number.isFinite(grams) && grams > 0 ? Math.round(grams) : undefined;
+        const meal = mealsForDate(get(), dateKey).find((m) => m.slot === slot);
+        const batchId = meal?.mealPrep?.batchId;
+        if (!batchId) {
+          patchMealInDay(set, get, dateKey, slot, { weighedBatchGrams: value });
+        } else {
+          // Meal prep and leftovers: every day cooked from this batch shares the weight.
+          const update = (meals: PlannedMeal[]) =>
+            meals.map((m) => (m.mealPrep?.batchId === batchId ? { ...m, weighedBatchGrams: value } : m));
+          set((s) => ({
+            dailyPlans: Object.fromEntries(
+              Object.entries(s.dailyPlans).map(([key, meals]) => [
+                key,
+                meals.some((m) => m.mealPrep?.batchId === batchId) ? update(meals) : meals,
+              ]),
+            ),
+            plannedMeals: update(s.plannedMeals),
+          }));
+        }
+        void get().syncAccountSnapshot();
+      },
+
+      addMealSides: (dateKey, slot, sides) => {
+        const meal = mealsForDate(get(), dateKey).find((m) => m.slot === slot);
+        if (!meal || sides.length === 0) return;
+        patchMealInDay(set, get, dateKey, slot, { sides: [...(meal.sides ?? []), ...sides] });
+        void get().syncAccountSnapshot();
+      },
+
+      removeMealSide: (dateKey, slot, index) => {
+        const meal = mealsForDate(get(), dateKey).find((m) => m.slot === slot);
+        if (!meal?.sides) return;
+        const next = meal.sides.filter((_, i) => i !== index);
+        patchMealInDay(set, get, dateKey, slot, { sides: next.length > 0 ? next : undefined });
+        void get().syncAccountSnapshot();
+      },
+
       swapMealSlots: (dateKey, slotA, slotB) => {
         if (slotA === slotB) return;
         const state = get();
@@ -1304,9 +1366,10 @@ export const useAppStore = create<AppState>()(
 
         const built = buildSlotReplacementMeals(state, targetDateKey, slot, pick);
         if (!built) return;
+        const regenerated = built.meals.map((m) => (m.slot === slot ? { ...m, generated: true } : m));
 
         set((s) => ({
-          ...setDayMeals(s, targetDateKey, built.meals),
+          ...setDayMeals(s, targetDateKey, regenerated),
           mealTracking: clearSlotTracking(s.mealTracking, targetDateKey, slot),
           macroRedistributionNotices: built.redistributed
             ? [...new Set([...s.macroRedistributionNotices, targetDateKey])]
@@ -1658,3 +1721,80 @@ export function useTodayTotals() {
   const plannedMeals = useAppStore((s) => s.plannedMeals);
   return sumPlannedMacros(mealsForDate({ dailyPlans, plannedMeals, todayDateKey }, todayDateKey));
 }
+
+/**
+ * Goal-based portions: whenever plans, targets, the profile, meal locks, or logs change, re-size
+ * today's and future meals to their share of the daily targets. Never changed: past days, kept
+ * meals, locked meals, and meals logged as eaten. The samePortions check stops the update from
+ * re-triggering itself.
+ */
+function portionedPlans(
+  s: AppState,
+): Pick<AppState, "dailyPlans" | "plannedMeals"> | null {
+  if (!s.userProfile || !(s.targets.calories > 0)) return null;
+  const timing = s.userProfile.mealTiming;
+  const resize = (dateKey: string, meals: PlannedMeal[]) => {
+    const lockedSlots = new Set(
+      meals.filter((m) => isMealLocked(s.lockedMeals, dateKey, m.slot)).map((m) => m.slot),
+    );
+    // Meals already logged as eaten keep the amounts they were eaten at.
+    const day = s.mealTracking[dateKey] ?? {};
+    const fixedSlots = new Set(
+      meals
+        .filter((m) => {
+          const entry = day[m.slot];
+          return entry != null && entry.status !== "skipped";
+        })
+        .map((m) => m.slot),
+    );
+    return applyGoalPortions(meals, s.targets, { timing, lockedSlots, fixedSlots });
+  };
+  let dailyChanged = false;
+  let todayChanged = false;
+  const nextDaily: Record<string, PlannedMeal[]> = {};
+  for (const [dateKey, meals] of Object.entries(s.dailyPlans)) {
+    if (dateKey < s.todayDateKey) {
+      nextDaily[dateKey] = meals;
+      continue;
+    }
+    const next = resize(dateKey, meals);
+    if (samePortions(next, meals)) {
+      nextDaily[dateKey] = meals;
+    } else {
+      nextDaily[dateKey] = next;
+      dailyChanged = true;
+    }
+  }
+  let plannedMeals = s.plannedMeals;
+  const today = nextDaily[s.todayDateKey];
+  if (today) {
+    if (today !== s.plannedMeals && !samePortions(today, s.plannedMeals)) {
+      plannedMeals = today;
+      todayChanged = true;
+    }
+  } else if (s.plannedMeals.length > 0) {
+    const next = resize(s.todayDateKey, s.plannedMeals);
+    if (!samePortions(next, s.plannedMeals)) {
+      plannedMeals = next;
+      todayChanged = true;
+    }
+  }
+  if (!dailyChanged && !todayChanged) return null;
+  return { dailyPlans: dailyChanged ? nextDaily : s.dailyPlans, plannedMeals };
+}
+
+useAppStore.subscribe((s, prev) => {
+  if (
+    s.dailyPlans === prev.dailyPlans &&
+    s.plannedMeals === prev.plannedMeals &&
+    s.targets === prev.targets &&
+    s.userProfile === prev.userProfile &&
+    s.lockedMeals === prev.lockedMeals &&
+    s.mealTracking === prev.mealTracking &&
+    s.todayDateKey === prev.todayDateKey
+  ) {
+    return;
+  }
+  const next = portionedPlans(s);
+  if (next) useAppStore.setState(next);
+});

@@ -9,6 +9,7 @@ import { mealDisplayName } from "@/utils/recipeDisplay";
 import { recipeMatchesSearch } from "@/utils/recipeProteinSource";
 import { isBeverageRecipe, recipeFitsSlot } from "@/utils/generateDayPlan";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
+import { closestFitRecipes, type RecipeFit } from "@/utils/macroRedistribution";
 import { SLOT_LABELS } from "@/utils/planningPrefs";
 
 const slotLabel = SLOT_LABELS;
@@ -17,12 +18,15 @@ export function ReplaceMealSheet({
   meal,
   dateKey,
   excludeRecipeIds,
+  closestFit = false,
   onClose,
   onSelect,
 }: {
   meal: PlannedMeal;
   dateKey: string;
   excludeRecipeIds: Set<string>;
+  /** Opened from "Swap meal": list the closest fits for this slot's target first. */
+  closestFit?: boolean;
   onClose: () => void;
   onSelect: (recipeId: string) => void;
 }) {
@@ -45,6 +49,24 @@ export function ReplaceMealSheet({
     if (!q) return pool;
     return pool.filter((r) => recipeMatchesSearch(r, q));
   }, [meal.recipe.id, meal.slot, query, userRecipes]);
+
+  const fits = useMemo(() => {
+    const target = meal.portion?.target;
+    if (!closestFit || !target) return new Map<string, RecipeFit>();
+    const library = allRecipes(userRecipes);
+    const exclude = new Set([...excludeRecipeIds, meal.recipe.id]);
+    return new Map(
+      closestFitRecipes(library, meal.slot, target, exclude).map((c) => [c.recipe.id, c.fit] as const),
+    );
+  }, [closestFit, meal.portion?.target, meal.recipe.id, meal.slot, excludeRecipeIds, userRecipes]);
+
+  const ordered = useMemo(() => {
+    if (fits.size === 0 || query.trim()) return candidates;
+    const top = [...fits.keys()]
+      .map((id) => candidates.find((r) => r.id === id))
+      .filter((r): r is NonNullable<typeof r> => r != null);
+    return [...top, ...candidates.filter((r) => !fits.has(r.id))];
+  }, [candidates, fits, query]);
 
   return (
     <div className="fixed inset-0 z-[92] flex items-end justify-center sm:items-center">
@@ -100,11 +122,12 @@ export function ReplaceMealSheet({
         </div>
 
         <ul className="min-h-0 flex-1 overflow-y-auto p-2">
-          {candidates.length === 0 ? (
+          {ordered.length === 0 ? (
             <li className="px-4 py-10 text-center text-sm text-slate-500">No matching recipes.</li>
           ) : (
-            candidates.map((recipe) => {
+            ordered.map((recipe) => {
               const alreadyPlanned = excludeRecipeIds.has(recipe.id);
+              const fit = query.trim() ? undefined : fits.get(recipe.id);
               return (
                 <li key={recipe.id}>
                   <button
@@ -123,6 +146,11 @@ export function ReplaceMealSheet({
                       <p className="mt-0.5 text-xs capitalize text-slate-400">
                         {recipe.cuisine} · {Math.round(recipe.calories)} kcal
                       </p>
+                      {fit && (
+                        <p className="mt-1 text-[11px] font-medium text-emerald-800">
+                          {fitLabel(fit)}
+                        </p>
+                      )}
                       {alreadyPlanned && (
                         <p className="mt-1 text-[10px] font-medium text-amber-700">
                           Already on this day
@@ -138,4 +166,10 @@ export function ReplaceMealSheet({
       </section>
     </div>
   );
+}
+
+function fitLabel(fit: RecipeFit): string {
+  if (fit.fits) return "Fits your target";
+  const gap = Math.round(Math.abs(fit.kcalGap) / 10) * 10;
+  return fit.kcalGap < 0 ? `Closest fit · about ${gap} kcal under` : `Closest fit · about ${gap} kcal over`;
 }

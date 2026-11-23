@@ -561,12 +561,12 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
     id: "pork-bacon-flour",
     label: "Pork Bacon + Flour Tortilla",
     ingredients: [
-      { name: "10-inch flour tortilla", quantity: 1, unit: "large", category: "Grains" },
+      { name: "6-inch flour tortillas", quantity: 2, unit: "small", category: "Grains" },
       { name: "Center-cut bacon", quantity: 2, unit: "slices", category: "Protein" },
     ],
     instructions: [
       "Cook bacon in a skillet over medium until crisp; crumble or leave whole and set aside.",
-      "Warm the flour tortilla in the dry skillet 30 seconds per side until soft with light char spots.",
+      "Warm the flour tortillas in the dry skillet 30 seconds per side until soft with light char spots.",
       "Fill with scrambled eggs and bacon; fold and serve.",
     ],
     servingWeightGrams: 285,
@@ -575,12 +575,12 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
     id: "turkey-bacon-flour",
     label: "Turkey Bacon + Flour Tortilla",
     ingredients: [
-      { name: "10-inch flour tortilla", quantity: 1, unit: "large", category: "Grains" },
+      { name: "6-inch flour tortillas", quantity: 2, unit: "small", category: "Grains" },
       { name: "Turkey bacon", quantity: 3, unit: "slices", category: "Protein" },
     ],
     instructions: [
       "Cook turkey bacon until crisp (usually 2–3 minutes per side).",
-      "Warm the flour tortilla and fill with eggs and turkey bacon as in the classic build.",
+      "Warm the flour tortillas and fill with eggs and turkey bacon as in the classic build.",
     ],
     servingWeightGrams: 280,
     calories: 405,
@@ -596,7 +596,7 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
       { name: "Center-cut bacon", quantity: 2, unit: "slices", category: "Protein" },
     ],
     instructions: [
-      "Use two corn tortillas instead of one flour tortilla — about 120 fewer calories than the flour base.",
+      "Use two corn tortillas instead of two flour tortillas — about 90 fewer calories than the flour base.",
       "Warm corn tortillas briefly on a dry skillet; stack or serve as two smaller tacos with eggs and bacon divided between them.",
     ],
     servingWeightGrams: 265,
@@ -609,7 +609,7 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
     id: "loaded-toppings",
     label: "Loaded Toppings",
     ingredients: [
-      { name: "10-inch flour tortilla", quantity: 1, unit: "large", category: "Grains" },
+      { name: "6-inch flour tortillas", quantity: 2, unit: "small", category: "Grains" },
       { name: "Center-cut bacon", quantity: 2, unit: "slices", category: "Protein" },
       { name: "Shredded cheddar", quantity: 2, unit: "tbsp", category: "Dairy" },
       { name: "Avocado (sliced)", quantity: 0.25, unit: "medium", category: "Produce" },
@@ -1012,6 +1012,8 @@ const baseRecipeLibrary: Recipe[] = [
     fat: 14,
     prepMinutes: 10,
     cookMinutes: 25,
+    // The ingredient list makes a tray of egg bites: about 3 servings.
+    servings: 3,
     ingredients: [
       { name: "Eggs", quantity: 4, unit: "large", category: "Protein" },
       { name: "Liquid egg whites", quantity: 0.5, unit: "cup", category: "Protein" },
@@ -1144,7 +1146,8 @@ const baseRecipeLibrary: Recipe[] = [
     imageUrl: "/recipes/breakfast-taco.png",
     cuisine: "mexican",
     tags: ["whole_food", "high_protein", "quick", "breakfast_friendly"],
-    mealSlots: ["breakfast", "snack"],
+    // A meal, not a snack.
+    mealSlots: ["breakfast"],
     calories: 430,
     protein: 24,
     carbs: 36,
@@ -1162,9 +1165,9 @@ const baseRecipeLibrary: Recipe[] = [
     instructions: [
       "Choose a variation below for your tortilla, bacon type, and any toppings.",
       "Whisk eggs with salt and pepper. Melt butter in a skillet over medium-low and scramble gently until soft and fluffy — do not overcook.",
-      "Cook bacon per your variation; warm the tortilla in the same skillet until pliable.",
-      "Layer bacon and eggs down the center of the tortilla. Add toppings if using the loaded variation.",
-      "Fold the sides in and roll into a burrito-style wrap, or serve open-faced restaurant-style.",
+      "Cook bacon per your variation; warm the tortillas in the same skillet until pliable.",
+      "Divide bacon and eggs between the tortillas. Add toppings if using the loaded variation.",
+      "Fold each in half like a taco, or serve open-faced restaurant-style.",
     ],
     variationDetails: breakfastTacoVariations,
     mealPrepNotes:
@@ -1177,7 +1180,8 @@ const baseRecipeLibrary: Recipe[] = [
     imageUrl: "/recipes/breakfast-sandwich.png",
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "breakfast_friendly"],
-    mealSlots: ["breakfast", "snack"],
+    // A meal, not a snack.
+    mealSlots: ["breakfast"],
     calories: 475,
     protein: 28,
     carbs: 30,
