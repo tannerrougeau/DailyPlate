@@ -180,3 +180,45 @@ describe("check-in plan changes go through the queue", () => {
     expect(useAppStore.getState().userProfile!.prioritizeMinimalPrep).toBe(before);
   });
 });
+
+describe("meal-log patterns go through the queue", () => {
+  it("skipping longer recipes changes nothing by itself; a Yes applies it with a checkpoint", async () => {
+    const { recipeLibrary } = await import("@/recipes/recipeLibrary");
+    const { createPlannedMeal } = await import("@/utils/recipeDisplay");
+    const { toDateKey } = await import("@/utils/date");
+    const long = recipeLibrary.filter((r) => r.prepMinutes + r.cookMinutes > 35 && r.mealSlots.includes("dinner")).slice(0, 4);
+    const quick = recipeLibrary.find((r) => r.prepMinutes + r.cookMinutes <= 20 && r.mealSlots.includes("lunch"))!;
+    const days = [0, 1, 2, 3].map((i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      return toDateKey(d);
+    });
+    useAppStore.setState({
+      todayDateKey: days[0],
+      userProfile: { ...useAppStore.getState().userProfile!, prioritizeMinimalPrep: false },
+      dailyPlans: Object.fromEntries(
+        days.map((key, i) => [key, [createPlannedMeal("dinner", long[i]!), createPlannedMeal("lunch", quick)]]),
+      ),
+      mealTracking: {},
+      questionQueue: [],
+      questionLog: {},
+    });
+    const skip = { status: "skipped" as const, loggedAt: new Date().toISOString() };
+    const eat = { status: "all" as const, loggedAt: new Date().toISOString() };
+    for (const key of days) {
+      useAppStore.getState().setMealTracking(key, "dinner", skip);
+      useAppStore.getState().setMealTracking(key, "lunch", key === days[0] ? eat : skip);
+    }
+    // Logging alone never flips the setting.
+    expect(useAppStore.getState().userProfile!.prioritizeMinimalPrep).toBe(false);
+
+    useAppStore.getState().refreshQuestions();
+    const q = useAppStore.getState().questionQueue.find((x) => x.id === "plan:minimal-prep")!;
+    expect(q.text).toBe("You've been skipping longer recipes. Want quicker, minimal-prep meals?");
+
+    const cp = useAppStore.getState().answerQuestion(q.id, "yes")!;
+    expect(useAppStore.getState().userProfile!.prioritizeMinimalPrep).toBe(true);
+    useAppStore.getState().restoreCheckpoint(cp.id);
+    expect(useAppStore.getState().userProfile!.prioritizeMinimalPrep).toBe(false);
+  });
+});

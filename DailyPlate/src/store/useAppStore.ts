@@ -52,7 +52,6 @@ import { pickPreferredVariationId } from "@/utils/variationPrefs";
 import {
   analyzePersonalizationSignals,
   buildPersonalizationInsights,
-  deriveAdaptiveProfileUpdates,
   pickPrimaryInsight,
   type PersonalizationInsight,
 } from "@/utils/personalizationEngine";
@@ -90,6 +89,7 @@ import {
 import {
   applyChange,
   enqueue,
+  logPlanQuestions,
   recordAnswer,
   tasteQuestions,
   usageQuestions,
@@ -1420,8 +1420,15 @@ export const useAppStore = create<AppState>()(
           const recipe = byId.get(swap.recipeId);
           if (recipe) passes.push({ recipe, at: swap.at });
         }
+        const logSignals = analyzePersonalizationSignals({
+          mealTracking: s.mealTracking,
+          dailyPlans: s.dailyPlans,
+          plannedMeals: s.plannedMeals,
+          todayDateKey: s.todayDateKey,
+        });
         const candidates = [
           ...extra,
+          ...logPlanQuestions(s.userProfile, logSignals, now),
           ...usageQuestions(s.usageEvents, prefs, s.profileAnchoredAt, now),
           ...tasteQuestions(passes, s.userProfile.dislikedFoodCustom ?? "", now),
         ];
@@ -1845,19 +1852,10 @@ export const useAppStore = create<AppState>()(
           );
           const patch: Partial<AppState> = { mealTracking: nextTracking };
 
+          // Log patterns only queue questions (refreshQuestions); settings change on a Yes.
           if (loggedCount >= 3 && s.userProfile) {
-            const signals = analyzePersonalizationSignals({
-              mealTracking: nextTracking,
-              dailyPlans: s.dailyPlans,
-              plannedMeals: s.plannedMeals,
-              todayDateKey: s.todayDateKey,
-            });
-            const adaptive = deriveAdaptiveProfileUpdates(s.userProfile, signals);
-            if (Object.keys(adaptive).length > 0) {
-              patch.userProfile = { ...s.userProfile, ...adaptive };
-            }
             const insight = computePersonalizationInsight(
-              { ...s, mealTracking: nextTracking, userProfile: patch.userProfile ?? s.userProfile },
+              { ...s, mealTracking: nextTracking },
               "tracking",
             );
             if (insight) patch.personalizationInsight = insight;
@@ -1940,11 +1938,9 @@ export const useAppStore = create<AppState>()(
         });
         const experience = buildExperienceRecommendations(entry, mergedProfile, signals);
 
-        const adaptiveFromLogs = deriveAdaptiveProfileUpdates(mergedProfile, signals);
         const finalProfile: UserProfile = withPlanningDefaults({
           ...mergedProfile,
           ...experience.profileUpdates,
-          ...adaptiveFromLogs,
         });
 
         const personalizationInsight = computePersonalizationInsight(

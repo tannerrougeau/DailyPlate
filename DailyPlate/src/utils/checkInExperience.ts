@@ -9,7 +9,6 @@ import {
 import {
   analyzePersonalizationSignals,
   buildPersonalizationInsights,
-  deriveAdaptiveProfileUpdates,
   type PersonalizationSignals,
 } from "@/utils/personalizationEngine";
 
@@ -28,7 +27,8 @@ export function buildExperienceRecommendations(
       todayDateKey: entry.submittedAt.slice(0, 10),
     });
 
-  const profileUpdates = deriveAdaptiveProfileUpdates(profile, logSignals);
+  // Plan settings change only through a Yes in the question queue.
+  const profileUpdates: Partial<UserProfile> = {};
   const variety = checkInScale(entry, "mealVarietySatisfaction");
   const ease = checkInScale(entry, "planEaseOfUse");
   const enjoyment = checkInScale(entry, "recipeEnjoyment");

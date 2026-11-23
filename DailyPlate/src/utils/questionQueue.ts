@@ -1,6 +1,7 @@
 import type { Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { CheckInEntry } from "@/types/tdeeFeedback";
+import { logPlanPatterns, type PersonalizationSignals } from "@/utils/personalizationEngine";
 import { checkInScale } from "@/utils/checkInScale";
 import type { CheckpointState, DisplayPrefs, PlanSettings } from "@/utils/displayPrefs";
 import { firstIngredientOption, ingredientRole } from "@/utils/ingredientNutrition";
@@ -78,6 +79,59 @@ export function nextQuestions(
   return ordered.slice(0, max);
 }
 
+/** The two plan changes, shared by check-in and meal-log questions (same id = asked once). */
+function minimalPrepChange(): QuestionChange {
+  return { kind: "planSettings", set: { prioritizeMinimalPrep: true }, what: "Quick, minimal-prep meals first" };
+}
+
+function weeklyMealPrepChange(profile: UserProfile | null): QuestionChange {
+  return {
+    kind: "planSettings",
+    set: {
+      weeklyMealPrepEnabled: true,
+      weeklyMealPrepSlot: profile?.weeklyMealPrepSlot ?? "dinner",
+      weeklyMealPrepRepeatCount: profile?.weeklyMealPrepRepeatCount ?? 3,
+    },
+    what: "Weekly meal prep turned on",
+  };
+}
+
+/**
+ * Meal-log patterns that used to change settings automatically; now asked when Today opens
+ * (normal 3-day schedule). Not asked when the setting is already on.
+ */
+export function logPlanQuestions(
+  profile: UserProfile | null,
+  signals: PersonalizationSignals,
+  now: Date,
+): Question[] {
+  if (!profile) return [];
+  const at = now.toISOString();
+  const { skipsLongPrep, eatsBatchMeals } = logPlanPatterns(profile, signals);
+  const out: Question[] = [];
+  if (skipsLongPrep) {
+    out.push({
+      id: "plan:minimal-prep",
+      text: "You've been skipping longer recipes. Want quicker, minimal-prep meals?",
+      why: "Several longer recipes were skipped recently.",
+      source: "usage",
+      change: minimalPrepChange(),
+      addedAt: at,
+    });
+  }
+  if (eatsBatchMeals) {
+    out.push({
+      id: "plan:weekly-meal-prep",
+      text: "You've been eating a lot of batch-friendly meals. Want to batch-cook one meal for a few days?",
+      why: "You've eaten several batch-friendly meals recently.",
+      source: "usage",
+      change: weeklyMealPrepChange(profile),
+      addedAt: at,
+    });
+  }
+  return out;
+}
+
 /**
  * Plan changes a low (1–2 of 5) check-in answer used to make automatically. Now they're asked.
  */
@@ -103,15 +157,7 @@ export function checkInPlanQuestions(entry: CheckInEntry, profile: UserProfile |
       text: "Want to batch-cook one meal for a few days?",
       why: "Your check-in said following the plan felt hard.",
       source: "check-in",
-      change: {
-        kind: "planSettings",
-        set: {
-          weeklyMealPrepEnabled: true,
-          weeklyMealPrepSlot: profile?.weeklyMealPrepSlot ?? "dinner",
-          weeklyMealPrepRepeatCount: profile?.weeklyMealPrepRepeatCount ?? 3,
-        },
-        what: "Weekly meal prep turned on",
-      },
+      change: weeklyMealPrepChange(profile),
       addedAt: at,
     });
   }
@@ -121,7 +167,7 @@ export function checkInPlanQuestions(entry: CheckInEntry, profile: UserProfile |
       text: "Want quicker, minimal-prep meals?",
       why: "Your check-in said meals weren't hitting the mark and the plan felt hard.",
       source: "check-in",
-      change: { kind: "planSettings", set: { prioritizeMinimalPrep: true }, what: "Quick, minimal-prep meals first" },
+      change: minimalPrepChange(),
       addedAt: at,
     });
   }

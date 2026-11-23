@@ -185,36 +185,22 @@ export function recipePersonalizationBoost(
 }
 
 /**
- * Plan updates from meal logs (long-prep skips, enjoyed batch meals). Check-in answers no longer
- * change plans here: they queue questions instead (see checkInPlanQuestions).
+ * Meal-log patterns that suggest a plan setting. Nothing is changed here: the question queue asks
+ * (see logPlanQuestions), and only a Yes applies it.
  */
-export function deriveAdaptiveProfileUpdates(
+export function logPlanPatterns(
   profile: UserProfile,
   signals: PersonalizationSignals,
-): Partial<UserProfile> {
-  const updates: Partial<UserProfile> = {};
-
-  if (
-    !profile.prioritizeMinimalPrep &&
-    signals.loggedMealCount >= 4 &&
-    signals.skippedLongPrepCount >= 2 &&
-    signals.skipRate >= 0.35
-  ) {
-    updates.prioritizeMinimalPrep = true;
-  }
-
-  if (
-    !profile.weeklyMealPrepEnabled &&
-    signals.loggedMealCount >= 5 &&
-    signals.enjoyedBatchCount >= 3
-  ) {
-    updates.weeklyMealPrepEnabled = true;
-    updates.weeklyMealPrepSlot = updates.weeklyMealPrepSlot ?? profile.weeklyMealPrepSlot ?? "dinner";
-    updates.weeklyMealPrepRepeatCount =
-      updates.weeklyMealPrepRepeatCount ?? profile.weeklyMealPrepRepeatCount ?? 3;
-  }
-
-  return updates;
+): { skipsLongPrep: boolean; eatsBatchMeals: boolean } {
+  return {
+    skipsLongPrep:
+      !profile.prioritizeMinimalPrep &&
+      signals.loggedMealCount >= 4 &&
+      signals.skippedLongPrepCount >= 2 &&
+      signals.skipRate >= 0.35,
+    eatsBatchMeals:
+      !profile.weeklyMealPrepEnabled && signals.loggedMealCount >= 5 && signals.enjoyedBatchCount >= 3,
+  };
 }
 
 function macroSplitLabel(pref: UserProfile["macroSplitPreference"]): string {
@@ -237,24 +223,8 @@ export function buildPersonalizationInsights(input: {
 }): PersonalizationInsight[] {
   const { profile, signals, checkInEntry: entry, favoriteIds, source } = input;
   const messages: string[] = [];
-  const adaptive = deriveAdaptiveProfileUpdates(profile, signals);
-  const nextProfile = { ...profile, ...adaptive };
-
-  if (adaptive.prioritizeMinimalPrep && !profile.prioritizeMinimalPrep) {
-    messages.push(
-      "Based on your recent logs, we enabled quick & minimal-prep meal priority — future plans will favor faster recipes.",
-    );
-  }
-  if (adaptive.prioritizeMinProtein && !profile.prioritizeMinProtein) {
-    messages.push(
-      "Based on your check-in and logs, we adjusted protein upward and will prioritize high-protein meals in your plans.",
-    );
-  }
-  if (adaptive.weeklyMealPrepEnabled && !profile.weeklyMealPrepEnabled) {
-    messages.push(
-      "You’ve been eating batch-friendly meals — we enabled weekly meal prep to reduce cooking days.",
-    );
-  }
+  // Plan settings only change through a Yes in the question queue, so no "we enabled…" messages here.
+  const nextProfile = profile;
 
   if (entry && source === "check_in") {
     if (isMidLowScore(checkInScale(entry, "mealVarietySatisfaction"))) {

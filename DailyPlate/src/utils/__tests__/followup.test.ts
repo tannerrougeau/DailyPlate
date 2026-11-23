@@ -7,11 +7,12 @@ import { normalizePortions, normalizeUsda } from "@/server/foodSources";
 import { buildExperienceRecommendations } from "@/utils/checkInExperience";
 import { startingDisplayPrefs } from "@/utils/displayPrefs";
 import { applyPortion, fetchPortions } from "@/utils/foodSearch";
-import { analyzePersonalizationSignals, deriveAdaptiveProfileUpdates } from "@/utils/personalizationEngine";
+import { analyzePersonalizationSignals } from "@/utils/personalizationEngine";
 import {
   applyChange,
   checkInPlanQuestions,
   checkInQuestions,
+  logPlanQuestions,
   nextQuestions,
   usesLongBatches,
   type Question,
@@ -74,9 +75,8 @@ describe("repeats vs batch cooking", () => {
     const qs = checkInQuestions(entry({ mealVarietySatisfaction: 2 }), startingDisplayPrefs("existing"), profile, new Date());
     expect(qs.map((q) => q.id)).toContain("shorter-batches");
     expect(qs.find((q) => q.id === "shorter-batches")!.text).toBe("Want shorter batches? (e.g., 2 days instead of 4)");
-    const auto = deriveAdaptiveProfileUpdates(profile, analyzePersonalizationSignals({ mealTracking: {}, dailyPlans: {}, plannedMeals: [], todayDateKey: today }));
-    expect(auto.weeklyMealPrepRepeatCount).toBeUndefined();
-    expect(auto.maxLeftoverStreakDays).toBeUndefined();
+    // The only change on offer is the question; nothing shortens batches by itself.
+    expect(qs.find((q) => q.id === "shorter-batches")!.change.kind).toBe("shorterBatches");
   });
 
   it("no batch question without batches longer than 2 days", () => {
@@ -101,7 +101,6 @@ describe("neutral check-in answers (3 of 5)", () => {
   const plain = { goal: "maintain" } as unknown as UserProfile;
 
   it("change no plan settings and ask no plan questions", () => {
-    expect(deriveAdaptiveProfileUpdates(plain, signals)).toEqual({});
     expect(checkInPlanQuestions(entry(), plain, new Date())).toEqual([]);
   });
 
@@ -188,5 +187,37 @@ describe("end-of-check-in order", () => {
     expect(nextQuestions(queue, {}, new Date(), 2, { planFirst: true }).map((x) => x.id)).toEqual(["plan-1", "plan-2"]);
     // On app open (no planFirst) the queue order is kept.
     expect(nextQuestions(queue, {}, new Date(), 1).map((x) => x.id)).toEqual(["display-1"]);
+  });
+});
+
+describe("meal-log patterns queue questions", () => {
+  const base = analyzePersonalizationSignals({ mealTracking: {}, dailyPlans: {}, plannedMeals: [], todayDateKey: today });
+  const plain = { goal: "maintain" } as unknown as UserProfile;
+  const skipping = { ...base, loggedMealCount: 6, skippedLongPrepCount: 3, skipRate: 0.5 };
+  const batchEater = { ...base, loggedMealCount: 6, enjoyedBatchCount: 4 };
+
+  it("skipping longer recipes → minimal-prep question, with the suggested wording", () => {
+    const qs = logPlanQuestions(plain, skipping, new Date());
+    expect(qs.map((x) => x.text)).toEqual(["You've been skipping longer recipes. Want quicker, minimal-prep meals?"]);
+    expect(qs[0]!.change).toMatchObject({ kind: "planSettings", set: { prioritizeMinimalPrep: true } });
+  });
+
+  it("eating batch-friendly meals → weekly meal prep question", () => {
+    const qs = logPlanQuestions(plain, batchEater, new Date());
+    expect(qs.map((x) => x.text)).toEqual([
+      "You've been eating a lot of batch-friendly meals. Want to batch-cook one meal for a few days?",
+    ]);
+  });
+
+  it("not asked when the setting is already on, or without enough logs", () => {
+    const on = { ...plain, prioritizeMinimalPrep: true, weeklyMealPrepEnabled: true } as UserProfile;
+    expect(logPlanQuestions(on, { ...skipping, enjoyedBatchCount: 4 }, new Date())).toEqual([]);
+    expect(logPlanQuestions(plain, base, new Date())).toEqual([]);
+  });
+
+  it("shares ids with the check-in versions, so the same change is never queued twice", () => {
+    expect(logPlanQuestions(plain, skipping, new Date())[0]!.id).toBe(
+      checkInPlanQuestions(entry({ planEaseOfUse: 1, recipeEnjoyment: 1 }), plain, new Date()).find((q) => q.id === "plan:minimal-prep")!.id,
+    );
   });
 });
