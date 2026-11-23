@@ -419,6 +419,8 @@ function householdMeasure(line: PortionLine): string | null {
   const unit = normalizeUnit(line.ingredient.unit);
   if (unit === "oz") {
     const oz = Math.round((line.grams / 28.3495) * 2) / 2;
+    // A pound or more reads better in pounds: 680 g → "1½ lb".
+    if (oz >= 16) return `${formatPracticalQty(Math.round((oz / 16) * 4) / 4)} lb`;
     return `${formatPracticalQty(oz)} oz`;
   }
   const cupG = gramsPerUnit(name, "cup");
@@ -448,26 +450,29 @@ function snapCup(cups: number): number {
   return whole + best;
 }
 
-/** e.g. "Cooked rice, 75 g dry (about ⅓ cup)", "Eggs, 3 large (150 g)", "Olive oil, 2 tsp". */
+/**
+ * e.g. "Ground turkey: 680 g raw (about 1½ lb)", "Rice: 300 g dry (about 1½ cups)",
+ * "Eggs: 3 large (150 g)", "Olive oil: 2 tsp".
+ */
 export function formatPortionLine(line: PortionLine): string {
   const ing = line.ingredient;
   const unit = normalizeUnit(ing.unit);
   const name = displayName(ing.name, line.stateLabel === "dry");
   if (line.grams == null) {
-    return `${name}, ${formatPracticalQty(ing.quantity)} ${ing.unit}`;
+    return `${name}: ${formatPracticalQty(ing.quantity)} ${ing.unit}`;
   }
   if (line.count != null) {
     const qty = formatPracticalQty(line.count);
     const u = line.count >= 1.5 && PLURAL_UNIT[unit] ? PLURAL_UNIT[unit]! : ing.unit;
-    return `${name}, ${qty} ${u} (${line.grams} g)`;
+    return `${name}: ${qty} ${u} (${line.grams} g)`;
   }
   if (unit === "tsp" || unit === "tbsp" || unit === "pinch") {
     const grams = line.grams >= 10 ? ` (${line.grams} g)` : "";
-    return `${name}, ${formatPracticalQty(ing.quantity)} ${ing.unit}${grams}`;
+    return `${name}: ${formatPracticalQty(ing.quantity)} ${ing.unit}${grams}`;
   }
   const label = line.stateLabel ? ` ${line.stateLabel}` : "";
   const measure = householdMeasure(line);
-  return `${name}, ${line.grams} g${label}${measure ? ` (about ${measure})` : ""}`;
+  return `${name}: ${line.grams} g${label}${measure ? ` (about ${measure})` : ""}`;
 }
 
 /** Drop "Cooked" from a name when the line is shown as a dry amount. */

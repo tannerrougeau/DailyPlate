@@ -9,6 +9,7 @@ import { UsageNote } from "@/components/UsageNote";
 import { RollingWeekCalendar } from "@/components/RollingWeekCalendar";
 import { ClearDatesButton } from "@/components/ClearDatesButton";
 import { cookedMeals } from "@/utils/boughtMeals";
+import { batchPrepFor } from "@/utils/batchPrep";
 import { useAppStore } from "@/store/useAppStore";
 import { formatQty, groceriesFromMeals, groceryVolumeLabel, mergeGroceryLists, simplifyGroceryList } from "@/utils/grocery";
 import {
@@ -124,10 +125,24 @@ export function GroceryScreen() {
         key,
       );
       const mult = key === todayDateKey ? todayMult : profileMult;
-      return groceriesFromMeals(meals, mult);
+      // Same whole-batch amounts as the prep section (each person's portions, every batch day).
+      return groceriesFromMeals(
+        meals,
+        mult,
+        (meal) =>
+          batchPrepFor({
+            meal,
+            dateKey: key,
+            todayKey: todayDateKey,
+            dailyPlans,
+            profile: userProfile,
+            todayOverride: todayHouseholdOverride,
+          })?.lines ?? null,
+      );
     });
     return simplifyGroceryList(mergeGroceryLists(lists));
   }, [
+    todayHouseholdOverride,
     slotSourceOverrides,
     userProfile,
     dailyPlans,

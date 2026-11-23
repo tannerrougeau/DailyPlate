@@ -1,6 +1,7 @@
 import type { GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
 import { groceryItemForBeverage, resolveBeverage } from "@/utils/beverages";
 import { batchServings, mealPortionLines } from "@/utils/mealPortions";
+import type { PortionLine } from "@/utils/goalPortions";
 import { sideLines } from "@/utils/mealSides";
 import {
   formatPracticalQty,
@@ -10,9 +11,14 @@ import {
 const TINY_SEASONING =
   /salt|pepper|paprika|cumin|oregano|chili|herb|zest|garlic powder|onion powder|pinch|seasoning|spice/i;
 
+/**
+ * `batchLinesFor` returns the whole batch a meal belongs to (the same amounts the prep section
+ * shows), so the list matches what gets cooked. Without it, the batch is this meal × household × days.
+ */
 export function groceriesFromMeals(
   meals: PlannedMeal[],
   householdMultiplier = 1,
+  batchLinesFor?: (meal: PlannedMeal) => PortionLine[] | null,
 ): GroceryItem[] {
   const map = new Map<string, GroceryItem>();
   const countedBatches = new Set<string>();
@@ -34,10 +40,8 @@ export function groceriesFromMeals(
     let ingredients: RecipeIngredient[] = sides;
     if (!meal.mealPrep || !countedBatches.has(meal.mealPrep.batchId)) {
       if (meal.mealPrep) countedBatches.add(meal.mealPrep.batchId);
-      ingredients = [
-        ...mealPortionLines(meal, batchServings(meal, householdMultiplier)).map((line) => line.ingredient),
-        ...sides,
-      ];
+      const lines = batchLinesFor?.(meal) ?? mealPortionLines(meal, batchServings(meal, householdMultiplier));
+      ingredients = [...lines.map((line) => line.ingredient), ...sides];
     }
 
     for (const ing of ingredients) {

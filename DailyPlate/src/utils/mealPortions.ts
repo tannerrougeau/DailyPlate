@@ -289,6 +289,26 @@ function componentPart(line: PortionLine, cookedTogether: boolean): string {
   return `${label} ${g} g${cookedLabel}`;
 }
 
+const PART_ORDER: PortionLine["role"][] = ["protein", "carb", "vegetable"];
+
+/** Main parts of a serving cooked separately, e.g. ["Turkey 120 g cooked", "Rice 150 g cooked"]. */
+export function servingParts(meal: PlannedMeal, servings = 1): string[] {
+  return mealPortionLines(meal, servings)
+    .filter((l) => PART_ORDER.includes(l.role) && (l.nutritionGrams ?? 0) > 0)
+    .sort((a, b) => PART_ORDER.indexOf(a.role) - PART_ORDER.indexOf(b.role) || (b.nutritionGrams ?? 0) - (a.nutritionGrams ?? 0))
+    .slice(0, 4)
+    .map((l) => componentPart(l, false));
+}
+
+/** Cooked weight of one serving when the dish is cooked together; null when served as parts or counted. */
+export function mixedServingGrams(meal: PlannedMeal): number | null {
+  if (isPackagedRecipe(meal.recipe)) return null;
+  const lines = mealPortionLines(meal, 1);
+  if (lines.length === 0 || dishCount(meal.recipe, lines) || servedAsComponents(meal.recipe, lines)) return null;
+  const g = cookedWeightOfLines(lines, true);
+  return g > 0 ? g : null;
+}
+
 export type ServingSummary = {
   /** Short line for the meal card. */
   text: string;
