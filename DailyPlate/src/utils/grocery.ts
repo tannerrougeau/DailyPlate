@@ -1,10 +1,10 @@
 import type { GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
-import { groceryItemForBeverage, plannedMealFoodScale, resolveBeverage } from "@/utils/beverages";
+import { groceryItemForBeverage, resolveBeverage } from "@/utils/beverages";
+import { batchServings, mealPortionLines } from "@/utils/mealPortions";
 import {
   formatPracticalQty,
   roundIngredientQuantity,
 } from "@/utils/practicalScaling";
-import { effectiveCarbVariationId, effectiveFatVariationId, effectiveVariationId, scaledIngredientsForMeal } from "@/utils/recipeDisplay";
 
 const TINY_SEASONING =
   /salt|pepper|paprika|cumin|oregano|chili|herb|zest|garlic powder|onion powder|pinch|seasoning|spice/i;
@@ -12,7 +12,6 @@ const TINY_SEASONING =
 export function groceriesFromMeals(
   meals: PlannedMeal[],
   householdMultiplier = 1,
-  prioritizeMinProtein = false,
 ): GroceryItem[] {
   const map = new Map<string, GroceryItem>();
   const countedBatches = new Set<string>();
@@ -33,15 +32,8 @@ export function groceriesFromMeals(
       countedBatches.add(meal.mealPrep.batchId);
     }
 
-    const portionMult = meal.mealPrep?.portionsCooked ?? 1;
-    const ingredients = scaledIngredientsForMeal(
-      meal.recipe,
-      effectiveVariationId(meal),
-      plannedMealFoodScale(meal) * portionMult,
-      householdMultiplier,
-      prioritizeMinProtein,
-      effectiveCarbVariationId(meal),
-      effectiveFatVariationId(meal),
+    const ingredients = mealPortionLines(meal, batchServings(meal, householdMultiplier)).map(
+      (line) => line.ingredient,
     );
 
     for (const ing of ingredients) {

@@ -1314,6 +1314,118 @@ add({
   aliases: ["Black pepper"],
 });
 
+/*
+ * Portion roles, measuring state, and cooked/raw yields.
+ * role:  protein | carb | fat | vegetable | flavor — default for goal-based portions (recipes can override).
+ * state: raw | dry | cooked | as-sold — how the recipe amount is measured.
+ * yield: cookedPerRaw = cooked weight ÷ weight as measured (raw or dry). Cooked-state foods
+ *        keep the factor so the dry amount can be shown (dry = cooked ÷ cookedPerRaw);
+ *        dryCupGrams gives the household measure for that dry amount.
+ */
+const MEAT_YIELD_SOURCE =
+  "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut.";
+const VEG_YIELD_SOURCE =
+  "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together.";
+
+const ROLE_GROUPS = {
+  protein: [
+    "turkey-ground-93-raw", "beef-ground-93-raw", "chicken-breast-raw", "chicken-ground-raw",
+    "chicken-breast-roasted", "chicken-thigh-raw-skin", "sirloin-raw", "salmon-raw",
+    "tuna-canned-water", "egg-whole-raw", "egg-white-raw", "bacon-cooked", "turkey-bacon",
+    "ham-deli", "turkey-patty-cooked", "chicken-sausage", "beef-jerky", "meat-stick", "whey",
+    "greek-nonfat", "greek-cup", "cottage-lowfat", "cottage-cup", "edamame", "smoked-salmon",
+    "protein-bar", "protein-chips", "rtd-shake",
+  ],
+  carb: [
+    "rice-white-cooked", "oats-dry", "pasta-dry", "protein-pasta-dry", "bread-wheat", "bagel",
+    "croissant", "biscuit", "tortilla-flour", "tortilla-wheat", "tortilla-corn", "apple-raw",
+    "banana-raw", "potato-raw", "hash-brown", "sweet-potato-raw", "berries", "strawberries",
+    "black-beans", "chickpeas", "corn", "pineapple", "mango", "granola", "honey", "maple", "jam",
+    "sugar", "croutons", "almond-milk", "milk-2", "milk-fat-free",
+  ],
+  fat: [
+    "olive-oil", "butter", "chia", "almond-butter", "peanut-butter", "almonds", "peanuts",
+    "cashews", "pecans", "walnuts", "avocado-raw", "cheddar", "mozzarella", "babybel", "feta",
+    "parmesan", "cream-cheese", "sour-cream", "mayo", "caesar", "hummus", "coconut",
+  ],
+  vegetable: [
+    "broccoli-cooked", "green-beans-cooked", "asparagus-raw", "spinach-raw", "lettuce-raw",
+    "pepper-raw", "brussels", "carrot-raw", "celery-raw", "tomato-raw", "tomato-canned",
+    "cucumber-raw", "onion-raw", "zucchini-raw", "mushroom-raw", "cauliflower-raw",
+    "broccoli-raw", "frozen-veg",
+  ],
+};
+
+const STATE_BY_ID = {
+  "chicken-breast-roasted": "cooked",
+  "bacon-cooked": "cooked",
+  "turkey-bacon": "cooked",
+  "turkey-patty-cooked": "cooked",
+  "chicken-sausage": "cooked",
+  "rice-white-cooked": "cooked",
+  "broccoli-cooked": "cooked",
+  "green-beans-cooked": "cooked",
+  "hash-brown": "cooked",
+  "edamame": "cooked",
+  "corn": "cooked",
+  "frozen-veg": "cooked",
+  "oats-dry": "dry",
+  "pasta-dry": "dry",
+  "protein-pasta-dry": "dry",
+};
+
+const RAW_IDS = new Set([
+  "turkey-ground-93-raw", "beef-ground-93-raw", "chicken-breast-raw", "chicken-ground-raw",
+  "chicken-thigh-raw-skin", "sirloin-raw", "salmon-raw", "egg-whole-raw", "egg-white-raw",
+  "brussels", "berries", "strawberries", "pineapple", "mango", "ginger", "jalapeno", "herbs-fresh",
+]);
+
+const YIELD_BY_ID = {
+  "turkey-ground-93-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "beef-ground-93-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "chicken-ground-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "chicken-breast-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "chicken-thigh-raw-skin": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "sirloin-raw": { cookedPerRaw: 0.75, source: MEAT_YIELD_SOURCE },
+  "salmon-raw": { cookedPerRaw: 0.8, source: MEAT_YIELD_SOURCE },
+  "rice-white-cooked": {
+    cookedPerRaw: 2.6,
+    dryCupGrams: 185,
+    source:
+      "Derived from USDA FoodData Central portion weights: 1 cup dry long-grain rice ≈ 185 g yields ≈ 3 cups cooked at 158 g.",
+  },
+  "pasta-dry": {
+    cookedPerRaw: 2.5,
+    source:
+      "Derived from USDA FoodData Central portion weights: 56 g (2 oz) dry yields ≈ 1 cup cooked at 140 g.",
+  },
+  "protein-pasta-dry": {
+    cookedPerRaw: 2.5,
+    source: "Assumed same as wheat pasta (USDA FoodData Central portion weights).",
+  },
+  "oats-dry": {
+    cookedPerRaw: 1,
+    source:
+      "Recipes list the soaking/cooking liquid separately, so oats add their dry weight only (avoids double counting).",
+  },
+  "spinach-raw": { cookedPerRaw: 0.3, source: VEG_YIELD_SOURCE },
+  "mushroom-raw": { cookedPerRaw: 0.6, source: VEG_YIELD_SOURCE },
+  "onion-raw": { cookedPerRaw: 0.75, source: VEG_YIELD_SOURCE },
+  "zucchini-raw": { cookedPerRaw: 0.8, source: VEG_YIELD_SOURCE },
+  "pepper-raw": { cookedPerRaw: 0.85, source: VEG_YIELD_SOURCE },
+};
+
+const roleById = new Map();
+for (const [role, ids] of Object.entries(ROLE_GROUPS)) {
+  for (const id of ids) roleById.set(id, role);
+}
+
+for (const f of foods) {
+  f.role = roleById.get(f.id) ?? "flavor";
+  f.state = STATE_BY_ID[f.id] ?? (RAW_IDS.has(f.id) || f.id.endsWith("-raw") ? "raw" : "as-sold");
+  f.yield = YIELD_BY_ID[f.id] ?? null;
+}
+
 const clean = foods.map((f) => {
   const grams = {
     cup: f.grams.cup ?? null,

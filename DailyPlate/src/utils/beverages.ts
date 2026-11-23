@@ -10,12 +10,7 @@ import type {
 } from "@/types";
 
 export type { BeverageId };
-import {
-  effectiveCarbVariationId,
-  effectiveVariationId,
-  recipeFiberGrams,
-  resolveRecipeMacros,
-} from "@/utils/recipeDisplay";
+import { mealFoodNutrition } from "@/utils/mealPortions";
 
 export interface Beverage {
   id: BeverageId;
@@ -35,7 +30,6 @@ export interface Beverage {
 }
 
 export const DEFAULT_BEVERAGE_ID: BeverageId = "water";
-export const MIN_FOOD_SCALE_FACTOR = 0.75;
 
 export const BEVERAGES: Beverage[] = [
   { id: "water", label: "Water", calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
@@ -124,50 +118,16 @@ export function defaultBeverageForSlot(
   return lastBySlot?.[canonicalBeverageSlot(slot)] ?? DEFAULT_BEVERAGE_ID;
 }
 
-export function foodScaleForBeverage(
-  originalScale: number,
-  foodCalories: number,
-  drinkCalories: number,
-): number {
-  if (!(originalScale > 0) || !(foodCalories > 0) || !(drinkCalories > 0)) {
-    return originalScale;
-  }
-  const originalFoodKcal = foodCalories * originalScale;
-  const factor = Math.max(
-    MIN_FOOD_SCALE_FACTOR,
-    (originalFoodKcal - drinkCalories) / originalFoodKcal,
-  );
-  return originalScale * factor;
-}
-
-export function plannedMealFoodScale(meal: PlannedMeal): number {
-  const drink = resolveBeverage(meal.beverageId);
-  const macros = resolveRecipeMacros(
-    meal.recipe,
-    effectiveVariationId(meal),
-    effectiveCarbVariationId(meal),
-  );
-  return foodScaleForBeverage(meal.scale, macros.calories, drink.calories);
-}
-
+/** Food (goal-sized portion) plus the drink. Drinks are counted in the meal targets, so food is not shrunk. */
 export function mealMacrosWithBeverage(meal: PlannedMeal): DailyTargets {
   const drink = resolveBeverage(meal.beverageId);
-  const food = resolveRecipeMacros(
-    meal.recipe,
-    effectiveVariationId(meal),
-    effectiveCarbVariationId(meal),
-  );
-  const foodScale = foodScaleForBeverage(meal.scale, food.calories, drink.calories);
-  const fiber =
-    recipeFiberGrams(meal.recipe, effectiveVariationId(meal), effectiveCarbVariationId(meal)) *
-      foodScale +
-    drink.fiber;
+  const food = mealFoodNutrition(meal);
   return {
-    calories: food.calories * foodScale + drink.calories,
-    protein: food.protein * foodScale + drink.protein,
-    carbs: food.carbs * foodScale + drink.carbs,
-    fat: food.fat * foodScale + drink.fat,
-    fiber,
+    calories: food.calories + drink.calories,
+    protein: food.protein + drink.protein,
+    carbs: food.carbs + drink.carbs,
+    fat: food.fat + drink.fat,
+    fiber: food.fiber + drink.fiber,
   };
 }
 

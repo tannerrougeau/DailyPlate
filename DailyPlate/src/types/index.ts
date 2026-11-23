@@ -26,11 +26,16 @@ export type IngredientCategory =
   | "Grains"
   | "Spices";
 
+/** How an ingredient scales in goal-based portions. Default comes from ingredients.json. */
+export type IngredientRole = "protein" | "carb" | "fat" | "vegetable" | "flavor";
+
 export interface RecipeIngredient {
   name: string;
   quantity: number;
   unit: string;
   category: IngredientCategory;
+  /** Per-recipe override of the ingredients.json role. */
+  role?: IngredientRole;
 }
 
 export interface RecipeVariationDetail {
@@ -130,6 +135,29 @@ export interface PlannedMeal {
   selectedFatVariationId?: FatVariationId;
   /** Drink on this meal card. Default water. */
   beverageId?: BeverageId;
+  /** Goal-based role multipliers for the user's own serving (vs. the recipe's base serving). */
+  portion?: GoalPortion;
+  /** User chose Keep on the "doesn't fit" notice for this meal. */
+  kept?: boolean;
+  /** Actual cooked batch weight the user entered (g). */
+  weighedBatchGrams?: number;
+}
+
+export interface RoleMultipliers {
+  protein: number;
+  carb: number;
+  fat: number;
+  vegetable: number;
+}
+
+export interface GoalPortion {
+  multipliers: RoleMultipliers;
+  /** Meal targets this portion was sized for. */
+  target: DailyTargets;
+  /** Calories after rounding minus target (negative = under). */
+  kcalGap: number;
+  /** Within 10% of target calories with protein at target. */
+  fits: boolean;
 }
 
 export interface DailyTargets {

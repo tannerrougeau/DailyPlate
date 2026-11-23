@@ -7,14 +7,6 @@ import type {
   RecipeIngredient,
   RecipeVariationDetail,
 } from "@/types";
-import type { DailyTargets } from "@/types";
-import type { UserProfile } from "@/types/profile";
-import {
-  collapsedPersonPortions,
-  formatHouseholdServingSplit,
-  resolveHouseholdCounts,
-  type HouseholdDayCounts,
-} from "@/utils/household";
 import { estimateFiberFromIngredients } from "@/utils/fiberEstimate";
 import { nutritionFromIngredients } from "@/utils/ingredientNutrition";
 import {
@@ -33,13 +25,7 @@ import {
   recipeHasCookingFatSwap,
   resolveFatVariationId,
 } from "@/recipes/fatAlternatives";
-import { RECIPE_SCALE_MAX, RECIPE_SCALE_MIN } from "@/utils/macroRedistribution";
-import { applyPracticalIngredientScaling, formatPracticalQty } from "@/utils/practicalScaling";
-
-const PROTEIN_INGREDIENT_HINT =
-  /protein powder|whey|casein|egg white|cottage cheese|greek yogurt|skyr|collagen/i;
-const CARB_FAT_ADJUST_HINT =
-  /oats|honey|maple|banana|granola|peanut butter|almond butter|oil|butter|sugar|chocolate chips/i;
+import { applyPracticalIngredientScaling } from "@/utils/practicalScaling";
 
 /** First variation in variationDetails — the default/base build. */
 export function defaultVariationId(recipe: Recipe): string | undefined {
@@ -239,171 +225,21 @@ export function resolveRecipeInstructions(
   );
 }
 
-function isProteinForwardBoost(ing: RecipeIngredient): boolean {
-  return ing.category === "Protein" || PROTEIN_INGREDIENT_HINT.test(ing.name);
-}
-
-function isProteinForwardTrim(ing: RecipeIngredient): boolean {
-  return ing.category === "Grains" || CARB_FAT_ADJUST_HINT.test(ing.name);
-}
-
-/**
- * Per-ingredient multiplier when boosting protein without over-scaling carbs.
- * The 8% / 6% nudge is relative to the full batch (meal scale × household).
- */
-export function proteinAwareIngredientMultiplier(
-  ing: RecipeIngredient,
-  totalMult: number,
-  prioritizeProtein: boolean,
-): number {
-  if (!prioritizeProtein || totalMult <= 1.05) return totalMult;
-  if (isProteinForwardBoost(ing)) return totalMult * 1.08;
-  if (isProteinForwardTrim(ing)) return totalMult * 0.94;
-  return totalMult;
-}
-
+/** Base recipe × meal scale × household, rounded — for previews without a goal portion (e.g. meal prep). */
 export function scaledIngredientsForMeal(
   recipe: Recipe,
   variationId: string | undefined,
   mealScale: number,
   householdMult: number,
-  prioritizeProtein: boolean,
   carbVariationId?: CarbVariationId,
   fatVariationId?: FatVariationId,
 ): RecipeIngredient[] {
   const effectiveId = resolveVariationId(recipe, variationId);
   const base = resolveRecipeIngredients(recipe, effectiveId, carbVariationId, fatVariationId);
   const total = mealScale * householdMult;
-  const scaled = base.map((ing) => ({
-    ...ing,
-    quantity: ing.quantity * proteinAwareIngredientMultiplier(ing, total, prioritizeProtein),
-  }));
-  return applyPracticalIngredientScaling(scaled);
-}
-
-export function estimateServingWeightGrams(
-  protein: number,
-  carbs: number,
-  fat: number,
-  explicit?: number,
-  scale = 1,
-): number {
-  if (explicit != null) return Math.round(explicit * scale);
-  const kcal = (protein * 4 + carbs * 4 + fat * 9) * scale;
-  return Math.round(kcal / 1.05);
-}
-
-export function servingWeightForMeal(
-  meal: PlannedMeal,
-  householdMult: number,
-  targets?: DailyTargets | null,
-): number | null {
-  const { recipe, scale, mealPrep } = meal;
-  const variationId = effectiveVariationId(meal);
-  const carbId = effectiveCarbVariationId(meal);
-  const macros = resolveRecipeMacros(recipe, variationId, carbId);
-  const effectiveScale = scale * householdMult;
-  const variation = getVariationDetail(recipe, variationId);
-
-  let base =
-    variation?.servingWeightGrams ??
-    recipe.servingWeightGrams ??
-    estimateServingWeightGrams(
-      macros.protein,
-      macros.carbs,
-      macros.fat,
-      undefined,
-      1,
-    );
-
-  if (recipe.id === "blended-cottage-cheese-pudding-49" && targets) {
-    const slotTargetProtein = targets.protein / 4;
-    const atScale = macros.protein * scale;
-    if (atScale < slotTargetProtein * 0.9) {
-      const bump = Math.min(RECIPE_SCALE_MAX, slotTargetProtein / Math.max(atScale, 1));
-      base = Math.round(base * Math.min(bump, 1.15));
-    }
-  }
-
-  const grams = Math.round(base * effectiveScale);
-
-  if (mealPrep && recipe.batchWeightGrams && recipe.mealPrepBatchServings) {
-    return grams;
-  }
-  return grams;
-}
-
-export function mixedPersonServingWeights(
-  recipe: Recipe,
-  opts: {
-    meal?: PlannedMeal | null;
-    variationId?: string;
-    carbVariationId?: CarbVariationId;
-    mealScale?: number;
-    profile?: UserProfile | null;
-    countsOverride?: HouseholdDayCounts | null;
-    targets?: DailyTargets | null;
-  } = {},
-): { label: string; grams: number; kind: "adult" | "child" }[] | null {
-  if (!recipeIsMixedBatch(recipe)) return null;
-  const mealScale = opts.mealScale ?? opts.meal?.scale ?? 1;
-  const people = collapsedPersonPortions(opts.profile, opts.countsOverride);
-  if (people.length === 0) return null;
-  const variationId =
-    opts.variationId ?? (opts.meal ? effectiveVariationId(opts.meal) : undefined);
-  const carbVariationId =
-    opts.carbVariationId ?? (opts.meal ? effectiveCarbVariationId(opts.meal) : undefined);
-  const variation = getVariationDetail(recipe, variationId);
-  const macros = resolveRecipeMacros(recipe, variationId, carbVariationId);
-  const mealGrams =
-    opts.meal != null ? servingWeightForMeal(opts.meal, 1, opts.targets) : null;
-  const perRecipe =
-    mealGrams != null && opts.meal
-      ? mealGrams / Math.max(opts.meal.scale, 0.01)
-      : (variation?.servingWeightGrams ??
-          recipe.servingWeightGrams ??
-          estimateServingWeightGrams(macros.protein, macros.carbs, macros.fat, undefined, 1));
-  if (!(perRecipe > 0)) return null;
-  return people.map((p) => {
-    const title =
-      p.label === "Adult" ? "Adult serving" : p.label === "Child" ? "Child serving" : p.label;
-    return {
-      label: title,
-      grams: Math.round(perRecipe * mealScale * p.multiplier),
-      kind: p.kind,
-    };
-  });
-}
-
-export function formatPersonServingWeights(
-  weights: { label: string; grams: number }[] | null | undefined,
-  compact = false,
-): string | null {
-  if (!weights?.length) return null;
-  const parts = weights
-    .filter((w) => w.grams > 0)
-    .map((w) => `${w.label}: ~${w.grams} g`);
-  if (parts.length === 0) return null;
-  return compact ? parts.join(" · ") : parts.join("\n");
-}
-
-export function batchWeightLabel(
-  meal: PlannedMeal,
-  householdMult: number,
-): string | null {
-  const { recipe, scale, mealPrep } = meal;
-  if (!mealPrep || !recipe.batchWeightGrams || !recipe.mealPrepBatchServings) {
-    return null;
-  }
-  const portions = mealPrep.portionsCooked;
-  const perServing = recipe.servingWeightGrams ?? recipe.batchWeightGrams / recipe.mealPrepBatchServings;
-  const batch = Math.round(perServing * portions * scale * householdMult);
-  const serving = Math.round(perServing * scale * householdMult);
-  return `Jar meal prep: ~${serving} g per serving · ~${batch} g total batch (${portions} jars)`;
-}
-
-export function clampMealScaleForRecipe(scale: number): number {
-  return Math.min(RECIPE_SCALE_MAX, Math.max(RECIPE_SCALE_MIN, scale));
+  return applyPracticalIngredientScaling(
+    base.map((ing) => ({ ...ing, quantity: ing.quantity * total })),
+  );
 }
 
 export function mealDisplayName(meal: PlannedMeal): string {
@@ -422,14 +258,6 @@ export function mealDisplayName(meal: PlannedMeal): string {
   }
 
   return parts.length === 1 ? parts[0]! : parts.join(" — ");
-}
-
-export function shouldShowProteinAdjustNote(
-  profile: UserProfile | null,
-  meal: PlannedMeal,
-): boolean {
-  if (!profile?.prioritizeMinProtein) return false;
-  return clampMealScaleForRecipe(meal.scale) > 1.05;
 }
 
 const PROTEIN_NAME_KEYWORDS = [
@@ -488,66 +316,6 @@ export function shortIngredientName(name: string): string {
   return words[words.length - 1] ?? first.trim();
 }
 
-/** Describes ingredient amounts that protein-forward scaling actually changed. */
-export function describeProteinForwardAdjustments(
-  recipe: Recipe,
-  variationId: string | undefined,
-  mealScale: number,
-  householdMult: number,
-  prioritizeProtein: boolean,
-  carbVariationId?: CarbVariationId,
-  fatVariationId?: FatVariationId,
-): string | null {
-  if (!prioritizeProtein) return null;
-  const uniform = scaledIngredientsForMeal(
-    recipe,
-    variationId,
-    mealScale,
-    householdMult,
-    false,
-    carbVariationId,
-    fatVariationId,
-  );
-  const adjusted = scaledIngredientsForMeal(
-    recipe,
-    variationId,
-    mealScale,
-    householdMult,
-    true,
-    carbVariationId,
-    fatVariationId,
-  );
-  const increased: string[] = [];
-  const reduced: string[] = [];
-  for (const next of adjusted) {
-    const prev = uniform.find((row) => row.name === next.name && row.unit === next.unit);
-    if (!prev || !(prev.quantity > 0)) continue;
-    const ratio = next.quantity / prev.quantity;
-    const label = shortIngredientName(next.name);
-    if (ratio > 1.03) increased.push(label);
-    else if (ratio < 0.97) reduced.push(label);
-  }
-  const parts = [
-    ...[...new Set(increased)].map((name) => `${name} increased`),
-    ...[...new Set(reduced)].map((name) => `${name} reduced`),
-  ];
-  if (parts.length === 0) return null;
-  return `Protein-forward: ${parts.join(", ")}.`;
-}
-
-export function formatIngredientListHeading(
-  householdMult: number,
-  servesLine: string | null,
-  yourPortion: boolean,
-): string {
-  if (yourPortion) return "Ingredients — your portion";
-  const rounded = Math.round(householdMult * 10) / 10;
-  const count = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
-  const servingWord = count === "1" ? "serving" : "servings";
-  const who = servesLine ? servesLine.replace(/^Serves\s+/i, "") : "you";
-  return `Ingredients — total for ${count} ${servingWord} (${who})`;
-}
-
 export function recipeIsMixedBatch(recipe: Recipe): boolean {
   if (recipe.cookStyle === "mixed") return true;
   if (recipe.cookStyle === "assembled") return false;
@@ -572,137 +340,4 @@ export function recipeIsMixedBatch(recipe: Recipe): boolean {
     return false;
   }
   return true;
-}
-
-function isServingGuidancePart(ing: RecipeIngredient): boolean {
-  const name = ing.name.toLowerCase();
-  if (ing.category === "Spices") return false;
-  if (/salt|pepper|oil|butter|seasoning/.test(name) && ing.category !== "Protein") return false;
-  if (ing.category === "Protein" || ing.category === "Grains") return true;
-  if (/milk|sweetened drink|soda|juice/.test(name)) return true;
-  return /avocado/.test(name);
-}
-
-function servingPartRank(ing: RecipeIngredient): number {
-  const name = ing.name.toLowerCase();
-  if (/egg/.test(name)) return 0;
-  if (/ham|bacon|turkey bacon|sausage|steak|chicken/.test(name)) return 1;
-  if (/toast|bread|bagel|biscuit|tortilla/.test(name)) return 2;
-  if (/avocado|tomato/.test(name)) return 3;
-  if (/cheese/.test(name)) return 4;
-  return 5;
-}
-
-function servingNoun(ing: RecipeIngredient, qty: number): string {
-  const name = ing.name
-    .toLowerCase()
-    .replace(/\([^)]*\)/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  const plural = qty >= 1.5;
-  if (/egg/.test(name)) return plural ? "eggs" : "egg";
-  if (/ham/.test(name)) return plural ? "slices ham" : "slice ham";
-  if (/turkey bacon/.test(name)) return plural ? "slices turkey bacon" : "slice turkey bacon";
-  if (/bacon/.test(name)) return plural ? "slices bacon" : "slice bacon";
-  if (
-    /sliced bread|toast|^bread$/.test(name) ||
-    /for toast/i.test(ing.name)
-  ) {
-    if (qty >= 1.5) return "slices toast";
-    return "toast";
-  }
-  if (/bagel/.test(name)) return plural ? "bagels" : "bagel";
-  if (/biscuit/.test(name)) return plural ? "biscuits" : "biscuit";
-  if (/tortilla/.test(name)) return plural ? "tortillas" : "tortilla";
-  if (/avocado/.test(name)) return "avocado";
-  const unit = ing.unit.toLowerCase();
-  if (unit === "slice" || unit === "slices") {
-    const noun = name.replace(/^sliced /, "");
-    return plural ? `slices ${noun}` : `slice ${noun}`;
-  }
-  return name;
-}
-
-function formatServingQty(ing: RecipeIngredient, qty: number): string {
-  const toastLike = /toast|sliced bread|for toast|^bread$/i.test(ing.name);
-  if (toastLike && qty > 0.3 && qty < 0.85) return "½–1";
-  const rounded =
-    /egg|slice|ham|bacon|toast|bagel|biscuit|tortilla/i.test(ing.name)
-      ? Math.max(0.5, Math.round(qty * 2) / 2)
-      : qty;
-  return formatPracticalQty(rounded);
-}
-
-function formatServingPart(ing: RecipeIngredient, qty: number): string {
-  const amount = formatServingQty(ing, qty);
-  const unit = ing.unit.toLowerCase();
-  const noun = servingNoun(ing, qty);
-  if (
-    /egg|ham|bacon|toast|bagel|biscuit|tortilla|bread/.test(ing.name.toLowerCase()) ||
-    unit === "slice" ||
-    unit === "slices" ||
-    unit === "large"
-  ) {
-    return `${amount} ${noun}`;
-  }
-  return `${amount} ${ing.unit} ${noun}`;
-}
-
-export function assembledServingGuidance(
-  recipe: Recipe,
-  opts: {
-    variationId?: string;
-    carbVariationId?: CarbVariationId;
-    fatVariationId?: FatVariationId;
-    mealScale?: number;
-    profile?: UserProfile | null;
-    countsOverride?: HouseholdDayCounts | null;
-  } = {},
-): string | null {
-  if (recipeIsMixedBatch(recipe)) return null;
-  const mealScale = opts.mealScale ?? 1;
-  const ingredients = resolveRecipeIngredients(
-    recipe,
-    opts.variationId,
-    opts.carbVariationId,
-    opts.fatVariationId,
-  );
-  const parts = ingredients
-    .filter(isServingGuidancePart)
-    .sort((a, b) => servingPartRank(a) - servingPartRank(b))
-    .slice(0, 4);
-  if (parts.length === 0) return null;
-  const people = collapsedPersonPortions(opts.profile, opts.countsOverride);
-  if (people.length === 0) return null;
-  return (
-    people
-      .map((p) => {
-        const line = parts
-          .map((ing) => formatServingPart(ing, ing.quantity * mealScale * p.multiplier))
-          .join(" + ");
-        return `${p.label}: ${line}`;
-      })
-      .join(". ") + "."
-  );
-}
-
-export function platingNoteForHousehold(
-  profile: UserProfile | null | undefined,
-  countsOverride?: HouseholdDayCounts | null,
-): string | null {
-  const { children } = resolveHouseholdCounts(profile, countsOverride);
-  if (children <= 0) return null;
-  return `Cook the full batch, then plate larger adult portions and smaller child portions (${formatHouseholdServingSplit(profile, countsOverride)}).`;
-}
-
-export function perPersonIngredientQty(
-  baseQuantity: number,
-  mealScale: number,
-  personMult: number,
-  ing: RecipeIngredient,
-  prioritizeProtein: boolean,
-): number {
-  return (
-    baseQuantity * proteinAwareIngredientMultiplier(ing, mealScale * personMult, prioritizeProtein)
-  );
 }

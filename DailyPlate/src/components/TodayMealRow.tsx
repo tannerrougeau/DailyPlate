@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChefHat, Heart, MoreHorizontal, ThumbsDown, X } fro
 import { LogSomethingElseSheet } from "@/components/LogSomethingElseSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
 import { RecipeImage } from "@/components/RecipeImage";
+import { ReplaceMealSheet } from "@/components/ReplaceMealSheet";
 import type {
   BeverageId,
   CarbVariationId,
@@ -15,9 +16,9 @@ import {
   BEVERAGES,
   beverageOptionLabel,
   mealMacrosWithBeverage,
-  plannedMealFoodScale,
   resolveBeverage,
 } from "@/utils/beverages";
+import { fitNotice, servingSummary } from "@/utils/mealPortions";
 import {
   countsFromOverride,
   formatHouseholdServesLine,
@@ -58,6 +59,7 @@ export function TodayMealRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [elseOpen, setElseOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [swapOpen, setSwapOpen] = useState(false);
   const [variationId, setVariationId] = useState(() => effectiveVariationId(meal));
   const [carbVariationId, setCarbVariationId] = useState<CarbVariationId>(() =>
     effectiveCarbVariationId(meal),
@@ -89,6 +91,9 @@ export function TodayMealRow({
   const setMealCarbVariation = useAppStore((s) => s.setMealCarbVariation);
   const setMealFatVariation = useAppStore((s) => s.setMealFatVariation);
   const setMealBeverage = useAppStore((s) => s.setMealBeverage);
+  const keepMeal = useAppStore((s) => s.keepMeal);
+  const replaceMealSlot = useAppStore((s) => s.replaceMealSlot);
+  const dayMeals = useAppStore((s) => s.dailyPlans[dateKey]);
 
   const householdCounts =
     dateKey === todayDateKey
@@ -96,7 +101,8 @@ export function TodayMealRow({
       : null;
   const householdMult = householdMultiplierFor(userProfile, householdCounts);
   const macros = mealMacrosWithBeverage(meal);
-  const foodScale = plannedMealFoodScale(meal);
+  const serving = servingSummary(meal, householdMult);
+  const notice = fitNotice(meal);
   const fav = favoriteIds.includes(recipe.id);
   const dislike = dislikedIds.includes(recipe.id);
   const kcal = Math.round(macros.calories);
@@ -205,8 +211,36 @@ export function TodayMealRow({
               <span className="font-semibold text-slate-800">{Math.round(macros.fiber ?? 0)}g</span>
             </span>
           </div>
+          {serving && (
+            <button
+              type="button"
+              onClick={() => setDetailsOpen(true)}
+              className="mt-1.5 block text-left text-[11px] font-semibold leading-snug text-slate-700 underline decoration-slate-300 underline-offset-2"
+            >
+              {serving.text}
+            </button>
+          )}
           {servingLine && (
             <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{servingLine}</p>
+          )}
+          {notice && (
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-2">
+              <p className="min-w-0 flex-1 text-xs font-medium text-amber-950">{notice}</p>
+              <button
+                type="button"
+                onClick={() => setSwapOpen(true)}
+                className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-950"
+              >
+                Swap meal
+              </button>
+              <button
+                type="button"
+                onClick={() => keepMeal(dateKey, slot)}
+                className="rounded-lg px-2.5 py-1 text-xs font-semibold text-amber-900"
+              >
+                Keep
+              </button>
+            </div>
           )}
           <label className="mt-2 flex min-w-0 items-center gap-1 text-[11px] text-slate-600">
             <span className="shrink-0 font-medium text-slate-500">Drink:</span>
@@ -295,7 +329,6 @@ export function TodayMealRow({
                   setFatVariationId(id);
                   setMealFatVariation(dateKey, slot, id);
                 }}
-                mealScale={foodScale}
                 householdMult={householdMult}
                 userProfile={userProfile}
                 countsOverride={householdCounts}
@@ -306,6 +339,7 @@ export function TodayMealRow({
                   selectedCarbVariationId: carbVariationId,
                   selectedFatVariationId: fatVariationId,
                 }}
+                dateKey={dateKey}
               />
             </div>
           )}
@@ -333,6 +367,20 @@ export function TodayMealRow({
           onSave={onLog}
         />
       )}
+      {swapOpen &&
+        createPortal(
+          <ReplaceMealSheet
+            meal={meal}
+            dateKey={dateKey}
+            excludeRecipeIds={
+              new Set((dayMeals ?? []).filter((m) => m.slot !== slot).map((m) => m.recipe.id))
+            }
+            closestFit
+            onClose={() => setSwapOpen(false)}
+            onSelect={(recipeId) => replaceMealSlot(dateKey, slot, recipeId)}
+          />,
+          document.body,
+        )}
     </article>
   );
 }

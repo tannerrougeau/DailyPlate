@@ -22,6 +22,10 @@ type Food = {
   per100g: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
   grams: Grams;
   aliases: string[];
+  /** Portion role, measuring state, and yield — set by buildIngredients.mjs; kept as-is on refresh. */
+  role?: string;
+  state?: string;
+  yield?: { cookedPerRaw: number; source: string; dryCupGrams?: number } | null;
 };
 
 const NUTRIENT = { calories: 1008, protein: 1003, carbs: 1005, fat: 1004, fiber: 1079 } as const;

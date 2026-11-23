@@ -114,7 +114,7 @@ export function GroceryScreen() {
     const lists = groceryDateKeys.map((key) => {
       const meals = mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey);
       const mult = key === todayDateKey ? todayMult : profileMult;
-      return groceriesFromMeals(meals, mult, userProfile?.prioritizeMinProtein === true);
+      return groceriesFromMeals(meals, mult);
     });
     return simplifyGroceryList(mergeGroceryLists(lists));
   }, [

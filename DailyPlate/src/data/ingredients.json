@@ -21,7 +21,13 @@
     },
     "aliases": [
       "Lean ground turkey"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "beef-ground-93-raw",
@@ -46,7 +52,13 @@
     "aliases": [
       "Lean ground beef (93%)",
       "Lean beef strips"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "chicken-breast-raw",
@@ -72,7 +84,13 @@
       "Chicken breast",
       "Chicken breast (boneless)",
       "Chicken breast (cubed)"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "chicken-ground-raw",
@@ -96,7 +114,13 @@
     },
     "aliases": [
       "Ground chicken"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "chicken-breast-roasted",
@@ -125,7 +149,10 @@
       "Diced turkey breast or deli turkey",
       "Sliced turkey",
       "Sliced turkey breast"
-    ]
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "chicken-thigh-raw-skin",
@@ -150,7 +177,13 @@
     },
     "aliases": [
       "Chicken thighs (bone-in, skin-on)"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "sirloin-raw",
@@ -174,7 +207,13 @@
     },
     "aliases": [
       "Sirloin steak"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "salmon-raw",
@@ -199,7 +238,13 @@
     "aliases": [
       "Salmon fillet",
       "Cooked salmon or tuna"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.8,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    }
   },
   {
     "id": "tuna-canned-water",
@@ -224,7 +269,10 @@
     },
     "aliases": [
       "Canned tuna in water"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "egg-whole-raw",
@@ -249,7 +297,10 @@
     },
     "aliases": [
       "Eggs"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "egg-white-raw",
@@ -274,7 +325,10 @@
     "aliases": [
       "Liquid egg whites",
       "Extra liquid egg whites"
-    ]
+    ],
+    "role": "protein",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "bacon-cooked",
@@ -302,7 +356,10 @@
       "Center-cut bacon",
       "Cooked bacon (crumbled)",
       "Cooked bacon, chopped"
-    ]
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "turkey-bacon",
@@ -328,7 +385,10 @@
     },
     "aliases": [
       "Turkey bacon"
-    ]
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "ham-deli",
@@ -355,7 +415,10 @@
     "aliases": [
       "Deli ham (lean)",
       "Diced ham"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "turkey-patty-cooked",
@@ -380,7 +443,10 @@
     },
     "aliases": [
       "Turkey burger patty"
-    ]
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "chicken-sausage",
@@ -404,7 +470,10 @@
     },
     "aliases": [
       "Chicken sausage, diced"
-    ]
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "beef-jerky",
@@ -428,7 +497,10 @@
     },
     "aliases": [
       "Beef jerky"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "meat-stick",
@@ -453,7 +525,10 @@
     },
     "aliases": [
       "Beef or turkey meat stick"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "rice-white-cooked",
@@ -480,7 +555,14 @@
       "Cooked white rice",
       "Cooked rice or quinoa",
       "Microwave rice (cooked)"
-    ]
+    ],
+    "role": "carb",
+    "state": "cooked",
+    "yield": {
+      "cookedPerRaw": 2.6,
+      "dryCupGrams": 185,
+      "source": "Derived from USDA FoodData Central portion weights: 1 cup dry long-grain rice ≈ 185 g yields ≈ 3 cups cooked at 158 g."
+    }
   },
   {
     "id": "oats-dry",
@@ -504,7 +586,13 @@
     },
     "aliases": [
       "Rolled oats"
-    ]
+    ],
+    "role": "carb",
+    "state": "dry",
+    "yield": {
+      "cookedPerRaw": 1,
+      "source": "Recipes list the soaking/cooking liquid separately, so oats add their dry weight only (avoids double counting)."
+    }
   },
   {
     "id": "pasta-dry",
@@ -528,7 +616,13 @@
     },
     "aliases": [
       "Orzo (dry)"
-    ]
+    ],
+    "role": "carb",
+    "state": "dry",
+    "yield": {
+      "cookedPerRaw": 2.5,
+      "source": "Derived from USDA FoodData Central portion weights: 56 g (2 oz) dry yields ≈ 1 cup cooked at 140 g."
+    }
   },
   {
     "id": "protein-pasta-dry",
@@ -552,7 +646,13 @@
     },
     "aliases": [
       "Protein pasta (dry)"
-    ]
+    ],
+    "role": "carb",
+    "state": "dry",
+    "yield": {
+      "cookedPerRaw": 2.5,
+      "source": "Assumed same as wheat pasta (USDA FoodData Central portion weights)."
+    }
   },
   {
     "id": "bread-wheat",
@@ -579,7 +679,10 @@
     "aliases": [
       "Bread (for toast)",
       "Sliced bread (toasted)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "bagel",
@@ -604,7 +707,10 @@
     },
     "aliases": [
       "Plain bagel (halved, toasted)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "croissant",
@@ -629,7 +735,10 @@
     },
     "aliases": [
       "Croissant"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "biscuit",
@@ -654,7 +763,10 @@
     },
     "aliases": [
       "Breakfast biscuit"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "tortilla-flour",
@@ -679,7 +791,10 @@
     },
     "aliases": [
       "10-inch flour tortilla"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "tortilla-wheat",
@@ -704,7 +819,10 @@
     },
     "aliases": [
       "Whole wheat or spinach tortilla"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "tortilla-corn",
@@ -729,7 +847,10 @@
     },
     "aliases": [
       "6-inch corn tortillas"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "teriyaki",
@@ -754,7 +875,10 @@
     },
     "aliases": [
       "Teriyaki sauce"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "soy-sauce",
@@ -780,7 +904,10 @@
       "Soy sauce",
       "Soy sauce (low-sodium)",
       "Soy sauce or teriyaki"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "broccoli-cooked",
@@ -809,7 +936,10 @@
       "Steamed broccoli",
       "Steamed broccoli florets, chopped",
       "Broccoli, cooked"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "green-beans-cooked",
@@ -835,7 +965,10 @@
     "aliases": [
       "Green beans or broccoli",
       "Green vegetable mix"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "sesame",
@@ -860,7 +993,10 @@
     "aliases": [
       "Sesame seeds",
       "Sesame seeds (optional)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "olive-oil",
@@ -887,7 +1023,10 @@
       "Olive oil (for vegetables)",
       "Olive oil or butter",
       "Avocado oil"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "butter",
@@ -912,7 +1051,10 @@
     "aliases": [
       "Butter",
       "Butter or oil"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "chia",
@@ -936,7 +1078,10 @@
     },
     "aliases": [
       "Chia seeds"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "whey",
@@ -965,7 +1110,10 @@
       "Chocolate protein powder",
       "Chocolate protein powder (or vanilla)",
       "Strawberry protein powder (or vanilla)"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "greek-nonfat",
@@ -992,7 +1140,10 @@
       "Plain Greek yogurt (0% or low sugar)",
       "Nonfat Greek yogurt",
       "Greek yogurt (optional)"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "greek-cup",
@@ -1016,7 +1167,10 @@
     },
     "aliases": [
       "Plain Greek yogurt cup (5.3 oz)"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cottage-lowfat",
@@ -1042,7 +1196,10 @@
       "Cottage cheese",
       "Cottage cheese (low-fat)",
       "Low-fat cottage cheese"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cottage-cup",
@@ -1066,7 +1223,10 @@
     },
     "aliases": [
       "Cottage cheese cup (4 oz)"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "almond-milk",
@@ -1092,7 +1252,10 @@
     "aliases": [
       "Unsweetened almond milk",
       "Unsweetened almond milk (or milk of choice)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "milk-2",
@@ -1117,7 +1280,10 @@
     },
     "aliases": [
       "Milk (2%)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "milk-fat-free",
@@ -1142,7 +1308,10 @@
     },
     "aliases": [
       "Fat-free milk"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "water",
@@ -1168,7 +1337,10 @@
     "aliases": [
       "Water",
       "Ice"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "salt",
@@ -1194,7 +1366,10 @@
     "aliases": [
       "Salt",
       "Pinch of salt"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "chili-powder",
@@ -1219,7 +1394,10 @@
     "aliases": [
       "Chili powder",
       "Mild chili seasoning"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cinnamon",
@@ -1243,7 +1421,10 @@
     },
     "aliases": [
       "Cinnamon"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cumin",
@@ -1267,7 +1448,10 @@
     },
     "aliases": [
       "Cumin"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "garlic-powder",
@@ -1291,7 +1475,10 @@
     },
     "aliases": [
       "Garlic powder"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "italian-herbs",
@@ -1317,7 +1504,10 @@
       "Dried Italian herbs",
       "Dried oregano",
       "Italian herbs"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "paprika",
@@ -1341,7 +1531,10 @@
     },
     "aliases": [
       "Smoked paprika"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "ranch",
@@ -1365,7 +1558,10 @@
     },
     "aliases": [
       "Ranch seasoning mix"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "ginger",
@@ -1389,7 +1585,10 @@
     },
     "aliases": [
       "Ginger (fresh)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "almond-butter",
@@ -1413,7 +1612,10 @@
     },
     "aliases": [
       "Almond butter"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "peanut-butter",
@@ -1437,7 +1639,10 @@
     },
     "aliases": [
       "Peanut butter"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "almonds",
@@ -1461,7 +1666,10 @@
     },
     "aliases": [
       "Almonds"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "peanuts",
@@ -1485,7 +1693,10 @@
     },
     "aliases": [
       "Peanuts"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cashews",
@@ -1509,7 +1720,10 @@
     },
     "aliases": [
       "Cashews"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "pecans",
@@ -1533,7 +1747,10 @@
     },
     "aliases": [
       "Chopped pecans"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "walnuts",
@@ -1558,7 +1775,10 @@
     "aliases": [
       "Chopped walnuts or hazelnuts",
       "Mixed nuts"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "apple-raw",
@@ -1584,7 +1804,10 @@
     "aliases": [
       "Apple",
       "Diced apple"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "banana-raw",
@@ -1611,7 +1834,10 @@
       "Banana",
       "Frozen banana",
       "Sliced banana"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "asparagus-raw",
@@ -1637,7 +1863,10 @@
     },
     "aliases": [
       "Asparagus"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "avocado-raw",
@@ -1662,7 +1891,10 @@
     },
     "aliases": [
       "Avocado (sliced)"
-    ]
+    ],
+    "role": "fat",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "potato-raw",
@@ -1688,7 +1920,10 @@
     "aliases": [
       "Baby red potatoes (halved)",
       "Potato (cubed)"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "hash-brown",
@@ -1712,7 +1947,10 @@
     },
     "aliases": [
       "Shredded hash browns (cooked)"
-    ]
+    ],
+    "role": "carb",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "sweet-potato-raw",
@@ -1739,7 +1977,10 @@
     "aliases": [
       "Sweet potato",
       "Sweet potato (diced)"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "spinach-raw",
@@ -1765,7 +2006,13 @@
       "Baby spinach",
       "Baby spinach, chopped",
       "Mixed greens or spinach"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.3,
+      "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    }
   },
   {
     "id": "lettuce-raw",
@@ -1792,7 +2039,10 @@
       "Romaine lettuce",
       "Romaine or mixed greens",
       "Shredded lettuce"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "pepper-raw",
@@ -1823,7 +2073,13 @@
       "Bell peppers (optional)",
       "Diced bell pepper",
       "Roasted red peppers, diced"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.85,
+      "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    }
   },
   {
     "id": "berries",
@@ -1853,7 +2109,10 @@
       "Raspberries (for topping)",
       "Fresh fruit (berries or sliced fruit)",
       "Frozen cherries or mixed berries"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "strawberries",
@@ -1878,7 +2137,10 @@
     "aliases": [
       "Diced strawberries",
       "Frozen strawberries"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "black-beans",
@@ -1903,7 +2165,10 @@
     "aliases": [
       "Black beans",
       "Black beans (canned, drained)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "chickpeas",
@@ -1927,7 +2192,10 @@
     },
     "aliases": [
       "Canned chickpeas (drained)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "edamame",
@@ -1951,7 +2219,10 @@
     },
     "aliases": [
       "Shelled edamame"
-    ]
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "sugar",
@@ -1976,7 +2247,10 @@
     "aliases": [
       "Brown sugar or coconut sugar",
       "Sweetener (to taste)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "brussels",
@@ -2001,7 +2275,10 @@
     },
     "aliases": [
       "Brussels sprouts (halved)"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "carrot-raw",
@@ -2030,7 +2307,10 @@
       "Carrots (diced)",
       "Carrots (thick batons)",
       "Shredded carrots"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "celery-raw",
@@ -2056,7 +2336,10 @@
     "aliases": [
       "Celery (diced)",
       "Celery stalks"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "tomato-raw",
@@ -2087,7 +2370,10 @@
       "Diced tomato",
       "Fresh tomato slices (optional)",
       "Tomato (sliced)"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "tomato-sundried",
@@ -2111,7 +2397,10 @@
     },
     "aliases": [
       "Sun-dried tomatoes, chopped"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "tomato-canned",
@@ -2136,7 +2425,10 @@
     },
     "aliases": [
       "Diced tomatoes (canned)"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cucumber-raw",
@@ -2163,7 +2455,10 @@
       "Cucumber",
       "Cucumber (chunked)",
       "Cucumber (sliced)"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "onion-raw",
@@ -2197,7 +2492,13 @@
       "Red onion (wedges)",
       "Yellow onion (thinly sliced)",
       "Yellow onion (wedges)"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    }
   },
   {
     "id": "garlic-raw",
@@ -2223,7 +2524,10 @@
     },
     "aliases": [
       "Garlic"
-    ]
+    ],
+    "role": "flavor",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "corn",
@@ -2247,7 +2551,10 @@
     },
     "aliases": [
       "Corn kernels"
-    ]
+    ],
+    "role": "carb",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "frozen-veg",
@@ -2273,7 +2580,10 @@
     "aliases": [
       "Frozen mixed vegetables",
       "Roasted vegetables"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "cooked",
+    "yield": null
   },
   {
     "id": "zucchini-raw",
@@ -2301,7 +2611,13 @@
       "Zucchini (chunked)",
       "Zucchini (half-moons)",
       "Zucchini or yellow squash (diced)"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.8,
+      "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    }
   },
   {
     "id": "mushroom-raw",
@@ -2326,7 +2642,13 @@
     "aliases": [
       "Mushrooms (optional)",
       "Sliced mushrooms"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.6,
+      "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    }
   },
   {
     "id": "pineapple",
@@ -2351,7 +2673,10 @@
     "aliases": [
       "Pineapple chunks",
       "Frozen pineapple (optional)"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "mango",
@@ -2375,7 +2700,10 @@
     },
     "aliases": [
       "Frozen mango chunks"
-    ]
+    ],
+    "role": "carb",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "cauliflower-raw",
@@ -2399,7 +2727,10 @@
     },
     "aliases": [
       "Riced cauliflower"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "broccoli-raw",
@@ -2423,7 +2754,10 @@
     },
     "aliases": [
       "Riced broccoli"
-    ]
+    ],
+    "role": "vegetable",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "broth",
@@ -2448,7 +2782,10 @@
     "aliases": [
       "Chicken broth",
       "Beef broth or chicken broth"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cheddar",
@@ -2484,7 +2821,10 @@
       "Gruyère cheese, shredded",
       "Shredded mozzarella or Gruyère",
       "Swiss cheese, shredded"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "mozzarella",
@@ -2510,7 +2850,10 @@
     "aliases": [
       "Mozzarella pearls",
       "Mozzarella string cheese"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "babybel",
@@ -2535,7 +2878,10 @@
     },
     "aliases": [
       "Mini Babybel cheese"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "feta",
@@ -2562,7 +2908,10 @@
       "Feta",
       "Feta cheese (crumbled)",
       "Feta cheese, crumbled"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "parmesan",
@@ -2586,7 +2935,10 @@
     },
     "aliases": [
       "Parmesan"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cream-cheese",
@@ -2610,7 +2962,10 @@
     },
     "aliases": [
       "Light cream cheese"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "sour-cream",
@@ -2634,7 +2989,10 @@
     },
     "aliases": [
       "Sour cream (optional)"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "mayo",
@@ -2660,7 +3018,10 @@
       "Light mayonnaise",
       "Light chipotle mayo or burger sauce",
       "Spicy mayo or yogurt sauce"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "caesar",
@@ -2684,7 +3045,10 @@
     },
     "aliases": [
       "Light Caesar dressing"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "mustard",
@@ -2708,7 +3072,10 @@
     },
     "aliases": [
       "Mustard (optional)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "salsa",
@@ -2733,7 +3100,10 @@
     "aliases": [
       "Salsa",
       "Salsa verde (optional)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "hummus",
@@ -2757,7 +3127,10 @@
     },
     "aliases": [
       "Hummus"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "tzatziki",
@@ -2781,7 +3154,10 @@
     },
     "aliases": [
       "Tzatziki"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "honey",
@@ -2805,7 +3181,10 @@
     },
     "aliases": [
       "Honey"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "maple",
@@ -2829,7 +3208,10 @@
     },
     "aliases": [
       "Maple syrup"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "jam",
@@ -2854,7 +3236,10 @@
     "aliases": [
       "Strawberry jam (low sugar)",
       "Orange marmalade"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cocoa",
@@ -2878,7 +3263,10 @@
     },
     "aliases": [
       "Unsweetened cocoa powder"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "choc-chips",
@@ -2903,7 +3291,10 @@
     "aliases": [
       "Dark chocolate chips",
       "Mini chocolate chips"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "coconut",
@@ -2927,7 +3318,10 @@
     },
     "aliases": [
       "Unsweetened shredded coconut"
-    ]
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "granola",
@@ -2952,7 +3346,10 @@
     "aliases": [
       "Granola",
       "High-protein granola (low sugar)"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "cornstarch",
@@ -2976,7 +3373,10 @@
     },
     "aliases": [
       "Cornstarch"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "rice-vinegar",
@@ -3000,7 +3400,10 @@
     },
     "aliases": [
       "Rice vinegar"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "lemon-juice",
@@ -3028,7 +3431,10 @@
       "Squeeze of lemon (optional)",
       "Lemon",
       "Lime juice"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "lemon-zest",
@@ -3052,7 +3458,10 @@
     },
     "aliases": [
       "Lemon zest"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "herbs-fresh",
@@ -3085,7 +3494,10 @@
       "Fresh parsley (optional)",
       "Fresh thyme (optional)",
       "Parsley"
-    ]
+    ],
+    "role": "flavor",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "capers",
@@ -3109,7 +3521,10 @@
     },
     "aliases": [
       "Capers (optional)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "olives",
@@ -3134,7 +3549,10 @@
     "aliases": [
       "Kalamata olives (pitted, halved)",
       "Kalamata olives (pitted)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "jalapeno",
@@ -3158,7 +3576,10 @@
     },
     "aliases": [
       "Jalapeño slices (optional)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "raw",
+    "yield": null
   },
   {
     "id": "hot-sauce",
@@ -3182,7 +3603,10 @@
     },
     "aliases": [
       "Hot sauce (optional)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "croutons",
@@ -3206,7 +3630,10 @@
     },
     "aliases": [
       "Croutons"
-    ]
+    ],
+    "role": "carb",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "stir-fry-sauce",
@@ -3230,7 +3657,10 @@
     },
     "aliases": [
       "Simple stir-fry sauce"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "smoked-salmon",
@@ -3254,7 +3684,10 @@
     },
     "aliases": [
       "Smoked salmon, chopped"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "protein-bar",
@@ -3280,7 +3713,10 @@
     "aliases": [
       "Protein bar",
       "RXBAR or similar nut-and-egg-white bar"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "protein-chips",
@@ -3305,7 +3741,10 @@
     },
     "aliases": [
       "Protein chips (1 bag)"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "rtd-shake",
@@ -3331,7 +3770,10 @@
     },
     "aliases": [
       "RTD protein shake (11.5 fl oz)"
-    ]
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "seaweed",
@@ -3356,7 +3798,10 @@
     },
     "aliases": [
       "Seaweed snacks"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "diet-drink",
@@ -3381,7 +3826,10 @@
     },
     "aliases": [
       "Diet beverage (zero-calorie soda, sparkling water, or similar)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "soda",
@@ -3406,7 +3854,10 @@
     },
     "aliases": [
       "Sweetened drink (soda, juice, or similar)"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "black-pepper",
@@ -3430,6 +3881,9 @@
     },
     "aliases": [
       "Black pepper"
-    ]
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null
   }
 ]
