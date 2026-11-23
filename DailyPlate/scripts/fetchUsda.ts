@@ -26,9 +26,15 @@ type Food = {
   role?: string;
   state?: string;
   yield?: { cookedPerRaw: number; source: string; dryCupGrams?: number } | null;
+  edible?: { fraction: number; source: string } | null;
+  usda?: { description: string; dataType?: string } | null;
+  /** Reason this food keeps typed values (wrong or no USDA match). */
+  skipUsda?: string;
 };
 
 const NUTRIENT = { calories: 1008, protein: 1003, carbs: 1005, fat: 1004, fiber: 1079 } as const;
+/** Foundation foods often report energy only as Atwater general (2047) or specific (2048) factors. */
+const ENERGY_FALLBACKS = [2047, 2048] as const;
 
 function readKey(): string {
   if (!fs.existsSync(envPath)) {
@@ -47,15 +53,24 @@ function readKey(): string {
   throw new Error("USDA_API_KEY is not set in .env.");
 }
 
-function nutrientAmount(food: { foodNutrients?: Array<Record<string, unknown>> }, id: number): number {
+/** Amount per 100 g, or null when USDA does not report the nutrient (keep the typed value then). */
+function nutrientAmount(food: { foodNutrients?: Array<Record<string, unknown>> }, id: number): number | null {
   for (const row of food.foodNutrients ?? []) {
     const nutrient = row.nutrient as { id?: number; number?: string } | undefined;
     const nid = nutrient?.id ?? (row.nutrientId as number | undefined);
     if (nid !== id) continue;
     const amount = row.amount ?? row.value;
-    return typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+    return typeof amount === "number" && Number.isFinite(amount) ? amount : null;
   }
-  return 0;
+  return null;
+}
+
+function energyAmount(food: { foodNutrients?: Array<Record<string, unknown>> }): number | null {
+  for (const id of [NUTRIENT.calories, ...ENERGY_FALLBACKS]) {
+    const v = nutrientAmount(food, id);
+    if (v != null) return v;
+  }
+  return null;
 }
 
 function portionGrams(portions: Array<Record<string, unknown>> | undefined, label: RegExp): number | null {
@@ -73,7 +88,8 @@ function portionGrams(portions: Array<Record<string, unknown>> | undefined, labe
 async function searchId(apiKey: string, query: string): Promise<number | null> {
   const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
   url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("query", query);
+  // The search endpoint rejects some characters (e.g. "1/8"); search on plain words.
+  url.searchParams.set("query", query.replace(/[^\p{L}\p{N}\s,%-]/gu, " ").replace(/\s+/g, " ").trim());
   url.searchParams.set("dataType", "Foundation,SR Legacy");
   url.searchParams.set("pageSize", "1");
   const response = await fetch(url);
@@ -89,6 +105,7 @@ async function fetchFood(apiKey: string, fdcId: number) {
   if (!response.ok) throw new Error(`USDA food ${fdcId} failed (${response.status})`);
   return response.json() as Promise<{
     description?: string;
+    dataType?: string;
     foodNutrients?: Array<Record<string, unknown>>;
     foodPortions?: Array<Record<string, unknown>>;
   }>;
@@ -103,21 +120,34 @@ async function main() {
   const foods = JSON.parse(fs.readFileSync(dataPath, "utf8")) as Food[];
   let updated = 0;
   for (const food of foods) {
-    let fdcId = food.fdcId;
-    if (fdcId == null) fdcId = await searchId(apiKey, food.query);
-    if (fdcId == null) {
-      console.log(`skip ${food.name}: no FDC match`);
+    if (food.skipUsda) {
+      console.log(`skip ${food.name}: ${food.skipUsda}`);
       continue;
     }
-    const detail = await fetchFood(apiKey, fdcId);
+    let fdcId = food.fdcId;
+    let detail: Awaited<ReturnType<typeof fetchFood>>;
+    try {
+      if (fdcId == null) fdcId = await searchId(apiKey, food.query);
+      if (fdcId == null) {
+        console.log(`skip ${food.name}: no FDC match`);
+        continue;
+      }
+      detail = await fetchFood(apiKey, fdcId);
+    } catch (error) {
+      if (error instanceof Error && error.message === "USDA rate limit") throw error;
+      console.log(`skip ${food.name}: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
     food.fdcId = fdcId;
+    const typed = food.per100g;
     food.per100g = {
-      calories: nutrientAmount(detail, NUTRIENT.calories),
-      protein: nutrientAmount(detail, NUTRIENT.protein),
-      carbs: nutrientAmount(detail, NUTRIENT.carbs),
-      fat: nutrientAmount(detail, NUTRIENT.fat),
-      fiber: nutrientAmount(detail, NUTRIENT.fiber),
+      calories: energyAmount(detail) ?? typed.calories,
+      protein: nutrientAmount(detail, NUTRIENT.protein) ?? typed.protein,
+      carbs: nutrientAmount(detail, NUTRIENT.carbs) ?? typed.carbs,
+      fat: nutrientAmount(detail, NUTRIENT.fat) ?? typed.fat,
+      fiber: nutrientAmount(detail, NUTRIENT.fiber) ?? typed.fiber,
     };
+    food.usda = { description: detail.description ?? "", dataType: detail.dataType };
     const cup = portionGrams(detail.foodPortions, /\b1\s+cup\b|\bcup\b/);
     const tbsp = portionGrams(detail.foodPortions, /\b1\s+tbsp\b|\btablespoon\b/);
     const tsp = portionGrams(detail.foodPortions, /\b1\s+tsp\b|\bteaspoon\b/);

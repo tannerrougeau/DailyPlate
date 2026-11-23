@@ -1,5 +1,5 @@
 import type { DailyTargets, MealSlotId, RecipeIngredient } from "@/types";
-import { nutritionOfLines, roundPortionLine, type PortionLine } from "@/utils/goalPortions";
+import { fitKcalTolerance, nutritionOfLines, roundPortionLine, type PortionLine } from "@/utils/goalPortions";
 import { ingredientRole, ZERO_NUTRIENTS, type NutrientVector } from "@/utils/ingredientNutrition";
 import { formatPracticalQty } from "@/utils/practicalScaling";
 import { isSnackPlanSlot } from "@/utils/planningPrefs";
@@ -154,7 +154,7 @@ function candidatesFor(slot: MealSlotId): Candidate[] {
 
 /**
  * One or two sides that best close a calorie gap (and the protein gap when protein is short).
- * Only for meals more than 10% under their calorie target. Returns null for snacks or when no side helps.
+ * Only for meals under their calorie target by more than the fit tolerance (10% or 50 kcal). Returns null for snacks or when no side helps.
  */
 export function suggestSides(
   current: Pick<NutrientVector, "calories" | "protein">,
@@ -163,7 +163,7 @@ export function suggestSides(
 ): SideSuggestion | null {
   if (isSnackPlanSlot(slot) || !(target.calories > 0)) return null;
   const gap = target.calories - current.calories;
-  if (gap <= target.calories * 0.1) return null;
+  if (gap <= fitKcalTolerance(target)) return null;
   const proteinShort = Math.max(0, target.protein - current.protein);
   let best: { c: Candidate; cost: number } | null = null;
   for (const c of candidatesFor(slot)) {
@@ -184,7 +184,7 @@ export function suggestSides(
     label: best.c.labels.join(" + "),
     nutrition: best.c.n,
     fits:
-      Math.abs(target.calories - after) <= target.calories * 0.1 &&
+      Math.abs(target.calories - after) <= fitKcalTolerance(target) &&
       current.protein + best.c.n.protein >= target.protein - 2,
   };
 }

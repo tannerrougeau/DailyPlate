@@ -93,11 +93,13 @@ export function fatVariationLabels(
   return FAT_VARIATION_OPTIONS;
 }
 
+/** One serving of ingredients: the recipe's list (plus variation) ÷ recipe.servings. */
 function rawRecipeIngredients(recipe: Recipe, variationId?: string): RecipeIngredient[] {
   const v = getVariationDetail(recipe, variationId);
-  if (!v) return recipe.ingredients;
-  if (v.replaceBase) return v.ingredients;
-  return [...recipe.ingredients, ...v.ingredients];
+  const list = !v ? recipe.ingredients : v.replaceBase ? v.ingredients : [...recipe.ingredients, ...v.ingredients];
+  const servings = recipe.servings != null && recipe.servings > 1 ? recipe.servings : 1;
+  if (servings === 1) return list;
+  return list.map((ing) => ({ ...ing, quantity: ing.quantity / servings }));
 }
 
 export function createPlannedMeal(

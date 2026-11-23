@@ -22,6 +22,10 @@ export type IngredientRecord = {
   state?: IngredientState;
   /** cookedPerRaw = cooked weight ÷ measured weight, with its source. */
   yield?: { cookedPerRaw: number; source: string; dryCupGrams?: number } | null;
+  /** Bone-in cuts: share of the bought weight that is eaten (nutrition uses only this part). */
+  edible?: { fraction: number; source: string } | null;
+  /** Set by scripts/fetchUsda.ts: the USDA food the values came from. */
+  usda?: { description: string; dataType?: string } | null;
 };
 
 export type IngredientState = "raw" | "dry" | "cooked" | "as-sold";
@@ -110,7 +114,7 @@ export function nutritionFromIngredients(
     const food = matchIngredient(ing.name);
     const grams = gramsForIngredient(ing);
     if (!food || grams == null) return null;
-    const factor = grams / 100;
+    const factor = (grams * edibleFraction(food)) / 100;
     totals.calories += food.per100g.calories * factor;
     totals.protein += food.per100g.protein * factor;
     totals.carbs += food.per100g.carbs * factor;
@@ -165,11 +169,16 @@ export function cookedGramsFromMeasured(name: string, measuredGrams: number): nu
   return measuredGrams * cookedPerMeasured(name);
 }
 
-/** Nutrients for a gram amount of a matched food. */
+function edibleFraction(food: IngredientRecord): number {
+  const f = food.edible?.fraction;
+  return f != null && f > 0 && f <= 1 ? f : 1;
+}
+
+/** Nutrients for a gram amount (as bought) of a matched food; bone-in cuts count only the edible part. */
 export function nutritionForGrams(name: string, grams: number): NutrientVector | null {
   const food = matchIngredient(name);
   if (!food || !Number.isFinite(grams)) return null;
-  const f = grams / 100;
+  const f = (grams * edibleFraction(food)) / 100;
   return {
     calories: food.per100g.calories * f,
     protein: food.per100g.protein * f,

@@ -31,8 +31,9 @@ export const ROLE_LIMITS: Record<keyof RoleMultipliers, { min: number; max: numb
   vegetable: { min: 0.85, max: 1.15 },
 };
 
-/** Fit: calories within 10% of target and protein at target (2 g allowance for rounding). */
+/** Fit: calories within 10% or 50 kcal of target (whichever is larger), protein at target (2 g allowance). */
 export const FIT_KCAL_TOLERANCE = 0.1;
+export const FIT_KCAL_MIN_TOLERANCE = 50;
 export const FIT_PROTEIN_ALLOWANCE_G = 2;
 
 export const UNIFORM_MULTIPLIERS: RoleMultipliers = { protein: 1, carb: 1, fat: 1, vegetable: 1 };
@@ -311,6 +312,11 @@ export function nutritionOfLines(lines: PortionLine[], servings = 1): NutrientVe
   };
 }
 
+/** Allowed calorie miss for a target: 10% or 50 kcal, whichever is larger. */
+export function fitKcalTolerance(target: Pick<DailyTargets, "calories">): number {
+  return Math.max(target.calories * FIT_KCAL_TOLERANCE, FIT_KCAL_MIN_TOLERANCE);
+}
+
 /** Snacks are checked on calories only (`caloriesOnly`). */
 export function fitsTarget(
   n: Pick<NutrientVector, "calories" | "protein">,
@@ -318,7 +324,7 @@ export function fitsTarget(
   opts: { caloriesOnly?: boolean } = {},
 ): boolean {
   if (!(target.calories > 0)) return true;
-  const kcalOk = Math.abs(n.calories - target.calories) <= target.calories * FIT_KCAL_TOLERANCE;
+  const kcalOk = Math.abs(n.calories - target.calories) <= fitKcalTolerance(target);
   if (opts.caloriesOnly) return kcalOk;
   const proteinOk = n.protein >= target.protein - FIT_PROTEIN_ALLOWANCE_G;
   return kcalOk && proteinOk;

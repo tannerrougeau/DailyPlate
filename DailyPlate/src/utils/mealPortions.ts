@@ -3,6 +3,7 @@ import type { MealTimingPreference } from "@/types/profile";
 import { resolveBeverage } from "@/utils/beverages";
 import {
   cookedGramsOfLine,
+  fitKcalTolerance,
   cookedWeightOfLines,
   nutritionOfLines,
   portionLines,
@@ -321,16 +322,17 @@ export function fitNotice(meal: PlannedMeal): string | null {
   const p = meal.portion;
   if (!p || p.fits || meal.kept || isPackagedRecipe(meal.recipe)) return null;
   const gap = Math.round(Math.abs(p.kcalGap) / 10) * 10;
-  if (p.kcalGap < 0 && Math.abs(p.kcalGap) > p.target.calories * 0.1) {
+  const tolerance = fitKcalTolerance(p.target);
+  if (p.kcalGap < 0 && Math.abs(p.kcalGap) > tolerance) {
     return `This meal is about ${gap} kcal under your target.`;
   }
-  if (p.kcalGap > 0 && p.kcalGap > p.target.calories * 0.1) {
+  if (p.kcalGap > 0 && p.kcalGap > tolerance) {
     return `This meal is about ${gap} kcal over your target.`;
   }
   return "This meal is a little under your protein target.";
 }
 
-/** Side to offer on the notice when the meal is more than 10% under its calorie target. */
+/** Side to offer on the notice when the meal is under its calorie target by more than the fit tolerance. */
 export function sideSuggestionFor(meal: PlannedMeal): SideSuggestion | null {
   const p = meal.portion;
   if (!p || p.fits || meal.kept || isPackagedRecipe(meal.recipe)) return null;

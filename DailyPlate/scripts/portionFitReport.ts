@@ -1,7 +1,7 @@
 /**
  * Goal-based portion report, using the app's own target calculation (computeDailyTargets +
  * splitMealTargets) for three sample profiles. For each profile and meal slot, lists the recipes
- * that cannot reach the slot target inside the role limits, how far off they are, and whether an
+ * that cannot reach the slot target (within 10% or 50 kcal) inside the role limits, how far off they are, and whether an
  * "Add side" suggestion would make the meal fit.
  *
  * Assumed for all profiles: moderate activity, Recommended protein, Balanced carb/fat split,

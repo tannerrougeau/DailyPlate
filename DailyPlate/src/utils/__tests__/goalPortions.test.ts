@@ -110,6 +110,28 @@ describe("fit notice threshold", () => {
     expect(fitsTarget({ calories: 600 * 1.101, protein: 45 }, t)).toBe(false);
   });
 
+  it("small targets use a 50 kcal tolerance (larger than 10%)", () => {
+    const small: DailyTargets = { calories: 300, protein: 10, carbs: 35, fat: 10, fiber: 3 };
+    expect(fitsTarget({ calories: 300 - 49, protein: 10 }, small)).toBe(true);
+    expect(fitsTarget({ calories: 300 - 51, protein: 10 }, small)).toBe(false);
+    expect(fitsTarget({ calories: 300 + 50, protein: 10 }, small)).toBe(true);
+    expect(fitsTarget({ calories: 300 + 51, protein: 10 }, small)).toBe(false);
+  });
+
+  it("the switch from 50 kcal to 10% happens at a 500 kcal target", () => {
+    const at = (calories: number): DailyTargets => ({ calories, protein: 10, carbs: 50, fat: 15, fiber: 5 });
+    expect(fitsTarget({ calories: 450, protein: 10 }, at(500))).toBe(true);
+    expect(fitsTarget({ calories: 449, protein: 10 }, at(500))).toBe(false);
+    expect(fitsTarget({ calories: 800 - 79, protein: 10 }, at(800))).toBe(true);
+    expect(fitsTarget({ calories: 800 - 81, protein: 10 }, at(800))).toBe(false);
+  });
+
+  it("snacks ignore protein", () => {
+    const snack: DailyTargets = { calories: 200, protein: 15, carbs: 20, fat: 8, fiber: 3 };
+    expect(fitsTarget({ calories: 200, protein: 4 }, snack, { caloriesOnly: true })).toBe(true);
+    expect(fitsTarget({ calories: 200, protein: 4 }, snack)).toBe(false);
+  });
+
   it("protein must reach the target (2 g allowance)", () => {
     expect(fitsTarget({ calories: 600, protein: 43 }, t)).toBe(true);
     expect(fitsTarget({ calories: 600, protein: 42.9 }, t)).toBe(false);
@@ -130,6 +152,22 @@ describe("fit notice threshold", () => {
     expect(fitNotice(at(-61))).toBe("This meal is about 60 kcal under your target.");
     expect(fitNotice(at(61))).toBe("This meal is about 60 kcal over your target.");
     expect(fitNotice({ ...at(-61), kept: true })).toBeNull();
+  });
+
+  it("notice uses the 50 kcal floor on small meals", () => {
+    const small: DailyTargets = { calories: 300, protein: 10, carbs: 35, fat: 10, fiber: 3 };
+    const base: PlannedMeal = createPlannedMeal("snack", teriyaki);
+    const at = (kcalGap: number): PlannedMeal => ({
+      ...base,
+      portion: {
+        multipliers: { protein: 1, carb: 1, fat: 1, vegetable: 1 },
+        target: small,
+        kcalGap,
+        fits: fitsTarget({ calories: small.calories + kcalGap, protein: small.protein }, small, { caloriesOnly: true }),
+      },
+    });
+    expect(fitNotice(at(-49))).toBeNull(); // 16% under but within 50 kcal
+    expect(fitNotice(at(-51))).toBe("This meal is about 50 kcal under your target.");
   });
 
   it("Teriyaki fits a 600 kcal target after sizing", () => {

@@ -75,6 +75,8 @@ export interface Recipe {
   fiber?: number;
   prepMinutes: number;
   cookMinutes: number;
+  /** How many servings the ingredient list makes (default 1). Stored macros are per serving. */
+  servings?: number;
   ingredients: RecipeIngredient[];
   instructions: string[];
   /** @deprecated Use variationDetails — labels only. */

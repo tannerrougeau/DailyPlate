@@ -27,6 +27,10 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Turkey, ground, 93% lean, 7% fat, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
@@ -58,12 +62,16 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Beef, ground, 93% lean meat / 7% fat, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "chicken-breast-raw",
     "name": "chicken breast, boneless skinless, raw",
-    "fdcId": 171477,
+    "fdcId": 171077,
     "query": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
     "per100g": {
       "calories": 120,
@@ -90,17 +98,21 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "chicken-ground-raw",
     "name": "chicken, ground, raw",
-    "fdcId": null,
+    "fdcId": 171116,
     "query": "Chicken, ground, raw",
     "per100g": {
       "calories": 143,
       "protein": 17.44,
-      "carbs": 0,
+      "carbs": 0.04,
       "fat": 8.1,
       "fiber": 0
     },
@@ -120,6 +132,10 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Chicken, ground, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
@@ -128,10 +144,10 @@
     "fdcId": 171534,
     "query": "Chicken, broiler or fryers, breast, meat only, cooked, roasted",
     "per100g": {
-      "calories": 165,
-      "protein": 31.02,
+      "calories": 151,
+      "protein": 30.54,
       "carbs": 0,
-      "fat": 3.57,
+      "fat": 3.17,
       "fiber": 0
     },
     "grams": {
@@ -152,18 +168,22 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, cooked, grilled",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "chicken-thigh-raw-skin",
     "name": "chicken thigh, bone-in skin-on, raw",
-    "fdcId": null,
+    "fdcId": 172385,
     "query": "Chicken, broilers or fryers, thigh, meat and skin, raw",
     "per100g": {
       "calories": 221,
-      "protein": 16.5,
-      "carbs": 0,
-      "fat": 16.6,
+      "protein": 16.52,
+      "carbs": 0.25,
+      "fat": 16.61,
       "fiber": 0
     },
     "grams": {
@@ -175,6 +195,10 @@
       "g": 1,
       "medium": 116
     },
+    "edible": {
+      "fraction": 0.79,
+      "source": "Approximate share of bone-in thigh weight that is meat and skin (bone ~21%, typical of USDA SR Legacy refuse for this cut). Verify."
+    },
     "aliases": [
       "Chicken thighs (bone-in, skin-on)"
     ],
@@ -183,18 +207,22 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Chicken, broilers or fryers, thigh, meat and skin, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "sirloin-raw",
     "name": "beef top sirloin, raw",
-    "fdcId": null,
+    "fdcId": 174763,
     "query": "Beef, top sirloin, separable lean only, trimmed to 1/8 inch fat, raw",
     "per100g": {
-      "calories": 157,
-      "protein": 21.8,
+      "calories": 135,
+      "protein": 21.91,
       "carbs": 0,
-      "fat": 7.4,
+      "fat": 4.62,
       "fiber": 0
     },
     "grams": {
@@ -213,6 +241,10 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Beef, top sirloin, steak, separable lean only, trimmed to 1/8\" fat, choice, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
@@ -244,18 +276,22 @@
     "yield": {
       "cookedPerRaw": 0.8,
       "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
+    "usda": {
+      "description": "Fish, salmon, Atlantic, farmed, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "tuna-canned-water",
     "name": "tuna, light, canned in water, drained",
-    "fdcId": null,
+    "fdcId": 334194,
     "query": "Fish, tuna, light, canned in water, drained solids",
     "per100g": {
-      "calories": 116,
-      "protein": 25.51,
-      "carbs": 0,
-      "fat": 0.82,
+      "calories": 90,
+      "protein": 19,
+      "carbs": 0.08,
+      "fat": 0.94,
       "fiber": 0
     },
     "grams": {
@@ -272,7 +308,11 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Fish, tuna, light, canned in water, drained solids",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "egg-whole-raw",
@@ -300,12 +340,16 @@
     ],
     "role": "protein",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Egg, whole, raw, fresh",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "egg-white-raw",
     "name": "egg white, raw",
-    "fdcId": null,
+    "fdcId": 172183,
     "query": "Egg, white, raw, fresh",
     "per100g": {
       "calories": 52,
@@ -328,12 +372,16 @@
     ],
     "role": "protein",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Egg, white, raw, fresh",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "bacon-cooked",
     "name": "pork bacon, cooked",
-    "fdcId": null,
+    "fdcId": 167712,
     "query": "Pork, cured, bacon, cooked, broiled, pan-fried or roasted",
     "per100g": {
       "calories": 541,
@@ -359,18 +407,22 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Pork, cured, bacon, cooked, broiled, pan-fried or roasted, reduced sodium",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "turkey-bacon",
     "name": "turkey bacon, cooked",
-    "fdcId": null,
+    "fdcId": 171639,
     "query": "Turkey bacon, cooked",
     "per100g": {
-      "calories": 218,
-      "protein": 16.5,
-      "carbs": 1.5,
-      "fat": 16.8,
+      "calories": 368,
+      "protein": 29.5,
+      "carbs": 4.24,
+      "fat": 25.87,
       "fiber": 0
     },
     "grams": {
@@ -388,18 +440,22 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Bacon, turkey, microwaved",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "ham-deli",
     "name": "ham, sliced, extra lean",
-    "fdcId": null,
+    "fdcId": 173863,
     "query": "Ham, sliced, extra lean",
     "per100g": {
-      "calories": 118,
-      "protein": 18.5,
-      "carbs": 1.5,
-      "fat": 3.8,
+      "calories": 107,
+      "protein": 16.85,
+      "carbs": 0.7,
+      "fat": 4.04,
       "fiber": 0
     },
     "grams": {
@@ -418,7 +474,11 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Ham, sliced, pre-packaged, deli meat (96%fat free, water added)",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "turkey-patty-cooked",
@@ -426,10 +486,10 @@
     "fdcId": 174492,
     "query": "Turkey, ground, 93% lean, 7% fat, patties, broiled",
     "per100g": {
-      "calories": 196,
-      "protein": 27.4,
+      "calories": 207,
+      "protein": 25.86,
       "carbs": 0,
-      "fat": 9.4,
+      "fat": 11.45,
       "fiber": 0
     },
     "grams": {
@@ -446,18 +506,22 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Turkey, ground, 93% lean, 7% fat, patties, broiled",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "chicken-sausage",
     "name": "chicken sausage, cooked",
-    "fdcId": null,
+    "fdcId": 173880,
     "query": "Chicken sausage, cooked",
     "per100g": {
-      "calories": 179,
-      "protein": 16.5,
-      "carbs": 2,
-      "fat": 11.5,
+      "calories": 183,
+      "protein": 21.43,
+      "carbs": 14.25,
+      "fat": 4.46,
       "fiber": 0
     },
     "grams": {
@@ -473,19 +537,23 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sausage, chicken or turkey, Italian style,  lower sodium",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "beef-jerky",
     "name": "beef jerky",
-    "fdcId": null,
+    "fdcId": 167536,
     "query": "Snacks, beef jerky, chopped and formed",
     "per100g": {
       "calories": 410,
       "protein": 33.2,
       "carbs": 11,
       "fat": 25.6,
-      "fiber": 1.2
+      "fiber": 1.8
     },
     "grams": {
       "cup": null,
@@ -500,18 +568,22 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Snacks, beef jerky, chopped and formed",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "meat-stick",
     "name": "beef stick, smoked",
-    "fdcId": null,
+    "fdcId": 168850,
     "query": "Snacks, beef sticks, smoked",
     "per100g": {
-      "calories": 413,
-      "protein": 21.4,
-      "carbs": 6.5,
-      "fat": 33.2,
+      "calories": 550,
+      "protein": 21.5,
+      "carbs": 5.4,
+      "fat": 49.6,
       "fiber": 0
     },
     "grams": {
@@ -528,7 +600,11 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Snacks, beef sticks, smoked",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "rice-white-cooked",
@@ -562,12 +638,16 @@
       "cookedPerRaw": 2.6,
       "dryCupGrams": 185,
       "source": "Derived from USDA FoodData Central portion weights: 1 cup dry long-grain rice ≈ 185 g yields ≈ 3 cups cooked at 158 g."
+    },
+    "usda": {
+      "description": "Rice, white, long-grain, regular, enriched, cooked",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "oats-dry",
     "name": "oats, rolled, dry",
-    "fdcId": null,
+    "fdcId": 173904,
     "query": "Cereals, oats, regular and quick, not fortified, dry",
     "per100g": {
       "calories": 379,
@@ -592,12 +672,16 @@
     "yield": {
       "cookedPerRaw": 1,
       "source": "Recipes list the soaking/cooking liquid separately, so oats add their dry weight only (avoids double counting)."
+    },
+    "usda": {
+      "description": "Cereals, oats, regular and quick, not fortified, dry",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "pasta-dry",
     "name": "pasta, enriched, dry",
-    "fdcId": null,
+    "fdcId": 169736,
     "query": "Pasta, dry, enriched",
     "per100g": {
       "calories": 371,
@@ -622,12 +706,17 @@
     "yield": {
       "cookedPerRaw": 2.5,
       "source": "Derived from USDA FoodData Central portion weights: 56 g (2 oz) dry yields ≈ 1 cup cooked at 140 g."
+    },
+    "usda": {
+      "description": "Pasta, dry, enriched",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "protein-pasta-dry",
     "name": "chickpea pasta, dry",
     "fdcId": null,
+    "skipUsda": "No chickpea pasta in USDA Foundation/SR Legacy; typed package-label values.",
     "query": "Pasta, gluten-free, chickpea, dry",
     "per100g": {
       "calories": 352,
@@ -657,12 +746,12 @@
   {
     "id": "bread-wheat",
     "name": "bread, whole-wheat",
-    "fdcId": null,
+    "fdcId": 172688,
     "query": "Bread, whole-wheat, commercially prepared",
     "per100g": {
       "calories": 252,
-      "protein": 12.3,
-      "carbs": 42.7,
+      "protein": 12.45,
+      "carbs": 42.71,
       "fat": 3.5,
       "fiber": 6
     },
@@ -682,19 +771,23 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Bread, whole-wheat, commercially prepared",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "bagel",
     "name": "bagel, plain",
-    "fdcId": null,
+    "fdcId": 174899,
     "query": "Bagels, plain, enriched",
     "per100g": {
-      "calories": 257,
-      "protein": 10,
-      "carbs": 50.5,
-      "fat": 1.6,
-      "fiber": 2.3
+      "calories": 264,
+      "protein": 10.56,
+      "carbs": 52.38,
+      "fat": 1.32,
+      "fiber": 1.6
     },
     "grams": {
       "cup": null,
@@ -710,12 +803,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Bagels, plain, enriched, with calcium propionate (includes onion, poppy, sesame)",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "croissant",
     "name": "croissant, butter",
-    "fdcId": null,
+    "fdcId": 174987,
     "query": "Croissants, butter",
     "per100g": {
       "calories": 406,
@@ -738,19 +835,23 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Croissants, butter",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "biscuit",
     "name": "biscuit, plain",
-    "fdcId": null,
+    "fdcId": 174903,
     "query": "Biscuits, plain or buttermilk, commercially prepared",
     "per100g": {
-      "calories": 353,
-      "protein": 7,
-      "carbs": 45,
-      "fat": 16,
-      "fiber": 1.5
+      "calories": 335,
+      "protein": 7.3,
+      "carbs": 48.4,
+      "fat": 12.1,
+      "fiber": 1.8
     },
     "grams": {
       "cup": null,
@@ -766,19 +867,23 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Biscuits, plain or buttermilk, dry mix, prepared",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "tortilla-flour",
     "name": "tortilla, flour, 10-inch",
-    "fdcId": null,
+    "fdcId": 175037,
     "query": "Tortillas, ready-to-bake or -fry, flour",
     "per100g": {
-      "calories": 312,
+      "calories": 306,
       "protein": 8.2,
-      "carbs": 51.6,
-      "fat": 8,
-      "fiber": 3.1
+      "carbs": 49.38,
+      "fat": 7.99,
+      "fiber": 3.5
     },
     "grams": {
       "cup": null,
@@ -794,19 +899,23 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Tortillas, ready-to-bake or -fry, flour, refrigerated",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "tortilla-wheat",
     "name": "tortilla, whole wheat",
-    "fdcId": null,
+    "fdcId": 174081,
     "query": "Tortillas, ready-to-bake or -fry, whole wheat",
     "per100g": {
       "calories": 310,
-      "protein": 9.8,
-      "carbs": 50,
-      "fat": 7.5,
-      "fiber": 6.4
+      "protein": 9.76,
+      "carbs": 45.89,
+      "fat": 9.76,
+      "fiber": 9.8
     },
     "grams": {
       "cup": null,
@@ -822,17 +931,21 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Tortillas, ready-to-bake or -fry, whole wheat",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "tortilla-corn",
     "name": "tortilla, corn, 6-inch",
-    "fdcId": null,
+    "fdcId": 175036,
     "query": "Tortillas, ready-to-bake or -fry, corn",
     "per100g": {
       "calories": 218,
       "protein": 5.7,
-      "carbs": 44.6,
+      "carbs": 44.64,
       "fat": 2.85,
       "fiber": 6.3
     },
@@ -850,7 +963,11 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Tortillas, ready-to-bake or -fry, corn",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "teriyaki",
@@ -878,12 +995,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sauce, teriyaki, ready-to-serve",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "soy-sauce",
     "name": "soy sauce",
-    "fdcId": null,
+    "fdcId": 174277,
     "query": "Soy sauce made from soy and wheat (shoyu)",
     "per100g": {
       "calories": 53,
@@ -907,7 +1028,11 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Soy sauce made from soy and wheat (shoyu)",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "broccoli-cooked",
@@ -939,7 +1064,11 @@
     ],
     "role": "vegetable",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Broccoli, cooked, boiled, drained, without salt",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "green-beans-cooked",
@@ -968,7 +1097,11 @@
     ],
     "role": "vegetable",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Beans, snap, green, cooked, boiled, drained, without salt",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "sesame",
@@ -996,12 +1129,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Seeds, sesame seeds, whole, dried",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "olive-oil",
     "name": "olive oil",
-    "fdcId": null,
+    "fdcId": 171413,
     "query": "Oil, olive, salad or cooking",
     "per100g": {
       "calories": 884,
@@ -1026,12 +1163,16 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Oil, olive, salad or cooking",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "butter",
     "name": "butter, salted",
-    "fdcId": null,
+    "fdcId": 173410,
     "query": "Butter, salted",
     "per100g": {
       "calories": 717,
@@ -1054,12 +1195,16 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Butter, salted",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "chia",
     "name": "chia seeds, dried",
-    "fdcId": null,
+    "fdcId": 170554,
     "query": "Seeds, chia seeds, dried",
     "per100g": {
       "calories": 486,
@@ -1081,12 +1226,17 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Seeds, chia seeds, dried",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "whey",
     "name": "whey protein powder",
     "fdcId": null,
+    "skipUsda": "USDA SR Legacy whey isolate (FDC 173177) lists 58 g protein and 29 g carbs per 100 g, unlike typical isolate; typed label values kept.",
     "query": "Beverages, Whey protein powder isolate",
     "per100g": {
       "calories": 381,
@@ -1118,13 +1268,13 @@
   {
     "id": "greek-nonfat",
     "name": "yogurt, Greek, plain, nonfat",
-    "fdcId": null,
+    "fdcId": 330137,
     "query": "Yogurt, Greek, plain, nonfat",
     "per100g": {
-      "calories": 59,
-      "protein": 10.19,
-      "carbs": 3.6,
-      "fat": 0.39,
+      "calories": 61,
+      "protein": 10.3,
+      "carbs": 3.64,
+      "fat": 0.37,
       "fiber": 0
     },
     "grams": {
@@ -1143,18 +1293,22 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Yogurt, Greek, plain, nonfat",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "greek-cup",
     "name": "yogurt, Greek, plain, nonfat, 5.3 oz cup",
-    "fdcId": null,
+    "fdcId": 330137,
     "query": "Yogurt, Greek, plain, nonfat",
     "per100g": {
-      "calories": 59,
-      "protein": 10.19,
-      "carbs": 3.6,
-      "fat": 0.39,
+      "calories": 61,
+      "protein": 10.3,
+      "carbs": 3.64,
+      "fat": 0.37,
       "fiber": 0
     },
     "grams": {
@@ -1170,18 +1324,22 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Yogurt, Greek, plain, nonfat",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "cottage-lowfat",
     "name": "cottage cheese, lowfat, 2%",
-    "fdcId": null,
+    "fdcId": 328841,
     "query": "Cheese, cottage, lowfat, 2% milkfat",
     "per100g": {
-      "calories": 81,
-      "protein": 10.45,
-      "carbs": 4.76,
-      "fat": 2.27,
+      "calories": 84,
+      "protein": 11,
+      "carbs": 4.31,
+      "fat": 2.3,
       "fiber": 0
     },
     "grams": {
@@ -1199,18 +1357,22 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, cottage, lowfat, 2% milkfat",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "cottage-cup",
     "name": "cottage cheese, lowfat, 2%, 4 oz cup",
-    "fdcId": null,
+    "fdcId": 328841,
     "query": "Cheese, cottage, lowfat, 2% milkfat",
     "per100g": {
-      "calories": 81,
-      "protein": 10.45,
-      "carbs": 4.76,
-      "fat": 2.27,
+      "calories": 84,
+      "protein": 11,
+      "carbs": 4.31,
+      "fat": 2.3,
       "fiber": 0
     },
     "grams": {
@@ -1226,19 +1388,23 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, cottage, lowfat, 2% milkfat",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "almond-milk",
     "name": "almond milk, unsweetened",
-    "fdcId": null,
+    "fdcId": 174832,
     "query": "Beverages, almond milk, unsweetened, shelf stable",
     "per100g": {
       "calories": 15,
-      "protein": 0.59,
-      "carbs": 0.58,
-      "fat": 1.1,
-      "fiber": 0.4
+      "protein": 0.4,
+      "carbs": 1.31,
+      "fat": 0.96,
+      "fiber": 0.2
     },
     "grams": {
       "cup": 240,
@@ -1255,12 +1421,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Beverages, almond milk, unsweetened, shelf stable",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "milk-2",
     "name": "milk, 2%",
-    "fdcId": null,
+    "fdcId": 171267,
     "query": "Milk, reduced fat, fluid, 2% milkfat",
     "per100g": {
       "calories": 50,
@@ -1283,18 +1453,22 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Milk, reduced fat, fluid, 2% milkfat, with added vitamin A and vitamin D",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "milk-fat-free",
     "name": "milk, fat-free",
-    "fdcId": null,
+    "fdcId": 169868,
     "query": "Milk, nonfat, fluid",
     "per100g": {
-      "calories": 34,
-      "protein": 3.37,
-      "carbs": 4.96,
-      "fat": 0.08,
+      "calories": 35,
+      "protein": 3.4,
+      "carbs": 4.85,
+      "fat": 0.18,
       "fiber": 0
     },
     "grams": {
@@ -1311,12 +1485,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Milk, fluid, nonfat, calcium fortified (fat free or skim)",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "water",
     "name": "water",
-    "fdcId": null,
+    "fdcId": 173647,
     "query": "Water, tap",
     "per100g": {
       "calories": 0,
@@ -1340,12 +1518,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Beverages, water, tap, drinking",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "salt",
     "name": "salt, table",
-    "fdcId": null,
+    "fdcId": 173468,
     "query": "Salt, table",
     "per100g": {
       "calories": 0,
@@ -1369,19 +1551,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Salt, table",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "chili-powder",
     "name": "chili powder",
-    "fdcId": null,
+    "fdcId": 171319,
     "query": "Spices, chili powder",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 282,
+      "protein": 13.46,
+      "carbs": 49.7,
+      "fat": 14.28,
+      "fiber": 34.8
     },
     "grams": {
       "cup": null,
@@ -1397,19 +1583,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, chili powder",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cinnamon",
     "name": "cinnamon, ground",
-    "fdcId": null,
+    "fdcId": 171320,
     "query": "Spices, cinnamon, ground",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 247,
+      "protein": 3.99,
+      "carbs": 80.59,
+      "fat": 1.24,
+      "fiber": 53.1
     },
     "grams": {
       "cup": null,
@@ -1424,19 +1614,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, cinnamon, ground",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cumin",
     "name": "cumin, ground",
-    "fdcId": null,
+    "fdcId": 170923,
     "query": "Spices, cumin seed",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 375,
+      "protein": 17.81,
+      "carbs": 44.24,
+      "fat": 22.27,
+      "fiber": 10.5
     },
     "grams": {
       "cup": null,
@@ -1451,19 +1645,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, cumin seed",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "garlic-powder",
     "name": "garlic powder",
-    "fdcId": null,
+    "fdcId": 171325,
     "query": "Spices, garlic powder",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 331,
+      "protein": 16.55,
+      "carbs": 72.73,
+      "fat": 0.73,
+      "fiber": 9
     },
     "grams": {
       "cup": null,
@@ -1478,19 +1676,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, garlic powder",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "italian-herbs",
     "name": "italian seasoning, dried",
-    "fdcId": null,
+    "fdcId": 171331,
     "query": "Spices, poultry seasoning",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 307,
+      "protein": 9.59,
+      "carbs": 65.59,
+      "fat": 7.53,
+      "fiber": 11.3
     },
     "grams": {
       "cup": null,
@@ -1507,19 +1709,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, poultry seasoning",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "paprika",
     "name": "paprika, smoked",
-    "fdcId": null,
+    "fdcId": 171329,
     "query": "Spices, paprika",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 282,
+      "protein": 14.14,
+      "carbs": 53.99,
+      "fat": 12.89,
+      "fiber": 34.9
     },
     "grams": {
       "cup": null,
@@ -1534,19 +1740,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, paprika",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "ranch",
     "name": "ranch seasoning mix",
-    "fdcId": null,
+    "fdcId": 171327,
     "query": "Spices, onion powder",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 341,
+      "protein": 10.41,
+      "carbs": 79.12,
+      "fat": 1.04,
+      "fiber": 15.2
     },
     "grams": {
       "cup": null,
@@ -1561,22 +1771,26 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, onion powder",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "ginger",
     "name": "ginger, fresh",
-    "fdcId": null,
+    "fdcId": 169231,
     "query": "Ginger root, raw",
     "per100g": {
-      "calories": 250,
-      "protein": 8,
-      "carbs": 50,
-      "fat": 6,
-      "fiber": 20
+      "calories": 80,
+      "protein": 1.82,
+      "carbs": 17.77,
+      "fat": 0.75,
+      "fiber": 2
     },
     "grams": {
-      "cup": null,
+      "cup": 96,
       "tbsp": 6,
       "tsp": 2,
       "oz": 28.3495,
@@ -1588,12 +1802,16 @@
     ],
     "role": "flavor",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Ginger root, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "almond-butter",
     "name": "almond butter",
-    "fdcId": null,
+    "fdcId": 168588,
     "query": "Nuts, almond butter, plain, without salt added",
     "per100g": {
       "calories": 614,
@@ -1615,19 +1833,23 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Nuts, almond butter, plain, without salt added",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "peanut-butter",
     "name": "peanut butter, smooth",
-    "fdcId": null,
+    "fdcId": 172470,
     "query": "Peanut butter, smooth style, without salt",
     "per100g": {
-      "calories": 588,
-      "protein": 25.09,
-      "carbs": 19.56,
-      "fat": 50.39,
-      "fiber": 6
+      "calories": 598,
+      "protein": 22.21,
+      "carbs": 22.31,
+      "fat": 51.36,
+      "fiber": 5
     },
     "grams": {
       "cup": 258,
@@ -1642,12 +1864,16 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Peanut butter, smooth style, without salt",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "almonds",
     "name": "almonds, dry roasted",
-    "fdcId": null,
+    "fdcId": 170567,
     "query": "Nuts, almonds",
     "per100g": {
       "calories": 579,
@@ -1669,17 +1895,21 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Nuts, almonds",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "peanuts",
     "name": "peanuts, dry roasted",
-    "fdcId": null,
+    "fdcId": 173806,
     "query": "Peanuts, all types, dry-roasted, without salt",
     "per100g": {
       "calories": 587,
       "protein": 24.35,
-      "carbs": 21.51,
+      "carbs": 21.26,
       "fat": 49.66,
       "fiber": 8.4
     },
@@ -1696,12 +1926,16 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Peanuts, all types, dry-roasted, without salt",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cashews",
     "name": "cashews, dry roasted",
-    "fdcId": null,
+    "fdcId": 170571,
     "query": "Nuts, cashew nuts, dry roasted, without salt added",
     "per100g": {
       "calories": 574,
@@ -1723,12 +1957,16 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Nuts, cashew nuts, dry roasted, without salt added",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "pecans",
     "name": "pecans",
-    "fdcId": null,
+    "fdcId": 170182,
     "query": "Nuts, pecans",
     "per100g": {
       "calories": 691,
@@ -1750,12 +1988,16 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Nuts, pecans",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "walnuts",
     "name": "walnuts",
-    "fdcId": null,
+    "fdcId": 170187,
     "query": "Nuts, walnuts, english",
     "per100g": {
       "calories": 654,
@@ -1778,19 +2020,23 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Nuts, walnuts, english",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "apple-raw",
     "name": "apple, raw, with skin",
-    "fdcId": null,
+    "fdcId": 1750340,
     "query": "Apples, raw, with skin",
     "per100g": {
-      "calories": 52,
-      "protein": 0.26,
-      "carbs": 13.81,
-      "fat": 0.17,
-      "fiber": 2.4
+      "calories": 64.6609,
+      "protein": 0.1484375,
+      "carbs": 15.6511625,
+      "fat": 0.1625,
+      "fiber": 2.075
     },
     "grams": {
       "cup": 125,
@@ -1807,12 +2053,16 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Apples, fuji, with skin, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "banana-raw",
     "name": "banana, raw",
-    "fdcId": null,
+    "fdcId": 173944,
     "query": "Bananas, raw",
     "per100g": {
       "calories": 89,
@@ -1837,12 +2087,16 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Bananas, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "asparagus-raw",
     "name": "asparagus, raw",
-    "fdcId": null,
+    "fdcId": 168389,
     "query": "Asparagus, raw",
     "per100g": {
       "calories": 20,
@@ -1866,12 +2120,16 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Asparagus, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "avocado-raw",
     "name": "avocado, raw",
-    "fdcId": null,
+    "fdcId": 171705,
     "query": "Avocados, raw, all commercial varieties",
     "per100g": {
       "calories": 160,
@@ -1894,12 +2152,16 @@
     ],
     "role": "fat",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Avocados, raw, all commercial varieties",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "potato-raw",
     "name": "potato, raw, flesh and skin",
-    "fdcId": null,
+    "fdcId": 170026,
     "query": "Potatoes, flesh and skin, raw",
     "per100g": {
       "calories": 77,
@@ -1923,19 +2185,23 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Potatoes, flesh and skin, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "hash-brown",
-    "name": "hash brown potatoes, cooked",
-    "fdcId": null,
-    "query": "Potatoes, hashed brown, home-prepared",
+    "name": "hash brown potatoes, shredded, no added fat",
+    "fdcId": 170026,
+    "query": "Potatoes, flesh and skin, raw",
     "per100g": {
-      "calories": 265,
-      "protein": 3,
-      "carbs": 35,
-      "fat": 12,
-      "fiber": 3
+      "calories": 77,
+      "protein": 2.05,
+      "carbs": 17.49,
+      "fat": 0.09,
+      "fiber": 2.1
     },
     "grams": {
       "cup": 156,
@@ -1950,12 +2216,16 @@
     ],
     "role": "carb",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Potatoes, flesh and skin, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "sweet-potato-raw",
     "name": "sweet potato, raw",
-    "fdcId": null,
+    "fdcId": 168482,
     "query": "Sweet potato, raw, unprepared",
     "per100g": {
       "calories": 86,
@@ -1980,12 +2250,16 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sweet potato, raw, unprepared (Includes foods for USDA's Food Distribution Program)",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "spinach-raw",
     "name": "spinach, raw",
-    "fdcId": null,
+    "fdcId": 168462,
     "query": "Spinach, raw",
     "per100g": {
       "calories": 23,
@@ -2012,16 +2286,20 @@
     "yield": {
       "cookedPerRaw": 0.3,
       "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    },
+    "usda": {
+      "description": "Spinach, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "lettuce-raw",
     "name": "romaine lettuce, raw",
-    "fdcId": null,
+    "fdcId": 169247,
     "query": "Lettuce, cos or romaine, raw",
     "per100g": {
       "calories": 17,
-      "protein": 1.24,
+      "protein": 1.23,
       "carbs": 3.29,
       "fat": 0.3,
       "fiber": 2.1
@@ -2042,15 +2320,19 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Lettuce, cos or romaine, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "pepper-raw",
     "name": "bell pepper, raw",
-    "fdcId": null,
+    "fdcId": 170108,
     "query": "Peppers, sweet, red, raw",
     "per100g": {
-      "calories": 31,
+      "calories": 26,
       "protein": 0.99,
       "carbs": 6.03,
       "fat": 0.3,
@@ -2058,7 +2340,7 @@
     },
     "grams": {
       "cup": 149,
-      "tbsp": null,
+      "tbsp": 9.3,
       "tsp": null,
       "oz": 28.3495,
       "each": 119,
@@ -2079,18 +2361,22 @@
     "yield": {
       "cookedPerRaw": 0.85,
       "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    },
+    "usda": {
+      "description": "Peppers, sweet, red, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "berries",
     "name": "blueberries, raw",
-    "fdcId": null,
+    "fdcId": 2346411,
     "query": "Blueberries, raw",
     "per100g": {
-      "calories": 57,
-      "protein": 0.74,
-      "carbs": 14.49,
-      "fat": 0.33,
+      "calories": 63.8563,
+      "protein": 0.703125,
+      "carbs": 14.571775,
+      "fat": 0.3063,
       "fiber": 2.4
     },
     "grams": {
@@ -2112,12 +2398,16 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Blueberries, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "strawberries",
     "name": "strawberries, raw",
-    "fdcId": null,
+    "fdcId": 167762,
     "query": "Strawberries, raw",
     "per100g": {
       "calories": 32,
@@ -2140,17 +2430,21 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Strawberries, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "black-beans",
     "name": "black beans, canned, drained",
-    "fdcId": null,
+    "fdcId": 175188,
     "query": "Beans, black, mature seeds, canned, drained",
     "per100g": {
       "calories": 91,
       "protein": 6.03,
-      "carbs": 16.6,
+      "carbs": 16.55,
       "fat": 0.29,
       "fiber": 6.9
     },
@@ -2168,12 +2462,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Beans, black turtle, mature seeds, canned",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "chickpeas",
     "name": "chickpeas, canned, drained",
-    "fdcId": null,
+    "fdcId": 173800,
     "query": "Chickpeas, canned, drained solids",
     "per100g": {
       "calories": 139,
@@ -2195,12 +2493,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Chickpeas (garbanzo beans, bengal gram), mature seeds, canned, drained solids",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "edamame",
     "name": "edamame, cooked",
-    "fdcId": null,
+    "fdcId": 168411,
     "query": "Edamame, frozen, prepared",
     "per100g": {
       "calories": 121,
@@ -2222,12 +2524,16 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Edamame, frozen, prepared",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "sugar",
     "name": "brown sugar",
-    "fdcId": null,
+    "fdcId": 168833,
     "query": "Sugars, brown",
     "per100g": {
       "calories": 380,
@@ -2250,19 +2556,23 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sugars, brown",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "brussels",
     "name": "brussels sprouts, raw",
-    "fdcId": null,
+    "fdcId": 2685575,
     "query": "Brussels sprouts, raw",
     "per100g": {
-      "calories": 43,
-      "protein": 3.38,
-      "carbs": 8.95,
-      "fat": 0.3,
-      "fiber": 3.8
+      "calories": 59.485,
+      "protein": 3.984375,
+      "carbs": 9.615625,
+      "fat": 0.565,
+      "fiber": 4.785
     },
     "grams": {
       "cup": 88,
@@ -2278,12 +2588,16 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Brussels sprouts, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "carrot-raw",
     "name": "carrot, raw",
-    "fdcId": null,
+    "fdcId": 170393,
     "query": "Carrots, raw",
     "per100g": {
       "calories": 41,
@@ -2310,18 +2624,22 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Carrots, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "celery-raw",
     "name": "celery, raw",
-    "fdcId": null,
+    "fdcId": 2346405,
     "query": "Celery, raw",
     "per100g": {
-      "calories": 14,
-      "protein": 0.69,
-      "carbs": 2.97,
-      "fat": 0.17,
+      "calories": 16.6973,
+      "protein": 0.4921875,
+      "carbs": 3.3165125,
+      "fat": 0.1625,
       "fiber": 1.6
     },
     "grams": {
@@ -2339,12 +2657,16 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Celery, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "tomato-raw",
     "name": "tomato, raw",
-    "fdcId": null,
+    "fdcId": 170457,
     "query": "Tomatoes, red, ripe, raw",
     "per100g": {
       "calories": 18,
@@ -2373,12 +2695,16 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Tomatoes, red, ripe, raw, year round average",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "tomato-sundried",
     "name": "tomatoes, sun-dried, packed in oil",
-    "fdcId": null,
+    "fdcId": 169384,
     "query": "Tomatoes, sun-dried, packed in oil, drained",
     "per100g": {
       "calories": 213,
@@ -2388,7 +2714,7 @@
       "fiber": 5.8
     },
     "grams": {
-      "cup": null,
+      "cup": 110,
       "tbsp": 7,
       "tsp": 2.3,
       "oz": 28.3495,
@@ -2400,18 +2726,22 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Tomatoes, sun-dried, packed in oil, drained",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "tomato-canned",
     "name": "tomatoes, canned, diced",
-    "fdcId": null,
+    "fdcId": 170052,
     "query": "Tomatoes, red, ripe, canned, stewed",
     "per100g": {
       "calories": 26,
-      "protein": 0.96,
-      "carbs": 5.4,
-      "fat": 0.2,
+      "protein": 0.91,
+      "carbs": 6.19,
+      "fat": 0.19,
       "fiber": 1
     },
     "grams": {
@@ -2428,18 +2758,22 @@
     ],
     "role": "vegetable",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Tomatoes, red, ripe, canned, stewed",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cucumber-raw",
     "name": "cucumber, raw, with peel",
-    "fdcId": null,
+    "fdcId": 2346406,
     "query": "Cucumber, with peel, raw",
     "per100g": {
-      "calories": 15,
-      "protein": 0.65,
-      "carbs": 3.63,
-      "fat": 0.11,
+      "calories": 15.9075,
+      "protein": 0.625,
+      "carbs": 2.9525,
+      "fat": 0.1775,
       "fiber": 0.5
     },
     "grams": {
@@ -2458,12 +2792,16 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cucumber, with peel, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "onion-raw",
     "name": "onion, raw",
-    "fdcId": null,
+    "fdcId": 170000,
     "query": "Onions, raw",
     "per100g": {
       "calories": 40,
@@ -2498,19 +2836,23 @@
     "yield": {
       "cookedPerRaw": 0.75,
       "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    },
+    "usda": {
+      "description": "Onions, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "garlic-raw",
     "name": "garlic, raw",
-    "fdcId": null,
+    "fdcId": 1104647,
     "query": "Garlic, raw",
     "per100g": {
-      "calories": 149,
-      "protein": 6.36,
-      "carbs": 33.06,
-      "fat": 0.5,
-      "fiber": 2.1
+      "calories": 143,
+      "protein": 6.62,
+      "carbs": 28.2,
+      "fat": 0.38,
+      "fiber": 2.7
     },
     "grams": {
       "cup": 136,
@@ -2527,12 +2869,16 @@
     ],
     "role": "flavor",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Garlic, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "corn",
     "name": "corn, sweet, cooked",
-    "fdcId": null,
+    "fdcId": 169999,
     "query": "Corn, sweet, yellow, cooked, boiled, drained, without salt",
     "per100g": {
       "calories": 96,
@@ -2554,19 +2900,23 @@
     ],
     "role": "carb",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Corn, sweet, yellow, cooked, boiled, drained, without salt",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "frozen-veg",
     "name": "mixed vegetables, frozen, cooked",
-    "fdcId": null,
+    "fdcId": 170472,
     "query": "Vegetables, mixed, frozen, cooked, boiled, drained, without salt",
     "per100g": {
       "calories": 65,
-      "protein": 2.9,
-      "carbs": 13,
-      "fat": 0.2,
-      "fiber": 4
+      "protein": 2.86,
+      "carbs": 13.09,
+      "fat": 0.15,
+      "fiber": 4.4
     },
     "grams": {
       "cup": 160,
@@ -2583,12 +2933,16 @@
     ],
     "role": "vegetable",
     "state": "cooked",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Vegetables, mixed, frozen, cooked, boiled, drained, without salt",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "zucchini-raw",
     "name": "zucchini, raw",
-    "fdcId": null,
+    "fdcId": 169291,
     "query": "Squash, summer, zucchini, includes skin, raw",
     "per100g": {
       "calories": 17,
@@ -2617,12 +2971,16 @@
     "yield": {
       "cookedPerRaw": 0.8,
       "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    },
+    "usda": {
+      "description": "Squash, summer, zucchini, includes skin, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "mushroom-raw",
     "name": "mushrooms, raw",
-    "fdcId": null,
+    "fdcId": 169251,
     "query": "Mushrooms, white, raw",
     "per100g": {
       "calories": 22,
@@ -2648,12 +3006,16 @@
     "yield": {
       "cookedPerRaw": 0.6,
       "source": "Estimate of sauté moisture loss; not from a USDA table. Applied only in recipes cooked together."
+    },
+    "usda": {
+      "description": "Mushrooms, white, raw",
+      "dataType": "SR Legacy"
     }
   },
   {
     "id": "pineapple",
     "name": "pineapple, raw",
-    "fdcId": null,
+    "fdcId": 169124,
     "query": "Pineapple, raw, all varieties",
     "per100g": {
       "calories": 50,
@@ -2676,12 +3038,16 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Pineapple, raw, all varieties",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "mango",
     "name": "mango, raw",
-    "fdcId": null,
+    "fdcId": 169910,
     "query": "Mangos, raw",
     "per100g": {
       "calories": 60,
@@ -2703,19 +3069,23 @@
     ],
     "role": "carb",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Mangos, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cauliflower-raw",
     "name": "cauliflower, raw",
-    "fdcId": null,
+    "fdcId": 2685573,
     "query": "Cauliflower, raw",
     "per100g": {
-      "calories": 25,
-      "protein": 1.92,
-      "carbs": 4.97,
-      "fat": 0.28,
-      "fiber": 2
+      "calories": 27.5923,
+      "protein": 1.640625,
+      "carbs": 4.723075,
+      "fat": 0.2375,
+      "fiber": 1.948
     },
     "grams": {
       "cup": 100,
@@ -2730,19 +3100,23 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cauliflower, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "broccoli-raw",
     "name": "broccoli, raw",
-    "fdcId": null,
+    "fdcId": 747447,
     "query": "Broccoli, raw",
     "per100g": {
-      "calories": 34,
-      "protein": 2.82,
-      "carbs": 6.64,
-      "fat": 0.37,
-      "fiber": 2.6
+      "calories": 31,
+      "protein": 2.57,
+      "carbs": 6.27,
+      "fat": 0.34,
+      "fiber": 2.4
     },
     "grams": {
       "cup": 90,
@@ -2757,18 +3131,22 @@
     ],
     "role": "vegetable",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Broccoli, raw",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "broth",
     "name": "chicken broth",
-    "fdcId": null,
+    "fdcId": 174536,
     "query": "Soup, chicken broth, ready-to-serve",
     "per100g": {
       "calories": 6,
-      "protein": 0.7,
-      "carbs": 0.4,
-      "fat": 0.2,
+      "protein": 0.64,
+      "carbs": 0.44,
+      "fat": 0.21,
       "fiber": 0
     },
     "grams": {
@@ -2785,18 +3163,22 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Soup, chicken broth, ready-to-serve",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cheddar",
     "name": "cheddar cheese",
-    "fdcId": null,
+    "fdcId": 328637,
     "query": "Cheese, cheddar",
     "per100g": {
-      "calories": 403,
-      "protein": 22.87,
-      "carbs": 3.09,
-      "fat": 33.31,
+      "calories": 408,
+      "protein": 23.3,
+      "carbs": 2.44,
+      "fat": 34,
       "fiber": 0
     },
     "grams": {
@@ -2816,20 +3198,115 @@
       "Shredded cheddar or mozzarella",
       "Shredded cheese",
       "Shredded cheese (optional)",
-      "Sliced cheddar or American cheese",
-      "Pepper Jack cheese, shredded",
-      "Gruyère cheese, shredded",
-      "Shredded mozzarella or Gruyère",
+      "Sliced cheddar or American cheese"
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Cheese, cheddar",
+      "dataType": "Foundation"
+    }
+  },
+  {
+    "id": "pepper-jack",
+    "name": "pepper jack cheese",
+    "fdcId": 2647438,
+    "query": "Cheese, pepper jack",
+    "per100g": {
+      "calories": 391.73,
+      "protein": 22.6171,
+      "carbs": 1.8979,
+      "fat": 32.63,
+      "fiber": 0
+    },
+    "grams": {
+      "cup": 113,
+      "tbsp": 7,
+      "tsp": 2.3,
+      "oz": 28.3495,
+      "each": 21,
+      "g": 1,
+      "slice": 21
+    },
+    "aliases": [
+      "Pepper Jack cheese, shredded"
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Cheese, monterey jack, solid",
+      "dataType": "Foundation"
+    }
+  },
+  {
+    "id": "gruyere",
+    "name": "gruyere cheese",
+    "fdcId": 171242,
+    "query": "Cheese, gruyere",
+    "per100g": {
+      "calories": 413,
+      "protein": 29.81,
+      "carbs": 0.36,
+      "fat": 32.34,
+      "fiber": 0
+    },
+    "grams": {
+      "cup": 108,
+      "tbsp": 6.8,
+      "tsp": 2.3,
+      "oz": 28.3495,
+      "each": null,
+      "g": 1
+    },
+    "aliases": [
+      "Gruyère cheese, shredded"
+    ],
+    "role": "fat",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Cheese, gruyere",
+      "dataType": "SR Legacy"
+    }
+  },
+  {
+    "id": "swiss",
+    "name": "swiss cheese",
+    "fdcId": 746767,
+    "query": "Cheese, swiss",
+    "per100g": {
+      "calories": 393,
+      "protein": 27,
+      "carbs": 1.44,
+      "fat": 31,
+      "fiber": 0
+    },
+    "grams": {
+      "cup": 108,
+      "tbsp": 6.8,
+      "tsp": 2.3,
+      "oz": 28.3495,
+      "each": 28,
+      "g": 1,
+      "slice": 28
+    },
+    "aliases": [
       "Swiss cheese, shredded"
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, swiss",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "mozzarella",
     "name": "mozzarella, part skim",
-    "fdcId": null,
+    "fdcId": 170847,
     "query": "Cheese, mozzarella, part skim milk",
     "per100g": {
       "calories": 254,
@@ -2849,22 +3326,27 @@
     },
     "aliases": [
       "Mozzarella pearls",
-      "Mozzarella string cheese"
+      "Mozzarella string cheese",
+      "Shredded mozzarella or Gruyère"
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, mozzarella, part skim milk",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "babybel",
     "name": "cheese, semisoft, Babybel-style",
-    "fdcId": null,
+    "fdcId": 171241,
     "query": "Cheese, gouda",
     "per100g": {
-      "calories": 333,
-      "protein": 23.8,
-      "carbs": 0.5,
-      "fat": 26,
+      "calories": 356,
+      "protein": 24.94,
+      "carbs": 2.22,
+      "fat": 27.44,
       "fiber": 0
     },
     "grams": {
@@ -2881,18 +3363,22 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, gouda",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "feta",
     "name": "feta cheese",
-    "fdcId": null,
+    "fdcId": 173420,
     "query": "Cheese, feta",
     "per100g": {
-      "calories": 264,
+      "calories": 265,
       "protein": 14.21,
-      "carbs": 4.09,
-      "fat": 21.28,
+      "carbs": 3.88,
+      "fat": 21.49,
       "fiber": 0
     },
     "grams": {
@@ -2911,18 +3397,22 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, feta",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "parmesan",
     "name": "parmesan cheese",
-    "fdcId": null,
+    "fdcId": 170848,
     "query": "Cheese, parmesan, hard",
     "per100g": {
       "calories": 392,
       "protein": 35.75,
       "carbs": 3.22,
-      "fat": 25.83,
+      "fat": 25,
       "fiber": 0
     },
     "grams": {
@@ -2938,18 +3428,22 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, parmesan, hard",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cream-cheese",
-    "name": "cream cheese, light",
-    "fdcId": null,
-    "query": "Cheese, cream, fat free",
+    "name": "cream cheese, low fat (light)",
+    "fdcId": 169079,
+    "query": "Cheese, cream, low fat",
     "per100g": {
-      "calories": 105,
-      "protein": 15.69,
-      "carbs": 7.66,
-      "fat": 1,
+      "calories": 208,
+      "protein": 7.85,
+      "carbs": 6.73,
+      "fat": 16.67,
       "fiber": 0
     },
     "grams": {
@@ -2965,18 +3459,22 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cheese, cream, low fat",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "sour-cream",
     "name": "sour cream, light",
-    "fdcId": null,
+    "fdcId": 173442,
     "query": "Cream, sour, reduced fat",
     "per100g": {
       "calories": 181,
       "protein": 7,
       "carbs": 7,
-      "fat": 14,
+      "fat": 14.1,
       "fiber": 0
     },
     "grams": {
@@ -2992,18 +3490,22 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sour cream, reduced fat",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "mayo",
     "name": "mayonnaise, light",
-    "fdcId": null,
+    "fdcId": 173594,
     "query": "Salad dressing, mayonnaise, light",
     "per100g": {
       "calories": 238,
-      "protein": 0.4,
-      "carbs": 7.5,
-      "fat": 22.6,
+      "protein": 0.37,
+      "carbs": 9.23,
+      "fat": 22.22,
       "fiber": 0
     },
     "grams": {
@@ -3021,19 +3523,23 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Salad dressing, mayonnaise, light",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "caesar",
     "name": "caesar dressing, light",
-    "fdcId": null,
+    "fdcId": 169877,
     "query": "Salad dressing, caesar, low calorie",
     "per100g": {
-      "calories": 160,
-      "protein": 1.5,
-      "carbs": 6,
-      "fat": 14,
-      "fiber": 0.4
+      "calories": 110,
+      "protein": 0.3,
+      "carbs": 18.6,
+      "fat": 4.4,
+      "fiber": 0.1
     },
     "grams": {
       "cup": 240,
@@ -3048,19 +3554,23 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Salad dressing, caesar, low calorie",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "mustard",
     "name": "mustard, prepared",
-    "fdcId": null,
+    "fdcId": 326698,
     "query": "Mustard, prepared, yellow",
     "per100g": {
-      "calories": 60,
-      "protein": 3.74,
-      "carbs": 5.83,
-      "fat": 3.34,
-      "fiber": 3.3
+      "calories": 61,
+      "protein": 4.25,
+      "carbs": 5.3,
+      "fat": 3.38,
+      "fiber": 4.3
     },
     "grams": {
       "cup": 249,
@@ -3075,19 +3585,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Mustard, prepared, yellow",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "salsa",
     "name": "salsa, ready-to-serve",
-    "fdcId": null,
+    "fdcId": 746777,
     "query": "Sauce, salsa, ready-to-serve",
     "per100g": {
-      "calories": 36,
-      "protein": 1.5,
-      "carbs": 7,
-      "fat": 0.2,
-      "fiber": 1.4
+      "calories": 29,
+      "protein": 1.44,
+      "carbs": 6.74,
+      "fat": 0.19,
+      "fiber": 1.8
     },
     "grams": {
       "cup": 255,
@@ -3103,19 +3617,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sauce, salsa, ready-to-serve",
+      "dataType": "Foundation"
+    }
   },
   {
     "id": "hummus",
     "name": "hummus, commercial",
-    "fdcId": null,
+    "fdcId": 174289,
     "query": "Hummus, commercial",
     "per100g": {
-      "calories": 166,
-      "protein": 7.9,
-      "carbs": 14.29,
-      "fat": 9.6,
-      "fiber": 6
+      "calories": 237,
+      "protein": 7.78,
+      "carbs": 15,
+      "fat": 17.82,
+      "fiber": 5.5
     },
     "grams": {
       "cup": 246,
@@ -3130,19 +3648,23 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Hummus, commercial",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "tzatziki",
     "name": "tzatziki, yogurt cucumber sauce",
-    "fdcId": null,
+    "fdcId": 170903,
     "query": "Yogurt, Greek, plain, lowfat",
     "per100g": {
       "calories": 73,
-      "protein": 6,
-      "carbs": 4,
-      "fat": 3.5,
-      "fiber": 0.2
+      "protein": 9.95,
+      "carbs": 3.94,
+      "fat": 1.92,
+      "fiber": 0
     },
     "grams": {
       "cup": 240,
@@ -3157,12 +3679,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Yogurt, Greek, plain, lowfat",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "honey",
     "name": "honey",
-    "fdcId": null,
+    "fdcId": 169640,
     "query": "Honey",
     "per100g": {
       "calories": 304,
@@ -3184,17 +3710,21 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Honey",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "maple",
     "name": "maple syrup",
-    "fdcId": null,
+    "fdcId": 169661,
     "query": "Syrups, maple",
     "per100g": {
       "calories": 260,
       "protein": 0.04,
-      "carbs": 67,
+      "carbs": 67.04,
       "fat": 0.06,
       "fiber": 0
     },
@@ -3211,19 +3741,23 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Syrups, maple",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "jam",
     "name": "strawberry jam",
-    "fdcId": null,
+    "fdcId": 169641,
     "query": "Jams and preserves, strawberry",
     "per100g": {
-      "calories": 250,
-      "protein": 0.4,
-      "carbs": 66,
-      "fat": 0.1,
-      "fiber": 1
+      "calories": 278,
+      "protein": 0.37,
+      "carbs": 68.86,
+      "fat": 0.07,
+      "fiber": 1.1
     },
     "grams": {
       "cup": 320,
@@ -3239,12 +3773,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Jams and preserves",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cocoa",
     "name": "cocoa powder, unsweetened",
-    "fdcId": null,
+    "fdcId": 169593,
     "query": "Cocoa, dry powder, unsweetened",
     "per100g": {
       "calories": 228,
@@ -3266,12 +3804,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cocoa, dry powder, unsweetened",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "choc-chips",
     "name": "chocolate chips, dark",
-    "fdcId": null,
+    "fdcId": 167976,
     "query": "Candies, semisweet chocolate",
     "per100g": {
       "calories": 480,
@@ -3294,12 +3836,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Candies, semisweet chocolate",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "coconut",
     "name": "coconut, dried, unsweetened",
-    "fdcId": null,
+    "fdcId": 170170,
     "query": "Nuts, coconut meat, dried, not sweetened",
     "per100g": {
       "calories": 660,
@@ -3321,18 +3867,22 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Nuts, coconut meat, dried (desiccated), not sweetened",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "granola",
     "name": "granola",
-    "fdcId": null,
+    "fdcId": 171646,
     "query": "Cereals ready-to-eat, granola, homemade",
     "per100g": {
       "calories": 489,
-      "protein": 13.7,
-      "carbs": 53.8,
-      "fat": 24.3,
+      "protein": 13.67,
+      "carbs": 53.88,
+      "fat": 24.31,
       "fiber": 8.9
     },
     "grams": {
@@ -3349,12 +3899,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cereals ready-to-eat, granola, homemade",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "cornstarch",
     "name": "cornstarch",
-    "fdcId": null,
+    "fdcId": 169698,
     "query": "Cornstarch",
     "per100g": {
       "calories": 381,
@@ -3376,12 +3930,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Cornstarch",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "rice-vinegar",
     "name": "vinegar, rice",
-    "fdcId": null,
+    "fdcId": 172237,
     "query": "Vinegar, distilled",
     "per100g": {
       "calories": 18,
@@ -3403,12 +3961,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Vinegar, distilled",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "lemon-juice",
     "name": "lemon juice, raw",
-    "fdcId": null,
+    "fdcId": 167747,
     "query": "Lemon juice, raw",
     "per100g": {
       "calories": 22,
@@ -3434,12 +3996,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Lemon juice, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "lemon-zest",
     "name": "lemon peel, raw",
-    "fdcId": null,
+    "fdcId": 167749,
     "query": "Lemon peel, raw",
     "per100g": {
       "calories": 47,
@@ -3461,12 +4027,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Lemon peel, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "herbs-fresh",
     "name": "parsley, fresh",
-    "fdcId": null,
+    "fdcId": 170416,
     "query": "Parsley, fresh",
     "per100g": {
       "calories": 36,
@@ -3486,7 +4056,6 @@
     },
     "aliases": [
       "Fresh basil",
-      "Fresh chives, chopped",
       "Fresh cilantro",
       "Fresh dill or parsley (optional)",
       "Fresh herbs (parsley or cilantro)",
@@ -3497,12 +4066,47 @@
     ],
     "role": "flavor",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Parsley, fresh",
+      "dataType": "SR Legacy"
+    }
+  },
+  {
+    "id": "chives",
+    "name": "chives, raw",
+    "fdcId": 169994,
+    "query": "Chives, raw",
+    "per100g": {
+      "calories": 30,
+      "protein": 3.27,
+      "carbs": 4.35,
+      "fat": 0.73,
+      "fiber": 2.5
+    },
+    "grams": {
+      "cup": 48,
+      "tbsp": 3,
+      "tsp": 1,
+      "oz": 28.3495,
+      "each": null,
+      "g": 1
+    },
+    "aliases": [
+      "Fresh chives, chopped"
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Chives, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "capers",
     "name": "capers, canned",
-    "fdcId": null,
+    "fdcId": 172238,
     "query": "Capers, canned",
     "per100g": {
       "calories": 23,
@@ -3524,19 +4128,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Capers, canned",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "olives",
     "name": "olives, ripe, canned",
-    "fdcId": null,
+    "fdcId": 169095,
     "query": "Olives, ripe, canned",
     "per100g": {
-      "calories": 115,
-      "protein": 0.84,
-      "carbs": 6.26,
-      "fat": 10.68,
-      "fiber": 3.2
+      "calories": 81,
+      "protein": 0.97,
+      "carbs": 5.61,
+      "fat": 6.87,
+      "fiber": 2.5
     },
     "grams": {
       "cup": 134,
@@ -3552,12 +4160,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Olives, ripe, canned (jumbo-super colossal)",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "jalapeno",
     "name": "jalapeno, raw",
-    "fdcId": null,
+    "fdcId": 168576,
     "query": "Peppers, jalapeno, raw",
     "per100g": {
       "calories": 29,
@@ -3579,19 +4191,23 @@
     ],
     "role": "flavor",
     "state": "raw",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Peppers, jalapeno, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "hot-sauce",
     "name": "hot sauce, ready-to-serve",
-    "fdcId": null,
+    "fdcId": 174528,
     "query": "Sauce, ready-to-serve, pepper, TABASCO",
     "per100g": {
       "calories": 12,
-      "protein": 0.5,
+      "protein": 1.29,
       "carbs": 0.8,
-      "fat": 0.6,
-      "fiber": 0.4
+      "fat": 0.76,
+      "fiber": 0.6
     },
     "grams": {
       "cup": 240,
@@ -3606,19 +4222,23 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sauce, ready-to-serve, pepper, TABASCO",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "croutons",
     "name": "croutons, plain",
-    "fdcId": null,
+    "fdcId": 172751,
     "query": "Croutons, plain",
     "per100g": {
       "calories": 407,
       "protein": 11.9,
       "carbs": 73.5,
-      "fat": 6.5,
-      "fiber": 5.5
+      "fat": 6.6,
+      "fiber": 5.1
     },
     "grams": {
       "cup": 30,
@@ -3633,12 +4253,16 @@
     ],
     "role": "carb",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Croutons, plain",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "stir-fry-sauce",
     "name": "stir-fry sauce",
-    "fdcId": null,
+    "fdcId": 171167,
     "query": "Sauce, teriyaki, ready-to-serve",
     "per100g": {
       "calories": 89,
@@ -3660,12 +4284,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Sauce, teriyaki, ready-to-serve",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "smoked-salmon",
     "name": "salmon, smoked",
-    "fdcId": null,
+    "fdcId": 173687,
     "query": "Fish, salmon, chinook, smoked",
     "per100g": {
       "calories": 117,
@@ -3675,7 +4303,7 @@
       "fiber": 0
     },
     "grams": {
-      "cup": null,
+      "cup": 136,
       "tbsp": null,
       "tsp": null,
       "oz": 28.3495,
@@ -3687,12 +4315,17 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Fish, salmon, chinook, smoked",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "protein-bar",
     "name": "snack, protein bar",
     "fdcId": null,
+    "skipUsda": "Packaged product; typed label values.",
     "query": "Snacks, protein bar",
     "per100g": {
       "calories": 404,
@@ -3722,6 +4355,7 @@
     "id": "protein-chips",
     "name": "snack, protein chips",
     "fdcId": null,
+    "skipUsda": "Packaged product; typed label values.",
     "query": "Snacks, tortilla chips, plain, white corn",
     "per100g": {
       "calories": 438,
@@ -3750,6 +4384,7 @@
     "id": "rtd-shake",
     "name": "protein shake, ready-to-drink",
     "fdcId": null,
+    "skipUsda": "Packaged product; typed label values.",
     "query": "Beverages, Protein powder soy based, prepared with water",
     "per100g": {
       "calories": 50,
@@ -3778,17 +4413,17 @@
   {
     "id": "seaweed",
     "name": "seaweed, dried",
-    "fdcId": null,
+    "fdcId": 170496,
     "query": "Seaweed, wakame, raw",
     "per100g": {
       "calories": 45,
-      "protein": 3,
-      "carbs": 9.1,
-      "fat": 0.6,
+      "protein": 3.03,
+      "carbs": 9.14,
+      "fat": 0.64,
       "fiber": 0.5
     },
     "grams": {
-      "cup": null,
+      "cup": 5,
       "tbsp": null,
       "tsp": null,
       "oz": 28.3495,
@@ -3801,12 +4436,17 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Seaweed, wakame, raw",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "diet-drink",
     "name": "carbonated beverage, diet",
     "fdcId": null,
+    "skipUsda": "USDA search returns regular cola; diet cola is zero-calorie.",
     "query": "Beverages, carbonated, cola, diet",
     "per100g": {
       "calories": 0,
@@ -3834,13 +4474,13 @@
   {
     "id": "soda",
     "name": "carbonated beverage, cola",
-    "fdcId": null,
+    "fdcId": 174852,
     "query": "Beverages, carbonated, cola",
     "per100g": {
-      "calories": 39,
+      "calories": 42,
       "protein": 0,
-      "carbs": 9.9,
-      "fat": 0,
+      "carbs": 10.36,
+      "fat": 0.25,
       "fiber": 0
     },
     "grams": {
@@ -3857,12 +4497,16 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Beverages, carbonated, cola, regular",
+      "dataType": "SR Legacy"
+    }
   },
   {
     "id": "black-pepper",
     "name": "pepper, black",
-    "fdcId": null,
+    "fdcId": 170931,
     "query": "Spices, pepper, black",
     "per100g": {
       "calories": 251,
@@ -3884,6 +4528,10 @@
     ],
     "role": "flavor",
     "state": "as-sold",
-    "yield": null
+    "yield": null,
+    "usda": {
+      "description": "Spices, pepper, black",
+      "dataType": "SR Legacy"
+    }
   }
 ]

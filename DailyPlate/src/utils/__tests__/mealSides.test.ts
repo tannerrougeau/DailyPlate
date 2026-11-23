@@ -78,6 +78,7 @@ describe("snack fit", () => {
     const sized = sizeMealToTarget(createPlannedMeal("snack", apple), { calories: 250, protein: 19, carbs: 25, fat: 12, fiber: 4 });
     const n = mealFoodNutrition(sized);
     expect(n.protein).toBeLessThan(17);
-    expect(sized.portion!.fits).toBe(Math.abs(n.calories - 250) <= 25);
+    // 250 kcal target: tolerance is 50 kcal (larger than 10%).
+    expect(sized.portion!.fits).toBe(Math.abs(n.calories - 250) <= 50);
   });
 });

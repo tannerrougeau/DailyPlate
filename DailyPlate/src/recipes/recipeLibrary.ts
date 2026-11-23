@@ -1012,6 +1012,8 @@ const baseRecipeLibrary: Recipe[] = [
     fat: 14,
     prepMinutes: 10,
     cookMinutes: 25,
+    // The ingredient list makes a tray of egg bites: about 3 servings.
+    servings: 3,
     ingredients: [
       { name: "Eggs", quantity: 4, unit: "large", category: "Protein" },
       { name: "Liquid egg whites", quantity: 0.5, unit: "cup", category: "Protein" },
