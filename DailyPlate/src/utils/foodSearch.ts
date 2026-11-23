@@ -4,6 +4,7 @@ import { commonSnackItems, type SnackItem } from "@/utils/snackItems";
 
 export const FOOD_SEARCH_URL = "/.netlify/functions/food-search";
 export const OFFLINE_MESSAGE = "Search needs a connection. Your saved foods and manual entry still work.";
+export const SEARCH_FAILED_MESSAGE = "Food search isn't working right now. Try again later or enter it manually.";
 const CACHE_PREFIX = "dailyplate-food-search:";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -46,13 +47,15 @@ function readCache(store: CacheStore | null, query: string, now: number): FoodIt
     const raw = store?.getItem(CACHE_PREFIX + norm(query));
     if (!raw) return null;
     const hit = JSON.parse(raw) as { at: number; results: FoodItem[] };
-    return now - hit.at < DAY_MS ? hit.results : null;
+    // An empty list may be from a time search was failing: treat it as a miss.
+    return now - hit.at < DAY_MS && hit.results.length > 0 ? hit.results : null;
   } catch {
     return null;
   }
 }
 
 function writeCache(store: CacheStore | null, query: string, results: FoodItem[], now: number) {
+  if (results.length === 0) return;
   try {
     store?.setItem(CACHE_PREFIX + norm(query), JSON.stringify({ at: now, results }));
   } catch {
@@ -66,6 +69,8 @@ export type FoodSearchOutcome = {
   /** USDA results, then Open Food Facts. */
   remote: FoodItem[];
   offline: boolean;
+  /** The search service failed (missing key, USDA/Open Food Facts errors): not the same as no matches. */
+  failed?: boolean;
 };
 
 /**
@@ -96,13 +101,14 @@ export async function searchFoods(
   if (!online) return { local, remote: [], offline: true };
   try {
     const res = await (deps.fetchImpl ?? fetch)(`${FOOD_SEARCH_URL}?q=${encodeURIComponent(q)}`);
-    if (!res.ok) return { local, remote: [], offline: true };
+    if (!res.ok) return { local, remote: [], offline: false, failed: true };
     const body = (await res.json()) as { results?: FoodItem[] };
     const results = body.results ?? [];
     writeCache(cache, q, results, now);
     return { local, remote: withoutLocal(results), offline: false };
   } catch {
-    return { local, remote: [], offline: true };
+    // Online but the request or its JSON failed (e.g. the function isn't deployed).
+    return { local, remote: [], offline: false, failed: true };
   }
 }
 

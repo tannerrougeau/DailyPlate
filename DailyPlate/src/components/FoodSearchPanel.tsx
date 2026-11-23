@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import type { FoodItem } from "@/utils/foodTypes";
-import { manualFood, OFFLINE_MESSAGE, searchFoods, type FoodSearchOutcome } from "@/utils/foodSearch";
+import {
+  manualFood,
+  OFFLINE_MESSAGE,
+  SEARCH_FAILED_MESSAGE,
+  searchFoods,
+  type FoodSearchOutcome,
+} from "@/utils/foodSearch";
 import { recentSnacks } from "@/utils/snackItems";
 
 /**
@@ -29,7 +35,8 @@ export function FoodSearchPanel({ onPick }: { onPick: (food: FoodItem) => void }
 
   const usda = outcome?.remote.filter((f) => f.source === "usda") ?? [];
   const off = outcome?.remote.filter((f) => f.source === "off") ?? [];
-  const nothing = outcome && outcome.local.length === 0 && outcome.remote.length === 0 && !outcome.offline;
+  const nothing =
+    outcome && outcome.local.length === 0 && outcome.remote.length === 0 && !outcome.offline && !outcome.failed;
 
   return (
     <div>
@@ -60,6 +67,7 @@ export function FoodSearchPanel({ onPick }: { onPick: (food: FoodItem) => void }
       </form>
 
       {outcome?.offline && <p className="mt-2 text-xs text-amber-800">{OFFLINE_MESSAGE}</p>}
+      {outcome?.failed && <p className="mt-2 text-xs text-amber-800">{SEARCH_FAILED_MESSAGE}</p>}
       {nothing && <p className="mt-2 text-xs text-slate-500">No matches. Try other words, or enter it from the label.</p>}
 
       <FoodGroup title="My foods" foods={outcome?.local ?? []} onPick={onPick} />

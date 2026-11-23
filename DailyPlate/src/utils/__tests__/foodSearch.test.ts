@@ -1,13 +1,23 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  handleFoodSearchRequest,
   normalizeOff,
   normalizeUsda,
   OFF_USER_AGENT,
   searchRemote,
+  setOffRetryMs,
+  USDA_DATA_TYPES,
   USDA_ENOUGH,
 } from "@/server/foodSources";
 import type { FoodItem } from "@/utils/foodTypes";
-import { fitLine, manualFood, proteinTopUp, searchFoods, searchLocal } from "@/utils/foodSearch";
+import {
+  fitLine,
+  manualFood,
+  proteinTopUp,
+  SEARCH_FAILED_MESSAGE,
+  searchFoods,
+  searchLocal,
+} from "@/utils/foodSearch";
 
 const usdaFood = (i: number, branded = true) => ({
   fdcId: 1000 + i,
@@ -102,12 +112,12 @@ describe("client search order", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("a failed request is treated as offline, so manual entry is the fallback", async () => {
+  it("a failed request is reported as failed (not offline, not 'no matches'); manual entry still works", async () => {
     const fetchImpl = vi.fn(async () => {
       throw new Error("network");
     }) as unknown as typeof fetch;
     const out = await searchFoods("bagel", { myFoods: [], fetchImpl, cache: null, online: true });
-    expect(out).toEqual({ local: [], remote: [], offline: true });
+    expect(out).toEqual({ local: [], remote: [], offline: false, failed: true });
     const typed = manualFood({ name: "Bagel", servingLabel: "1 bagel (105 g)", calories: 270, protein: 10, carbs: 53 });
     expect(typed).toMatchObject({ source: "manual", calories: 270, protein: 10, carbs: 53 });
   });
@@ -141,5 +151,83 @@ describe("framing", () => {
     expect(proteinTopUp(5)).toBeNull();
     expect(proteinTopUp(12)).toBe("Add a Greek yogurt cup to close the protein gap.");
     expect(proteinTopUp(20)).toBe("Add a Protein Drink to close the protein gap.");
+  });
+});
+
+describe("when search fails", () => {
+  setOffRetryMs(0);
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+  const html = (status: number) => new Response("<html>error</html>", { status });
+
+  it("USDA is called with POST and the data types in the body (GET with them in the URL gets HTTP 400)", async () => {
+    const fetchImpl = vi.fn(async () => json({ foods: Array.from({ length: 5 }, (_, i) => usdaFood(i)) })) as unknown as typeof fetch & ReturnType<typeof vi.fn>;
+    await searchRemote("snickers", "KEY", fetchImpl);
+    const [url, init] = fetchImpl.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body)).dataType).toEqual(USDA_DATA_TYPES);
+    expect(url).not.toContain("dataType");
+  });
+
+  it("Open Food Facts is retried once after a 503", async () => {
+    let off = 0;
+    const fetchImpl = vi.fn(async (url: string | URL) => {
+      if (String(url).includes("api.nal.usda.gov")) return html(400);
+      off += 1;
+      return off === 1 ? html(503) : json({ products: [offProduct] });
+    }) as unknown as typeof fetch;
+    const r = await searchRemote("snickers", "KEY", fetchImpl);
+    expect(off).toBe(2);
+    expect(r.results).toHaveLength(1);
+    expect(r.failed).toBe(false);
+    expect(r.errors).toEqual(["USDA search failed (HTTP 400)"]);
+  });
+
+  it("USDA error and Open Food Facts down → 502 search_failed, errors logged", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) =>
+      String(url).includes("api.nal.usda.gov") ? html(400) : html(503),
+    ) as unknown as typeof fetch;
+    const logs: string[] = [];
+    const res = await handleFoodSearchRequest("http://x/fn?q=snickers", "KEY", fetchImpl, (m) => logs.push(m));
+    expect(res.status).toBe(502);
+    expect(await res.json()).toMatchObject({ error: "search_failed", results: [] });
+    expect(logs).toEqual([
+      'food-search "snickers": USDA search failed (HTTP 400)',
+      'food-search "snickers": Open Food Facts search failed (HTTP 503)',
+    ]);
+  });
+
+  it("missing key is logged; Open Food Facts results still come back", async () => {
+    const fetchImpl = vi.fn(async () => json({ products: [offProduct] })) as unknown as typeof fetch;
+    const logs: string[] = [];
+    const res = await handleFoodSearchRequest("http://x/fn?q=snickers", undefined, fetchImpl, (m) => logs.push(m));
+    expect(res.status).toBe(200);
+    expect((await res.json()).results).toHaveLength(1);
+    expect(logs).toEqual(['food-search "snickers": USDA_API_KEY is not set']);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("a real empty result is 200 'no matches', not a failure", async () => {
+    const fetchImpl = vi.fn(async (url: string | URL) =>
+      String(url).includes("api.nal.usda.gov") ? json({ foods: [] }) : json({ products: [] }),
+    ) as unknown as typeof fetch;
+    const res = await handleFoodSearchRequest("http://x/fn?q=zzzz", "KEY", fetchImpl, () => undefined);
+    expect(res.status).toBe(200);
+    expect((await res.json()).results).toEqual([]);
+  });
+
+  it("the app shows the failure message on a 502 and never caches empty results", async () => {
+    const store = new Map<string, string>();
+    const cache = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    const failing = vi.fn(async () => json({ error: "search_failed", results: [] }, 502)) as unknown as typeof fetch;
+    const out = await searchFoods("snickers", { myFoods: [], fetchImpl: failing, cache, online: true });
+    expect(out.failed).toBe(true);
+    expect(SEARCH_FAILED_MESSAGE).toBe("Food search isn't working right now. Try again later or enter it manually.");
+    expect(store.size).toBe(0);
+    // An empty list cached earlier (while search was broken) is ignored.
+    store.set("dailyplate-food-search:snickers", JSON.stringify({ at: Date.now(), results: [] }));
+    const ok = vi.fn(async () => json({ results: [normalizeOff(offProduct)] })) as unknown as typeof fetch;
+    const again = await searchFoods("snickers", { myFoods: [], fetchImpl: ok, cache, online: true });
+    expect(ok).toHaveBeenCalledTimes(1);
+    expect(again.remote).toHaveLength(1);
   });
 });

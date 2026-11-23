@@ -9,6 +9,12 @@ export const OFF_USER_AGENT = "DailyPlate/1.0 (tannerrougeau@gmail.com)";
 export const OFF_CREDIT = "Open Food Facts";
 /** Ask Open Food Facts only when USDA has fewer results than this. */
 export const USDA_ENOUGH = 5;
+/** Pause before retrying Open Food Facts after a 503/429. */
+export let OFF_RETRY_MS = 600;
+/** Tests only: skip the retry pause. */
+export function setOffRetryMs(ms: number) {
+  OFF_RETRY_MS = ms;
+}
 
 type Fetch = typeof fetch;
 
@@ -101,14 +107,21 @@ export async function usdaPortions(fdcId: string, apiKey: string, fetchImpl: Fet
   return normalizePortions(body.foodPortions);
 }
 
+/** USDA data types searched: Branded for packaged products, the rest for generic foods. */
+export const USDA_DATA_TYPES = ["Branded", "Survey (FNDDS)", "SR Legacy", "Foundation"];
+
+/**
+ * USDA search uses POST with a JSON body: the GET form with "Survey (FNDDS)" in the query string is
+ * rejected by USDA's server with HTTP 400.
+ */
 export async function searchUsda(query: string, apiKey: string, fetchImpl: Fetch = fetch): Promise<FoodItem[]> {
-  const url = new URL("https://api.nal.usda.gov/fdc/v1/foods/search");
-  url.searchParams.set("api_key", apiKey);
-  url.searchParams.set("query", query);
-  url.searchParams.set("dataType", "Branded,Survey (FNDDS),SR Legacy,Foundation");
-  url.searchParams.set("pageSize", "15");
-  const res = await fetchImpl(url.toString());
-  if (!res.ok) throw new Error(`USDA search failed (${res.status})`);
+  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}`;
+  const res = await fetchImpl(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, dataType: USDA_DATA_TYPES, pageSize: 15 }),
+  });
+  if (!res.ok) throw new Error(`USDA search failed (HTTP ${res.status})`);
   const body = (await res.json()) as { foods?: UsdaFood[] };
   return (body.foods ?? []).map(normalizeUsda).filter((x): x is FoodItem => x != null);
 }
@@ -167,33 +180,103 @@ export async function searchOff(query: string, fetchImpl: Fetch = fetch): Promis
   url.searchParams.set("json", "1");
   url.searchParams.set("page_size", "10");
   url.searchParams.set("fields", "code,product_name,brands,serving_size,serving_quantity,nutriments");
-  const res = await fetchImpl(url.toString(), { headers: { "User-Agent": OFF_USER_AGENT } });
-  if (!res.ok) throw new Error(`Open Food Facts search failed (${res.status})`);
+  let res = await fetchImpl(url.toString(), { headers: { "User-Agent": OFF_USER_AGENT } });
+  if (res.status === 503 || res.status === 429) {
+    // Often briefly overloaded: one retry after a short pause.
+    await new Promise((r) => setTimeout(r, OFF_RETRY_MS));
+    res = await fetchImpl(url.toString(), { headers: { "User-Agent": OFF_USER_AGENT } });
+  }
+  if (!res.ok) throw new Error(`Open Food Facts search failed (HTTP ${res.status})`);
   const body = (await res.json()) as { products?: OffProduct[] };
   return (body.products ?? []).map(normalizeOff).filter((x): x is FoodItem => x != null);
 }
 
-/** USDA first; Open Food Facts only when USDA has fewer than 5 results (or no key / an error). */
+export type RemoteSearch = {
+  results: FoodItem[];
+  usdaCount: number;
+  offCount: number;
+  /** What went wrong (missing key, HTTP errors). Logged by the function, never shown verbatim. */
+  errors: string[];
+  /** Every source that was tried failed, so an empty list means "search is broken", not "no matches". */
+  failed: boolean;
+};
+
+/** USDA first; Open Food Facts when USDA has fewer than 5 results, has no key, or errors. */
 export async function searchRemote(
   query: string,
   apiKey: string | undefined,
   fetchImpl: Fetch = fetch,
-): Promise<{ results: FoodItem[]; usdaCount: number; offCount: number }> {
+): Promise<RemoteSearch> {
+  const errors: string[] = [];
   let usda: FoodItem[] = [];
-  if (apiKey) {
+  let usdaOk = false;
+  if (!apiKey) {
+    errors.push("USDA_API_KEY is not set");
+  } else {
     try {
       usda = await searchUsda(query, apiKey, fetchImpl);
-    } catch {
-      usda = [];
+      usdaOk = true;
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
     }
   }
   let off: FoodItem[] = [];
+  let offOk = false;
   if (usda.length < USDA_ENOUGH) {
     try {
       off = await searchOff(query, fetchImpl);
-    } catch {
-      off = [];
+      offOk = true;
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
     }
   }
-  return { results: [...usda, ...off], usdaCount: usda.length, offCount: off.length };
+  const results = [...usda, ...off];
+  return {
+    results,
+    usdaCount: usda.length,
+    offCount: off.length,
+    errors,
+    failed: results.length === 0 && !usdaOk && !offOk,
+  };
+}
+
+/**
+ * The function's request handling (kept here so it can be tested): search with ?q=, portions with
+ * ?fdcId=. Errors are logged; when every source fails the response is 502 with error
+ * "search_failed", so the app can say search isn't working instead of "no matches".
+ */
+export async function handleFoodSearchRequest(
+  url: string,
+  apiKey: string | undefined,
+  fetchImpl: Fetch = fetch,
+  log: (msg: string) => void = (m) => console.error(m),
+): Promise<Response> {
+  const params = new URL(url).searchParams;
+  const fdcId = (params.get("fdcId") ?? "").trim();
+  if (fdcId) {
+    if (!apiKey) {
+      log("food-search: USDA_API_KEY is not set");
+      return Response.json({ error: "search_failed", portions: [] }, { status: 502 });
+    }
+    if (!/^\d{1,10}$/.test(fdcId)) return Response.json({ error: "bad_request", portions: [] }, { status: 400 });
+    try {
+      const portions = await usdaPortions(fdcId, apiKey, fetchImpl);
+      return Response.json({ fdcId, portions }, { headers: { "Cache-Control": "public, max-age=86400" } });
+    } catch (e) {
+      log(`food-search: portions for ${fdcId} failed: ${e instanceof Error ? e.message : String(e)}`);
+      return Response.json({ error: "search_failed", portions: [] }, { status: 502 });
+    }
+  }
+  const q = (params.get("q") ?? "").trim().slice(0, 100);
+  if (q.length < 2) return Response.json({ error: "Type at least 2 characters." }, { status: 400 });
+  const r = await searchRemote(q, apiKey, fetchImpl);
+  for (const err of r.errors) log(`food-search "${q}": ${err}`);
+  if (r.failed) {
+    return Response.json({ error: "search_failed", query: q, results: [] }, { status: 502 });
+  }
+  return Response.json(
+    { query: q, results: r.results, usdaCount: r.usdaCount, offCount: r.offCount },
+    // Don't let a CDN keep a partial result (e.g. USDA errored) for a day.
+    { headers: { "Cache-Control": r.errors.length ? "no-store" : "public, max-age=86400" } },
+  );
 }
