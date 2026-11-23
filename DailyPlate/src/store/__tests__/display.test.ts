@@ -117,3 +117,66 @@ describe("checkpoints", () => {
     expect(useAppStore.getState().checkpoints[0]!.what).toBe("Turned on: Weigh your batch");
   });
 });
+
+describe("check-in plan changes go through the queue", () => {
+  const lowCheckIn = {
+    calorieTargetAtSubmit: 2400,
+    weightChangeDirection: "same" as const,
+    weightChangeAmount: null,
+    weightChangeUnit: "lbs" as const,
+    energyLevel: 3,
+    calorieAdherence: 3,
+    proteinAdherence: 1,
+    activityChange: "none" as const,
+    activityChangeNotes: "",
+    sleepQuality: 3,
+    strengthProgress: 3,
+    strengthNotes: "",
+    mealVarietySatisfaction: 3,
+    planEaseOfUse: 1,
+    recipeEnjoyment: 1,
+    hungerManagement: 3,
+    experienceNotes: "",
+    timesShoppedThisWeek: 2,
+    timesCookedThisWeek: 3,
+    leftoversFeltRepetitive: "no" as const,
+  };
+
+  it("low answers change nothing on their own", () => {
+    const before = useAppStore.getState().userProfile!;
+    useAppStore.getState().submitCheckIn(lowCheckIn as never, {});
+    const after = useAppStore.getState().userProfile!;
+    expect(after.prioritizeMinProtein).toBe(before.prioritizeMinProtein);
+    expect(after.weeklyMealPrepEnabled).toBe(before.weeklyMealPrepEnabled);
+    expect(after.prioritizeMinimalPrep).toBe(before.prioritizeMinimalPrep);
+  });
+
+  it("a Yes applies the plan change with a checkpoint, and Restore puts it back exactly", async () => {
+    const { checkInPlanQuestions } = await import("@/utils/questionQueue");
+    useAppStore.setState({
+      userProfile: { ...useAppStore.getState().userProfile!, prioritizeMinProtein: false, weeklyMealPrepEnabled: false },
+    });
+    const qs = checkInPlanQuestions(
+      { ...lowCheckIn, scaleMax: 5 } as never,
+      useAppStore.getState().userProfile,
+      new Date(),
+    );
+    useAppStore.getState().refreshQuestions(qs);
+    const cp = useAppStore.getState().answerQuestion("plan:protein-first", "yes")!;
+    expect(cp.what).toBe("Plans put protein first");
+    expect(useAppStore.getState().userProfile!.prioritizeMinProtein).toBe(true);
+    useAppStore.getState().restoreCheckpoint(cp.id);
+    expect(useAppStore.getState().userProfile!.prioritizeMinProtein).toBe(false);
+
+    const prep = useAppStore.getState().answerQuestion("plan:weekly-meal-prep", "yes")!;
+    expect(useAppStore.getState().userProfile!.weeklyMealPrepEnabled).toBe(true);
+    useAppStore.getState().restoreCheckpoint(prep.id);
+    expect(useAppStore.getState().userProfile!.weeklyMealPrepEnabled).toBe(false);
+  });
+
+  it("No leaves the plan alone", () => {
+    const before = useAppStore.getState().userProfile!.prioritizeMinimalPrep;
+    expect(useAppStore.getState().answerQuestion("plan:minimal-prep", "no")).toBeNull();
+    expect(useAppStore.getState().userProfile!.prioritizeMinimalPrep).toBe(before);
+  });
+});

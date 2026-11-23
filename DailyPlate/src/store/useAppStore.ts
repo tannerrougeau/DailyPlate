@@ -284,6 +284,7 @@ function commitCheckpoint(
     ...(after.ingredientVariety != null ? { ingredientVariety: after.ingredientVariety } : {}),
     ...(after.weeklyMealPrepRepeatCount != null ? { weeklyMealPrepRepeatCount: after.weeklyMealPrepRepeatCount } : {}),
     ...(after.maxLeftoverStreakDays != null ? { maxLeftoverStreakDays: after.maxLeftoverStreakDays } : {}),
+    ...(after.planSettings ?? {}),
   };
   if (s.userProfile && Object.keys(profileFields).length > 0) {
     patch.userProfile = { ...s.userProfile, ...profileFields };
@@ -1445,6 +1446,13 @@ export const useAppStore = create<AppState>()(
             ingredientVariety: s.userProfile.ingredientVariety,
             weeklyMealPrepRepeatCount: s.userProfile.weeklyMealPrepRepeatCount,
             maxLeftoverStreakDays: s.userProfile.maxLeftoverStreakDays,
+            planSettings: {
+              prioritizeMinProtein: s.userProfile.prioritizeMinProtein,
+              weeklyMealPrepEnabled: s.userProfile.weeklyMealPrepEnabled,
+              weeklyMealPrepSlot: s.userProfile.weeklyMealPrepSlot,
+              weeklyMealPrepRepeatCount: s.userProfile.weeklyMealPrepRepeatCount,
+              prioritizeMinimalPrep: s.userProfile.prioritizeMinimalPrep,
+            },
           },
           question.change,
         );
@@ -1485,6 +1493,13 @@ export const useAppStore = create<AppState>()(
         }
         if (cp.before.maxLeftoverStreakDays != null) {
           current.maxLeftoverStreakDays = s.userProfile.maxLeftoverStreakDays ?? 2;
+        }
+        if (cp.before.planSettings) {
+          const now: Record<string, unknown> = {};
+          for (const key of Object.keys(cp.before.planSettings)) {
+            now[key] = (s.userProfile as unknown as Record<string, unknown>)[key];
+          }
+          current.planSettings = now as typeof cp.before.planSettings;
         }
         return commitCheckpoint(set, get, `Restored: ${cp.what}`, "Restored from Display history", current, cp.before);
       },
@@ -1925,7 +1940,7 @@ export const useAppStore = create<AppState>()(
         });
         const experience = buildExperienceRecommendations(entry, mergedProfile, signals);
 
-        const adaptiveFromLogs = deriveAdaptiveProfileUpdates(mergedProfile, signals, entry);
+        const adaptiveFromLogs = deriveAdaptiveProfileUpdates(mergedProfile, signals);
         const finalProfile: UserProfile = withPlanningDefaults({
           ...mergedProfile,
           ...experience.profileUpdates,

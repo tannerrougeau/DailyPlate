@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { QuestionCard } from "@/components/QuestionCard";
 import { resolveDisplayPrefs, type Checkpoint } from "@/utils/displayPrefs";
-import { checkInQuestions, MAX_IN_CHECK_IN, nextQuestions, usesLongBatches, type Question } from "@/utils/questionQueue";
+import {
+  checkInPlanQuestions,
+  checkInQuestions,
+  MAX_IN_CHECK_IN,
+  nextQuestions,
+  usesLongBatches,
+  type Question,
+} from "@/utils/questionQueue";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { ChevronDown, X } from "lucide-react";
 import { CHECK_IN_DISCLAIMER } from "@/checkIn/questionnaire";
@@ -151,17 +158,22 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
     const plannedLongBatch = Object.entries(st.dailyPlans).some(
       ([key, meals]) => key >= st.todayDateKey && meals.some((m) => (m.mealPrep?.portionsCooked ?? 1) > 2),
     );
-    refreshQuestions(
-      checkInQuestions(
+    refreshQuestions([
+      // Plan changes from low (1–2) answers are asked, never applied automatically.
+      ...checkInPlanQuestions(checkInResult.entry, st.userProfile, now),
+      ...checkInQuestions(
         checkInResult.entry,
         resolveDisplayPrefs(st.displayPrefs),
         st.userProfile,
         now,
         usesLongBatches(st.userProfile) || plannedLongBatch,
       ),
-    );
+    ]);
     const after = useAppStore.getState();
-    setQuestions(nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN));
+    // Two at most; plan changes first, the rest stay queued.
+    setQuestions(
+      nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN, { planFirst: true }),
+    );
     setPhase("results");
   }
 

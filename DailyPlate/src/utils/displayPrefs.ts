@@ -79,6 +79,17 @@ export type CheckpointState = {
   weeklyMealPrepRepeatCount?: WeeklyMealPrepRepeatCount;
   /** Longest run of planned leftovers (days). */
   maxLeftoverStreakDays?: number;
+  /** Plan settings changed from a check-in question. */
+  planSettings?: PlanSettings;
+};
+
+/** Plan settings a check-in question can turn on (and a checkpoint can restore). */
+export type PlanSettings = {
+  prioritizeMinProtein?: boolean;
+  weeklyMealPrepEnabled?: boolean;
+  weeklyMealPrepSlot?: import("@/types").MealSlotId | null;
+  weeklyMealPrepRepeatCount?: WeeklyMealPrepRepeatCount;
+  prioritizeMinimalPrep?: boolean;
 };
 
 export type Checkpoint = {

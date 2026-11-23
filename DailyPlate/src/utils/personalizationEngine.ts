@@ -184,10 +184,13 @@ export function recipePersonalizationBoost(
   return boost;
 }
 
+/**
+ * Plan updates from meal logs (long-prep skips, enjoyed batch meals). Check-in answers no longer
+ * change plans here: they queue questions instead (see checkInPlanQuestions).
+ */
 export function deriveAdaptiveProfileUpdates(
   profile: UserProfile,
   signals: PersonalizationSignals,
-  entry?: CheckInEntry,
 ): Partial<UserProfile> {
   const updates: Partial<UserProfile> = {};
 
@@ -209,23 +212,6 @@ export function deriveAdaptiveProfileUpdates(
     updates.weeklyMealPrepSlot = updates.weeklyMealPrepSlot ?? profile.weeklyMealPrepSlot ?? "dinner";
     updates.weeklyMealPrepRepeatCount =
       updates.weeklyMealPrepRepeatCount ?? profile.weeklyMealPrepRepeatCount ?? 3;
-  }
-
-  if (entry) {
-    const protein = checkInScale(entry, "proteinAdherence");
-    const ease = checkInScale(entry, "planEaseOfUse");
-    const enjoyment = checkInScale(entry, "recipeEnjoyment");
-    if (isMidLowScore(protein) && !profile.prioritizeMinProtein) {
-      updates.prioritizeMinProtein = true;
-    }
-    if (isMidLowScore(ease) && !profile.weeklyMealPrepEnabled) {
-      updates.weeklyMealPrepEnabled = true;
-      updates.weeklyMealPrepSlot = profile.weeklyMealPrepSlot ?? "dinner";
-      updates.weeklyMealPrepRepeatCount = profile.weeklyMealPrepRepeatCount ?? 3;
-    }
-    if (isMidLowScore(enjoyment) && !profile.prioritizeMinimalPrep && isMidLowScore(ease)) {
-      updates.prioritizeMinimalPrep = true;
-    }
   }
 
   return updates;
@@ -251,7 +237,7 @@ export function buildPersonalizationInsights(input: {
 }): PersonalizationInsight[] {
   const { profile, signals, checkInEntry: entry, favoriteIds, source } = input;
   const messages: string[] = [];
-  const adaptive = deriveAdaptiveProfileUpdates(profile, signals, entry);
+  const adaptive = deriveAdaptiveProfileUpdates(profile, signals);
   const nextProfile = { ...profile, ...adaptive };
 
   if (adaptive.prioritizeMinimalPrep && !profile.prioritizeMinimalPrep) {

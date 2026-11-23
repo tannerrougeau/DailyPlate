@@ -8,7 +8,14 @@ import { buildExperienceRecommendations } from "@/utils/checkInExperience";
 import { startingDisplayPrefs } from "@/utils/displayPrefs";
 import { applyPortion, fetchPortions } from "@/utils/foodSearch";
 import { analyzePersonalizationSignals, deriveAdaptiveProfileUpdates } from "@/utils/personalizationEngine";
-import { applyChange, checkInQuestions, usesLongBatches } from "@/utils/questionQueue";
+import {
+  applyChange,
+  checkInPlanQuestions,
+  checkInQuestions,
+  nextQuestions,
+  usesLongBatches,
+  type Question,
+} from "@/utils/questionQueue";
 import { createPlannedMeal } from "@/utils/recipeDisplay";
 
 const today = "2026-11-23";
@@ -67,7 +74,7 @@ describe("repeats vs batch cooking", () => {
     const qs = checkInQuestions(entry({ mealVarietySatisfaction: 2 }), startingDisplayPrefs("existing"), profile, new Date());
     expect(qs.map((q) => q.id)).toContain("shorter-batches");
     expect(qs.find((q) => q.id === "shorter-batches")!.text).toBe("Want shorter batches? (e.g., 2 days instead of 4)");
-    const auto = deriveAdaptiveProfileUpdates(profile, analyzePersonalizationSignals({ mealTracking: {}, dailyPlans: {}, plannedMeals: [], todayDateKey: today }), entry({ mealVarietySatisfaction: 1 }));
+    const auto = deriveAdaptiveProfileUpdates(profile, analyzePersonalizationSignals({ mealTracking: {}, dailyPlans: {}, plannedMeals: [], todayDateKey: today }));
     expect(auto.weeklyMealPrepRepeatCount).toBeUndefined();
     expect(auto.maxLeftoverStreakDays).toBeUndefined();
   });
@@ -93,8 +100,9 @@ describe("neutral check-in answers (3 of 5)", () => {
   const signals = analyzePersonalizationSignals({ mealTracking: {}, dailyPlans: {}, plannedMeals: [], todayDateKey: today });
   const plain = { goal: "maintain" } as unknown as UserProfile;
 
-  it("change no plan settings", () => {
-    expect(deriveAdaptiveProfileUpdates(plain, signals, entry())).toEqual({});
+  it("change no plan settings and ask no plan questions", () => {
+    expect(deriveAdaptiveProfileUpdates(plain, signals)).toEqual({});
+    expect(checkInPlanQuestions(entry(), plain, new Date())).toEqual([]);
   });
 
   it("queue no questions", () => {
@@ -107,9 +115,17 @@ describe("neutral check-in answers (3 of 5)", () => {
     expect(suggestions[0]).toMatch(/^Your experience scores look solid/);
   });
 
-  it("1–2 still count as low", () => {
-    expect(deriveAdaptiveProfileUpdates(plain, signals, entry({ proteinAdherence: 2 })).prioritizeMinProtein).toBe(true);
-    expect(deriveAdaptiveProfileUpdates(plain, signals, entry({ planEaseOfUse: 2 })).weeklyMealPrepEnabled).toBe(true);
+  it("1–2 queue a plan question instead of changing the plan", () => {
+    expect(checkInPlanQuestions(entry({ proteinAdherence: 2 }), plain, new Date()).map((q) => q.id)).toEqual(["plan:protein-first"]);
+    expect(checkInPlanQuestions(entry({ planEaseOfUse: 2 }), plain, new Date()).map((q) => q.id)).toEqual(["plan:weekly-meal-prep"]);
+    expect(
+      checkInPlanQuestions(entry({ planEaseOfUse: 1, recipeEnjoyment: 2 }), plain, new Date()).map((q) => q.id),
+    ).toEqual(["plan:weekly-meal-prep", "plan:minimal-prep"]);
+  });
+
+  it("nothing is asked for a setting that's already on", () => {
+    const on = { ...plain, prioritizeMinProtein: true } as UserProfile;
+    expect(checkInPlanQuestions(entry({ proteinAdherence: 1 }), on, new Date())).toEqual([]);
   });
 });
 
@@ -154,5 +170,23 @@ describe("household portions for generic USDA foods", () => {
     const none = vi.fn(async () => new Response(JSON.stringify({ portions: [] }), { status: 200 })) as unknown as typeof fetch;
     expect(await fetchPortions({ ...food, sourceId: "10" }, { fetchImpl: none, cache: null })).toEqual([]);
     expect(food.servingLabel).toBe("100 g");
+  });
+});
+
+describe("end-of-check-in order", () => {
+  const q = (id: string, kind: "display" | "planSettings"): Question => ({
+    id,
+    text: id,
+    why: "",
+    source: "check-in",
+    change: kind === "display" ? { kind: "display", set: {} } : { kind: "planSettings", set: {}, what: id },
+    addedAt: "",
+  });
+
+  it("with more than two waiting, plan changes are asked first and the rest stay queued", () => {
+    const queue = [q("display-1", "display"), q("display-2", "display"), q("plan-1", "planSettings"), q("plan-2", "planSettings")];
+    expect(nextQuestions(queue, {}, new Date(), 2, { planFirst: true }).map((x) => x.id)).toEqual(["plan-1", "plan-2"]);
+    // On app open (no planFirst) the queue order is kept.
+    expect(nextQuestions(queue, {}, new Date(), 1).map((x) => x.id)).toEqual(["display-1"]);
   });
 });

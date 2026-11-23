@@ -2,7 +2,7 @@ import type { Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { CheckInEntry } from "@/types/tdeeFeedback";
 import { checkInScale } from "@/utils/checkInScale";
-import type { CheckpointState, DisplayPrefs } from "@/utils/displayPrefs";
+import type { CheckpointState, DisplayPrefs, PlanSettings } from "@/utils/displayPrefs";
 import { firstIngredientOption, ingredientRole } from "@/utils/ingredientNutrition";
 
 export const ASK_SPACING_DAYS = 3;
@@ -15,7 +15,8 @@ export type QuestionChange =
   | { kind: "display"; set: Partial<DisplayPrefs> }
   | { kind: "avoid"; ingredient: string }
   | { kind: "variety" }
-  | { kind: "shorterBatches"; days: number };
+  | { kind: "shorterBatches"; days: number }
+  | { kind: "planSettings"; set: PlanSettings; what: string };
 
 export type Question = {
   /** Stable id: the same question is never queued twice. */
@@ -54,9 +55,77 @@ export function enqueue(queue: Question[], log: QuestionLog, q: Question, now: D
   return [...queue, q];
 }
 
-/** Questions to show now, oldest first, at most `max`. */
-export function nextQuestions(queue: Question[], log: QuestionLog, now: Date, max: number): Question[] {
-  return queue.filter((q) => !blocked(log, q.id, now)).slice(0, max);
+/** Changes the plan (what gets generated) rather than only the display. */
+export function isPlanChange(q: Question): boolean {
+  return q.change.kind !== "display";
+}
+
+/**
+ * Questions to show now, at most `max`. With `planFirst` (end of a check-in), plan-change questions
+ * come before display ones; the rest stay queued.
+ */
+export function nextQuestions(
+  queue: Question[],
+  log: QuestionLog,
+  now: Date,
+  max: number,
+  opts: { planFirst?: boolean } = {},
+): Question[] {
+  const open = queue.filter((q) => !blocked(log, q.id, now));
+  const ordered = opts.planFirst
+    ? [...open.filter(isPlanChange), ...open.filter((q) => !isPlanChange(q))]
+    : open;
+  return ordered.slice(0, max);
+}
+
+/**
+ * Plan changes a low (1–2 of 5) check-in answer used to make automatically. Now they're asked.
+ */
+export function checkInPlanQuestions(entry: CheckInEntry, profile: UserProfile | null, now: Date): Question[] {
+  const at = now.toISOString();
+  const out: Question[] = [];
+  const protein = checkInScale(entry, "proteinAdherence");
+  const ease = checkInScale(entry, "planEaseOfUse");
+  const enjoyment = checkInScale(entry, "recipeEnjoyment");
+  if (protein <= 2 && !profile?.prioritizeMinProtein) {
+    out.push({
+      id: "plan:protein-first",
+      text: "Want plans to put protein first?",
+      why: "Your check-in said hitting protein was hard.",
+      source: "check-in",
+      change: { kind: "planSettings", set: { prioritizeMinProtein: true }, what: "Plans put protein first" },
+      addedAt: at,
+    });
+  }
+  if (ease <= 2 && !profile?.weeklyMealPrepEnabled) {
+    out.push({
+      id: "plan:weekly-meal-prep",
+      text: "Want to batch-cook one meal for a few days?",
+      why: "Your check-in said following the plan felt hard.",
+      source: "check-in",
+      change: {
+        kind: "planSettings",
+        set: {
+          weeklyMealPrepEnabled: true,
+          weeklyMealPrepSlot: profile?.weeklyMealPrepSlot ?? "dinner",
+          weeklyMealPrepRepeatCount: profile?.weeklyMealPrepRepeatCount ?? 3,
+        },
+        what: "Weekly meal prep turned on",
+      },
+      addedAt: at,
+    });
+  }
+  if (enjoyment <= 2 && ease <= 2 && !profile?.prioritizeMinimalPrep) {
+    out.push({
+      id: "plan:minimal-prep",
+      text: "Want quicker, minimal-prep meals?",
+      why: "Your check-in said meals weren't hitting the mark and the plan felt hard.",
+      source: "check-in",
+      change: { kind: "planSettings", set: { prioritizeMinimalPrep: true }, what: "Quick, minimal-prep meals first" },
+      addedAt: at,
+    });
+  }
+  return out;
 }
 
 /** Record an answer. "No" blocks the question for 30 days; "Not now" keeps it queued. */
@@ -249,9 +318,18 @@ export function applyChange(
     ingredientVariety?: UserProfile["ingredientVariety"];
     weeklyMealPrepRepeatCount?: UserProfile["weeklyMealPrepRepeatCount"];
     maxLeftoverStreakDays?: number;
+    planSettings?: PlanSettings;
   },
   change: QuestionChange,
 ): { before: CheckpointState; after: CheckpointState; what: string } {
+  if (change.kind === "planSettings") {
+    const was = current.planSettings ?? {};
+    const before: PlanSettings = {};
+    for (const key of Object.keys(change.set) as (keyof PlanSettings)[]) {
+      (before as Record<string, unknown>)[key] = was[key] ?? defaultPlanSetting(key);
+    }
+    return { before: { planSettings: before }, after: { planSettings: { ...change.set } }, what: change.what };
+  }
   if (change.kind === "shorterBatches") {
     return {
       before: {
@@ -286,4 +364,16 @@ export function applyChange(
     after: { ingredientVariety: "varied" },
     what: "More variety in plans",
   };
+}
+
+/** Value a plan setting has when it was never set, so Restore can put it back exactly. */
+function defaultPlanSetting(key: keyof PlanSettings): PlanSettings[keyof PlanSettings] {
+  switch (key) {
+    case "weeklyMealPrepSlot":
+      return "dinner";
+    case "weeklyMealPrepRepeatCount":
+      return 3;
+    default:
+      return false;
+  }
 }

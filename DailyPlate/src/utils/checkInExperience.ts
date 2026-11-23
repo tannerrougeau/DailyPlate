@@ -28,7 +28,7 @@ export function buildExperienceRecommendations(
       todayDateKey: entry.submittedAt.slice(0, 10),
     });
 
-  const profileUpdates = deriveAdaptiveProfileUpdates(profile, logSignals, entry);
+  const profileUpdates = deriveAdaptiveProfileUpdates(profile, logSignals);
   const variety = checkInScale(entry, "mealVarietySatisfaction");
   const ease = checkInScale(entry, "planEaseOfUse");
   const enjoyment = checkInScale(entry, "recipeEnjoyment");
