@@ -119,7 +119,7 @@ function TodayOverflowMenu({
           className="flex min-h-[52px] w-full items-center gap-3 rounded-2xl px-3 text-left hover:bg-slate-50"
         >
           <RefreshCw className="h-4 w-4 text-slate-400" />
-          <span className="text-sm font-semibold text-slate-900">Regenerate Today</span>
+          <span className="text-sm font-semibold text-slate-900">Regenerate today</span>
         </button>
         <button
           type="button"

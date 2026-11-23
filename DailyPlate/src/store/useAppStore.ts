@@ -75,6 +75,7 @@ import {
 } from "@/auth/appStateSnapshot";
 import type { AuthSession, LoginResult, RegisterResult } from "@/auth/types";
 import type { HouseholdDayOverride } from "@/utils/household";
+import type { SavedSnack } from "@/utils/snackItems";
 
 export type NavTab = "today" | "plan" | "recipes" | "grocery" | "guide";
 export type UsageNoteKey = "today" | "plan" | "recipes" | "grocery";
@@ -262,13 +263,17 @@ function buildDayPlanRespectingLocks(
   >,
   dateKey: string,
   overrides?: GenerateOverrides,
+  /** Slots to keep as they are besides locked ones (e.g. kept or eaten meals). */
+  keepSlots?: Set<MealSlotId>,
 ): DayPlanBuildResult | null {
   const library = recipesFor(state);
   const opts = buildGenerateOptions(state, overrides);
   if (!opts) return null;
 
   const existing = mealsForDate(state, dateKey);
-  const preserved = existing.filter((m) => isMealLocked(state.lockedMeals, dateKey, m.slot));
+  const preserved = existing.filter(
+    (m) => isMealLocked(state.lockedMeals, dateKey, m.slot) || keepSlots?.has(m.slot) === true,
+  );
   const lockedSlots = new Set(preserved.map((m) => m.slot));
   const slotsToFill = opts.slots.filter((s) => !lockedSlots.has(s));
 
@@ -416,6 +421,10 @@ export interface AppState {
   todayHouseholdOverride: HouseholdDayOverride | null;
   /** dateKey → slot → log entry */
   mealTracking: Record<string, DayMealTracking>;
+  /** Snacks logged on Today that were not planned, per day. */
+  snackLogs: Record<string, MealTrackingEntry[]>;
+  /** Custom snacks saved for reuse. */
+  savedSnacks: SavedSnack[];
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];
@@ -476,6 +485,19 @@ export interface AppState {
   setMealBeverage: (dateKey: string, slot: PlannedMeal["slot"], beverageId: BeverageId) => void;
   /** Keep a meal that cannot fit its target: use the closest fit and stop showing the notice. */
   keepMeal: (dateKey: string, slot: MealSlotId) => void;
+  addSnackLog: (dateKey: string, entry: MealTrackingEntry) => void;
+  removeSnackLog: (dateKey: string, loggedAt: string) => void;
+  saveSnack: (snack: Omit<SavedSnack, "id">) => SavedSnack;
+  deleteSavedSnack: (id: string) => void;
+  /**
+   * Replace today's meals, keeping locked, kept, and eaten meals (and their logs).
+   * Returns the previous meals and logs so the change can be undone.
+   */
+  regenerateToday: () =>
+    | { ok: true; previous: { dateKey: string; meals: PlannedMeal[]; tracking: DayMealTracking | null } }
+    | { ok: false };
+  /** Put a day's meals and meal logs back (Undo for Regenerate today). */
+  restoreDay: (dateKey: string, meals: PlannedMeal[], tracking: DayMealTracking | null) => void;
   /** Actual cooked batch weight (g) for a meal and every day of the same batch; null clears it. */
   setWeighedBatch: (dateKey: string, slot: MealSlotId, grams: number | null) => void;
   /** Add whole-food sides to a meal (from the "Add side" suggestion). */
@@ -555,6 +577,8 @@ export const useAppStore = create<AppState>()(
       todayHouseholdOverride: null,
       lastBeverageBySlot: {},
       mealTracking: {},
+      snackLogs: {},
+      savedSnacks: [],
       dismissedUsageNotes: {
         today: false,
         plan: false,
@@ -656,6 +680,8 @@ export const useAppStore = create<AppState>()(
           todayHouseholdOverride: null,
           lastBeverageBySlot: {},
           mealTracking: {},
+          snackLogs: {},
+          savedSnacks: [],
           favoriteIds: [],
           dislikedIds: [],
           profileAnchoredAt: null,
@@ -1248,6 +1274,88 @@ export const useAppStore = create<AppState>()(
         void get().syncAccountSnapshot();
       },
 
+      addSnackLog: (dateKey, entry) => {
+        set((s) => ({
+          snackLogs: { ...s.snackLogs, [dateKey]: [...(s.snackLogs[dateKey] ?? []), entry] },
+        }));
+        void get().syncAccountSnapshot();
+      },
+
+      removeSnackLog: (dateKey, loggedAt) => {
+        set((s) => {
+          const next = (s.snackLogs[dateKey] ?? []).filter((e) => e.loggedAt !== loggedAt);
+          const snackLogs = { ...s.snackLogs };
+          if (next.length > 0) snackLogs[dateKey] = next;
+          else delete snackLogs[dateKey];
+          return { snackLogs };
+        });
+        void get().syncAccountSnapshot();
+      },
+
+      saveSnack: (snack) => {
+        const saved: SavedSnack = { ...snack, id: crypto.randomUUID() };
+        set((s) => ({ savedSnacks: [...s.savedSnacks.filter((x) => x.name !== saved.name), saved] }));
+        void get().syncAccountSnapshot();
+        return saved;
+      },
+
+      deleteSavedSnack: (id) => {
+        set((s) => ({ savedSnacks: s.savedSnacks.filter((x) => x.id !== id) }));
+        void get().syncAccountSnapshot();
+      },
+
+      regenerateToday: () => {
+        const state = get();
+        const dateKey = state.todayDateKey;
+        if (state.lockedDays.includes(dateKey) || !state.userProfile) return { ok: false };
+        const before = mealsForDate(state, dateKey);
+        const tracking = state.mealTracking[dateKey] ?? {};
+        const keepSlots = new Set(
+          before
+            .filter((m) => {
+              const entry = tracking[m.slot];
+              return m.kept === true || (entry != null && entry.status !== "skipped");
+            })
+            .map((m) => m.slot),
+        );
+        // Today only: no low-complexity changes to other days.
+        const built = buildDayPlanRespectingLocks(state, dateKey, { lowComplexity: false }, keepSlots);
+        if (!built) return { ok: false };
+        const lockedOrKept = new Set(
+          built.meals
+            .filter((m) => keepSlots.has(m.slot) || isMealLocked(state.lockedMeals, dateKey, m.slot))
+            .map((m) => m.slot),
+        );
+        const keptTracking: DayMealTracking = Object.fromEntries(
+          Object.entries(tracking).filter(([slot]) => lockedOrKept.has(slot as MealSlotId)),
+        );
+        set((s) => {
+          const mealTracking = { ...s.mealTracking };
+          if (Object.keys(keptTracking).length > 0) mealTracking[dateKey] = keptTracking;
+          else delete mealTracking[dateKey];
+          return {
+            ...setDayMeals(s, dateKey, built.meals),
+            mealTracking,
+            grocerySelectedDateKeys: mergeGroceryDates(s.grocerySelectedDateKeys, [dateKey]),
+          };
+        });
+        void get().syncAccountSnapshot();
+        return {
+          ok: true,
+          previous: { dateKey, meals: before, tracking: state.mealTracking[dateKey] ?? null },
+        };
+      },
+
+      restoreDay: (dateKey, meals, tracking) => {
+        set((s) => {
+          const mealTracking = { ...s.mealTracking };
+          if (tracking && Object.keys(tracking).length > 0) mealTracking[dateKey] = tracking;
+          else delete mealTracking[dateKey];
+          return { ...setDayMeals(s, dateKey, meals), mealTracking };
+        });
+        void get().syncAccountSnapshot();
+      },
+
       keepMeal: (dateKey, slot) => {
         patchMealInDay(set, get, dateKey, slot, { kept: true });
         void get().syncAccountSnapshot();
@@ -1692,6 +1800,8 @@ export const useAppStore = create<AppState>()(
         todayHouseholdOverride: s.todayHouseholdOverride,
         lastBeverageBySlot: s.lastBeverageBySlot,
         mealTracking: s.mealTracking,
+        snackLogs: s.snackLogs,
+        savedSnacks: s.savedSnacks,
         dismissedUsageNotes: s.dismissedUsageNotes,
         favoriteIds: s.favoriteIds,
         dislikedIds: s.dislikedIds,

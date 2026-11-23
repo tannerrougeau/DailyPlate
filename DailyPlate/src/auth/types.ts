@@ -25,6 +25,8 @@ export interface SavedAccountState {
   userRecipes?: Recipe[];
   todayHouseholdOverride?: HouseholdDayOverride | null;
   lastBeverageBySlot?: Partial<Record<"breakfast" | "lunch" | "dinner" | "snack", import("@/types").BeverageId>>;
+  snackLogs?: Record<string, import("@/types").MealTrackingEntry[]>;
+  savedSnacks?: import("@/utils/snackItems").SavedSnack[];
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];

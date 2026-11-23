@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChefHat, Heart, MoreHorizontal, ThumbsDown, X } from "lucide-react";
+import { AdjustServingsSheet } from "@/components/AdjustServingsSheet";
 import { LogSomethingElseSheet } from "@/components/LogSomethingElseSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
 import { RecipeImage } from "@/components/RecipeImage";
@@ -25,7 +26,7 @@ import {
   formatHouseholdServesLine,
   householdMultiplierFor,
 } from "@/utils/household";
-import { foodLogFromPlannedMeal, trackingLabel } from "@/utils/mealTracking";
+import { foodLogForServings, trackingLabel } from "@/utils/mealTracking";
 import { variationIsMealPrep } from "@/utils/mealPrep";
 import { SLOT_LABELS } from "@/utils/planningPrefs";
 import {
@@ -61,6 +62,7 @@ export function TodayMealRow({
   const [elseOpen, setElseOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [swapOpen, setSwapOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [variationId, setVariationId] = useState(() => effectiveVariationId(meal));
   const [carbVariationId, setCarbVariationId] = useState<CarbVariationId>(() =>
     effectiveCarbVariationId(meal),
@@ -119,7 +121,7 @@ export function TodayMealRow({
       onLog(null);
       return;
     }
-    onLog(foodLogFromPlannedMeal(dateKey, meal, 1));
+    onLog(foodLogForServings(dateKey, meal, 1));
   }
 
   return (
@@ -214,15 +216,24 @@ export function TodayMealRow({
               <span className="font-semibold text-slate-800">{Math.round(macros.fiber ?? 0)}g</span>
             </span>
           </div>
-          {serving && (
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            {serving && (
+              <button
+                type="button"
+                onClick={() => setDetailsOpen(true)}
+                className="block text-left text-[11px] font-semibold leading-snug text-slate-700 underline decoration-slate-300 underline-offset-2"
+              >
+                {serving.text}
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setDetailsOpen(true)}
-              className="mt-1.5 block text-left text-[11px] font-semibold leading-snug text-slate-700 underline decoration-slate-300 underline-offset-2"
+              onClick={() => setAdjustOpen(true)}
+              className="text-[11px] font-semibold text-[#2563EB]"
             >
-              {serving.text}
+              Adjust
             </button>
-          )}
+          </div>
           {meal.sides?.length ? (
             <p className="mt-0.5 text-[11px] font-medium leading-snug text-slate-600">
               With {meal.sides.map(sideLabel).join(" + ")}
@@ -368,14 +379,22 @@ export function TodayMealRow({
           <TodayLogMenu
             mealName={mealDisplayName(meal)}
             onClose={() => setMenuOpen(false)}
-            onSkip={() => onLog(foodLogFromPlannedMeal(dateKey, meal, 0))}
-            onHalf={() => onLog(foodLogFromPlannedMeal(dateKey, meal, 0.5))}
-            onExtra={() => onLog(foodLogFromPlannedMeal(dateKey, meal, 1.5))}
+            onSkip={() => onLog(foodLogForServings(dateKey, meal, 0))}
+            onAdjust={() => setAdjustOpen(true)}
             onSomethingElse={() => setElseOpen(true)}
           />,
           document.body,
         )}
 
+      {adjustOpen && (
+        <AdjustServingsSheet
+          title={mealDisplayName(meal)}
+          servingGrams={serving?.grams ?? null}
+          current={trackingEntry?.portionMultiplier}
+          onChoose={(servings) => onLog(foodLogForServings(dateKey, meal, servings))}
+          onClose={() => setAdjustOpen(false)}
+        />
+      )}
       {elseOpen && (
         <LogSomethingElseSheet
           dateKey={dateKey}
@@ -406,15 +425,13 @@ function TodayLogMenu({
   mealName,
   onClose,
   onSkip,
-  onHalf,
-  onExtra,
+  onAdjust,
   onSomethingElse,
 }: {
   mealName: string;
   onClose: () => void;
   onSkip: () => void;
-  onHalf: () => void;
-  onExtra: () => void;
+  onAdjust: () => void;
   onSomethingElse: () => void;
 }) {
   useOverlayBack(true, onClose);
@@ -455,8 +472,7 @@ function TodayLogMenu({
         </div>
         <div className="space-y-1">
           <LogAction label="Skipped" hint="Don't count this meal" onClick={() => run(onSkip)} />
-          <LogAction label="Ate half" hint="Log 50% of calories and protein" onClick={() => run(onHalf)} />
-          <LogAction label="Ate 1.5×" hint="Log 150% of calories and protein" onClick={() => run(onExtra)} />
+          <LogAction label="Adjust servings" hint="½, 1, 1½ or 2 servings, or grams eaten" onClick={() => run(onAdjust)} />
           <LogAction
             label="Ate something else"
             hint="Pick another recipe or enter kcal and protein"
@@ -508,7 +524,7 @@ export function UndoToast({
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-24 z-[80] mx-auto flex max-w-lg items-center gap-3 px-4"
+      className="fixed inset-x-0 bottom-24 z-[80] mx-auto flex max-w-lg items-center gap-3 px-4 lg:bottom-8 lg:pl-60"
     >
       <div className="flex w-full items-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-white shadow-xl">
         <p className="flex-1 text-sm font-medium">{message}</p>

@@ -8,7 +8,8 @@ import type {
   PlannedMeal,
   Recipe,
 } from "@/types";
-import { mealMacrosWithBeverage } from "@/utils/beverages";
+import { mealMacrosWithBeverage, resolveBeverage } from "@/utils/beverages";
+import { mealFoodNutrition } from "@/utils/mealPortions";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
 import {
   effectiveVariationId,
@@ -45,11 +46,27 @@ export function macrosForMeal(meal: PlannedMeal): DailyTargets {
   return mealMacrosWithBeverage(meal);
 }
 
-function statusForPortion(portionMultiplier: number): MealTrackingStatus {
-  if (portionMultiplier <= 0) return "skipped";
-  if (portionMultiplier === 0.5) return "half";
-  if (portionMultiplier === 1.5) return "extra";
-  return "all";
+/** Status for a number of servings: 0 skipped, ½ half, 1 eaten, 1½ extra, anything else custom. */
+export function statusForServings(servings: number): MealTrackingStatus {
+  if (servings <= 0) return "skipped";
+  if (servings === 0.5) return "half";
+  if (servings === 1) return "all";
+  if (servings === 1.5) return "extra";
+  return "custom";
+}
+
+/** Servings eaten from a gram weight, rounded to 0.05. Null when the weight is unknown. */
+export function servingsFromGrams(grams: number, servingGrams: number | null | undefined): number | null {
+  if (!(servingGrams != null && servingGrams > 0) || !(grams > 0)) return null;
+  return Math.max(0.05, Math.round((grams / servingGrams) * 20) / 20);
+}
+
+export function formatServings(servings: number): string {
+  const s = Math.round(servings * 100) / 100;
+  if (s === 0.5) return "½ serving";
+  if (s === 1) return "1 serving";
+  if (s === 1.5) return "1½ servings";
+  return `${s} servings`;
 }
 
 function scaledMacros(macros: DailyTargets, portionMultiplier: number): DailyTargets {
@@ -62,24 +79,43 @@ function scaledMacros(macros: DailyTargets, portionMultiplier: number): DailyTar
   };
 }
 
-/** Logged amounts for the planned meal (including its drink), already scaled. */
-export function foodLogFromPlannedMeal(
-  date: string,
-  meal: PlannedMeal,
-  portionMultiplier: number,
-): MealTrackingEntry {
-  const macros = scaledMacros(macrosForMeal(meal), portionMultiplier);
+/** Meal food × servings, plus the drink once (a drink is not a serving of the meal; skipped = 0). */
+export function macrosForServings(meal: PlannedMeal, servings: number): DailyTargets {
+  if (servings <= 0) return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  const food = mealFoodNutrition(meal);
+  const drink = resolveBeverage(meal.beverageId);
   return {
-    status: statusForPortion(portionMultiplier),
+    calories: Math.round(food.calories * servings + drink.calories),
+    protein: Math.round(food.protein * servings + drink.protein),
+    carbs: Math.round(food.carbs * servings + drink.carbs),
+    fat: Math.round(food.fat * servings + drink.fat),
+    fiber: Math.round(food.fiber * servings + drink.fiber),
+  };
+}
+
+/** Log a planned meal eaten at `servings` (1 = the planned portion). */
+export function foodLogForServings(date: string, meal: PlannedMeal, servings: number): MealTrackingEntry {
+  return {
+    status: statusForServings(servings),
+    note: statusForServings(servings) === "custom" ? `Ate ${formatServings(servings)}` : undefined,
     loggedAt: new Date().toISOString(),
     date,
     slot: meal.slot,
     source: "recipe",
     recipeId: meal.recipe.id,
     variationId: effectiveVariationId(meal),
-    portionMultiplier,
-    ...macros,
+    portionMultiplier: servings,
+    ...macrosForServings(meal, servings),
   };
+}
+
+/** Logged amounts for the planned meal (including its drink), already scaled. */
+export function foodLogFromPlannedMeal(
+  date: string,
+  meal: PlannedMeal,
+  portionMultiplier: number,
+): MealTrackingEntry {
+  return foodLogForServings(date, meal, portionMultiplier);
 }
 
 /** Ate a different recipe than the one planned for this slot. */
@@ -215,6 +251,7 @@ export function migrateMealTracking(
 export function sumTrackedMacros(
   meals: PlannedMeal[],
   tracking: DayMealTracking | undefined,
+  snackLogs: MealTrackingEntry[] = [],
 ): {
   eaten: DailyTargets;
   planned: DailyTargets;
@@ -223,12 +260,19 @@ export function sumTrackedMacros(
 } {
   const planned = sumPlannedMacros(meals);
   const loggedCount = tracking ? Object.keys(tracking).length : 0;
-  const empty: DailyTargets = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  // Ad-hoc snacks logged on Today count toward the day's totals.
+  const eaten: DailyTargets = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  for (const entry of snackLogs) {
+    eaten.calories += entry.calories ?? 0;
+    eaten.protein += entry.protein ?? 0;
+    eaten.carbs += entry.carbs ?? 0;
+    eaten.fat += entry.fat ?? 0;
+    eaten.fiber = (eaten.fiber ?? 0) + (entry.fiber ?? 0);
+  }
   if (!tracking || loggedCount === 0) {
-    return { eaten: empty, planned, hasTracking: false, loggedCount: 0 };
+    return { eaten, planned, hasTracking: snackLogs.length > 0, loggedCount: 0 };
   }
 
-  const eaten: DailyTargets = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   for (const meal of meals) {
     const entry = tracking[meal.slot];
     if (!entry) continue;
