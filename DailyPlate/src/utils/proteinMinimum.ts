@@ -92,7 +92,8 @@ export function isCustomProteinOverride(
 
 /** Custom grams win; otherwise the goal-linked target. */
 export function resolvedProteinGrams(
-  profile: Pick<UserProfile, "goal" | "proteinPreference" | "weightKg" | "heightCm" | "minimumProteinGrams">,
+  profile: Pick<UserProfile, "goal" | "proteinPreference" | "weightKg" | "heightCm" | "minimumProteinGrams"> &
+    Partial<Pick<UserProfile, "minimumProteinCustom">>,
 ): number {
   const input: ProteinInput = {
     goal: profile.goal,
@@ -100,8 +101,10 @@ export function resolvedProteinGrams(
     weightKg: profile.weightKg,
     heightCm: profile.heightCm,
   };
-  if (isCustomProteinOverride(profile.minimumProteinGrams, input)) {
-    return Math.round(profile.minimumProteinGrams!);
+  // The explicit flag wins; older profiles without it fall back to comparing with the formula.
+  const custom = profile.minimumProteinCustom ?? isCustomProteinOverride(profile.minimumProteinGrams, input);
+  if (custom && profile.minimumProteinGrams != null && profile.minimumProteinGrams > 0) {
+    return Math.round(profile.minimumProteinGrams);
   }
   return goalLinkedProteinGrams(input);
 }

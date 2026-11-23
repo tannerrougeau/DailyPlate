@@ -1,10 +1,12 @@
 import type { Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { CheckInEntry } from "@/types/tdeeFeedback";
-import { logPlanPatterns, type PersonalizationSignals } from "@/utils/personalizationEngine";
+import { CUISINE_OPTIONS, logPlanPatterns, type PersonalizationSignals } from "@/utils/personalizationEngine";
+import { customTokens, DISLIKE_MATCHERS, DISLIKED_FOOD_CHIPS } from "@/utils/chipMatching";
 import { checkInScale } from "@/utils/checkInScale";
 import type { CheckpointState, DisplayPrefs, PlanSettings } from "@/utils/displayPrefs";
-import { firstIngredientOption, ingredientRole } from "@/utils/ingredientNutrition";
+import { ingredientRole } from "@/utils/ingredientNutrition";
+import { shortIngredientName } from "@/utils/recipeDisplay";
 
 export const ASK_SPACING_DAYS = 3;
 export const NO_SNOOZE_DAYS = 30;
@@ -17,7 +19,10 @@ export type QuestionChange =
   | { kind: "avoid"; ingredient: string }
   | { kind: "variety" }
   | { kind: "shorterBatches"; days: number }
-  | { kind: "planSettings"; set: PlanSettings; what: string };
+  | { kind: "planSettings"; set: PlanSettings; what: string }
+  | { kind: "preferCuisine"; cuisine: string; label: string }
+  | { kind: "favoriteFood"; food: string }
+  | { kind: "unavoid"; chip?: string; token?: string; label: string };
 
 export type Question = {
   /** Stable id: the same question is never queued twice. */
@@ -299,13 +304,8 @@ export function ingredientKeys(recipe: Pick<Recipe, "ingredients">): string[] {
   for (const ing of recipe.ingredients) {
     const role = ingredientRole(ing);
     if (role === "flavor" || role === "carb" || STAPLES.test(ing.name)) continue;
-    const word = firstIngredientOption(ing.name)
-      .replace(/\([^)]*\)/g, " ")
-      .toLowerCase()
-      .replace(/[^a-z\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !/^(fresh|sliced|diced|chopped|lean|ground|plain|low|fat|shredded|cooked|raw|large|medium|small|baby|optional|cherry|red|green|yellow|crumbled|halved|pitted|steamed)$/.test(w))
-      .pop();
+    // Known main foods first ("Salmon fillet" → salmon), else the last meaningful word.
+    const word = shortIngredientName(ing.name).replace(/[^a-z]/g, "");
     if (word) keys.add(word.replace(/(oes)$/, "o").replace(/(ies)$/, "y").replace(/s$/, ""));
   }
   return [...keys];
@@ -365,9 +365,43 @@ export function applyChange(
     weeklyMealPrepRepeatCount?: UserProfile["weeklyMealPrepRepeatCount"];
     maxLeftoverStreakDays?: number;
     planSettings?: PlanSettings;
+    preferredCuisines?: string[];
+    favoriteFoodCustom?: string;
+    dislikedFoodChips?: string[];
   },
   change: QuestionChange,
 ): { before: CheckpointState; after: CheckpointState; what: string } {
+  if (change.kind === "preferCuisine") {
+    const was = current.preferredCuisines ?? [];
+    return {
+      before: { preferredCuisines: was },
+      after: { preferredCuisines: was.includes(change.cuisine) ? was : [...was, change.cuisine] },
+      what: `More ${change.label}-style meals`,
+    };
+  }
+  if (change.kind === "favoriteFood") {
+    return {
+      before: { favoriteFoodCustom: current.favoriteFoodCustom ?? "" },
+      after: { favoriteFoodCustom: appendToken(current.favoriteFoodCustom, change.food) },
+      what: `More meals with ${pluralize(change.food)}`,
+    };
+  }
+  if (change.kind === "unavoid") {
+    if (change.chip) {
+      const was = current.dislikedFoodChips ?? [];
+      return {
+        before: { dislikedFoodChips: was },
+        after: { dislikedFoodChips: was.filter((c) => c !== change.chip) },
+        what: `Took ${change.label} off your avoid list`,
+      };
+    }
+    const tokens = customTokens(current.dislikedFoodCustom).filter((t) => t !== change.token);
+    return {
+      before: { dislikedFoodCustom: current.dislikedFoodCustom },
+      after: { dislikedFoodCustom: tokens.join(", ") },
+      what: `Took ${change.label} off your avoid list`,
+    };
+  }
   if (change.kind === "planSettings") {
     const was = current.planSettings ?? {};
     const before: PlanSettings = {};
@@ -422,4 +456,94 @@ function defaultPlanSetting(key: keyof PlanSettings): PlanSettings[keyof PlanSet
     default:
       return false;
   }
+}
+
+// ---------- Likes ----------
+
+/** Main (protein) ingredient words of a recipe, singular. */
+export function mainIngredientKeys(recipe: Pick<Recipe, "ingredients">): string[] {
+  return ingredientKeys({ ingredients: recipe.ingredients.filter((i) => ingredientRole(i) === "protein") });
+}
+
+/**
+ * Patterns across liked recipes: 3 or more sharing a cuisine or main ingredient that isn't already
+ * a favorite → "You've liked several Mexican-style meals. Want more like these?"
+ */
+export function likePatternQuestions(
+  liked: Pick<Recipe, "cuisine" | "ingredients">[],
+  profile: UserProfile | null,
+  now: Date,
+): Question[] {
+  if (!profile) return [];
+  const at = now.toISOString();
+  const out: Question[] = [];
+  const cuisines = new Map<string, number>();
+  const foods = new Map<string, number>();
+  for (const r of liked) {
+    cuisines.set(r.cuisine, (cuisines.get(r.cuisine) ?? 0) + 1);
+    for (const k of new Set(mainIngredientKeys(r))) foods.set(k, (foods.get(k) ?? 0) + 1);
+  }
+  const preferred = profile.preferredCuisines ?? [];
+  for (const [cuisine, n] of cuisines) {
+    if (n < 3 || preferred.includes(cuisine)) continue;
+    const label = CUISINE_OPTIONS.find((c) => c.id === cuisine)?.label ?? cuisine.charAt(0).toUpperCase() + cuisine.slice(1);
+    out.push({
+      id: `like:cuisine:${cuisine}`,
+      text: `You've liked several ${label}-style meals. Want more like these?`,
+      why: `You liked ${n} ${label}-style recipes.`,
+      source: "taste",
+      change: { kind: "preferCuisine", cuisine, label },
+      addedAt: at,
+    });
+  }
+  const favorites = (profile.favoriteFoodCustom ?? "").toLowerCase();
+  for (const [food, n] of foods) {
+    if (n < 3 || favorites.includes(food)) continue;
+    out.push({
+      id: `like:food:${food}`,
+      text: `You've liked several meals with ${pluralize(food)}. Want more like these?`,
+      why: `You liked ${n} recipes with ${pluralize(food)}.`,
+      source: "taste",
+      change: { kind: "favoriteFood", food },
+      addedAt: at,
+    });
+  }
+  return out;
+}
+
+/**
+ * Liking a recipe that has an avoided food → "You liked [recipe], which has mushrooms. Take
+ * mushrooms off your avoid list?" Never removed automatically.
+ */
+export function avoidConflictQuestions(
+  recipe: Pick<Recipe, "name" | "ingredients">,
+  profile: UserProfile | null,
+  now: Date,
+): Question[] {
+  if (!profile) return [];
+  const at = now.toISOString();
+  const text = recipe.ingredients.map((i) => i.name).join(" ").toLowerCase();
+  const out: Question[] = [];
+  for (const chip of profile.dislikedFoodChips ?? []) {
+    const patterns = DISLIKE_MATCHERS[chip];
+    if (!patterns?.some((re) => re.test(text))) continue;
+    const label = (DISLIKED_FOOD_CHIPS.find((c) => c.id === chip)?.label ?? chip).toLowerCase();
+    out.push(conflict(recipe.name, label, { chip }, at));
+  }
+  for (const token of customTokens(profile.dislikedFoodCustom ?? "")) {
+    if (token === recipe.name.toLowerCase() || !text.includes(token)) continue;
+    out.push(conflict(recipe.name, pluralize(token), { token }, at));
+  }
+  return out;
+}
+
+function conflict(recipeName: string, label: string, which: { chip?: string; token?: string }, at: string): Question {
+  return {
+    id: `unavoid:${which.chip ?? which.token}`,
+    text: `You liked ${recipeName}, which has ${label}. Take ${label} off your avoid list?`,
+    why: `You liked ${recipeName}.`,
+    source: "taste",
+    change: { kind: "unavoid", ...which, label },
+    addedAt: at,
+  };
 }

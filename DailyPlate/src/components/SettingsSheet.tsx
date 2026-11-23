@@ -6,7 +6,8 @@ import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { HouseholdPicker } from "@/components/HouseholdPicker";
 import { HouseholdDetailsSection } from "@/components/HouseholdDetailsSection";
-import { applyProfileToTargets, useAppStore } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
+import { targetsAfterProfileChange } from "@/utils/tdee";
 import { MealPatternSection } from "@/components/MealPatternSection";
 import { ProteinPreferenceSection } from "@/components/ProteinPreferenceSection";
 import { PlanningPrefsSection, type PlanningPrefsValue } from "@/components/PlanningPrefsSection";
@@ -60,6 +61,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const userProfile = useAppStore((s) => s.userProfile);
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const setTargets = useAppStore((s) => s.setTargets);
+  const targets = useAppStore((s) => s.targets);
   const authSession = useAppStore((s) => s.authSession);
   const logout = useAppStore((s) => s.logout);
   const syncAccountSnapshot = useAppStore((s) => s.syncAccountSnapshot);
@@ -106,12 +108,13 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
     setHouseholdAvoidCustom(userProfile.householdFoodAvoidCustom ?? "");
     const preference = migrateProteinPreference(userProfile.proteinPreference);
     setMinProteinGrams(
-      isCustomProteinOverride(userProfile.minimumProteinGrams, {
-        goal: userProfile.goal,
-        preference,
-        weightKg: userProfile.weightKg,
-        heightCm: userProfile.heightCm,
-      })
+      (userProfile.minimumProteinCustom ??
+        isCustomProteinOverride(userProfile.minimumProteinGrams, {
+          goal: userProfile.goal,
+          preference,
+          weightKg: userProfile.weightKg,
+          heightCm: userProfile.heightCm,
+        }))
         ? String(userProfile.minimumProteinGrams)
         : "",
     );
@@ -178,6 +181,9 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         .filter(Boolean)
         .filter((v, i, arr) => arr.indexOf(v) === i)
         .join(", "),
+      // Typed value = set by hand (kept as-is); empty = follows goal, weight and preference.
+      minimumProteinCustom:
+        minProteinGrams.trim() !== "" && Number.isFinite(parsedProtein) && parsedProtein > 0,
       minimumProteinGrams:
         minProteinGrams.trim() !== "" && Number.isFinite(parsedProtein) && parsedProtein > 0
           ? Math.round(parsedProtein)
@@ -189,7 +195,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             }),
     };
     setUserProfile(next);
-    setTargets(applyProfileToTargets(next));
+    // Keep current targets (e.g. an applied recommendation) unless a target input changed.
+    setTargets(targetsAfterProfileChange(userProfile, useAppStore.getState().userProfile ?? next, targets));
     void syncAccountSnapshot();
     onClose();
   };

@@ -10,8 +10,9 @@ import type {
 } from "@/types/profile";
 import {
   DEFAULT_PROTEIN_PREFERENCE,
+  goalLinkedProteinGrams,
+  isCustomProteinOverride,
   migrateProteinPreference,
-  resolvedProteinGrams,
 } from "@/utils/proteinMinimum";
 import { getProteinSource, type ProteinSourceFilter } from "@/utils/recipeProteinSource";
 import {
@@ -294,10 +295,8 @@ export function withPlanningDefaults(profile: UserProfile): UserProfile {
     avoidedProteinSources: profile.avoidedProteinSources ?? [],
     prioritizeMinProtein: profile.prioritizeMinProtein ?? defaults.prioritizeMinProtein,
     weeklyMealPrepSlot: profile.weeklyMealPrepSlot ?? defaults.weeklyMealPrepSlot,
-    minimumProteinGrams: resolvedProteinGrams({
-      ...profile,
-      proteinPreference,
-    }),
+    // Recalculated unless the user set it by hand (never overwrite a typed value).
+    ...proteinMinimumFields({ ...profile, proteinPreference }),
     householdMembers: (() => {
       const { adults, children } = resolveHouseholdCounts(profile);
       return syncHouseholdMembers(adults, children, profile.householdMembers);
@@ -325,4 +324,33 @@ export function isMealTimingAllowed(
   if (timing === "light_breakfast") return eatenMeals.includes("breakfast");
   if (timing === "bigger_dinner") return eatenMeals.includes("dinner");
   return true;
+}
+
+/**
+ * Protein minimum and its "set by hand" flag. Older saves have no flag: it's inferred once from the
+ * stored value (which matched the inputs it was saved with) and then kept explicitly.
+ */
+function proteinMinimumFields(
+  profile: UserProfile,
+): Pick<UserProfile, "minimumProteinGrams" | "minimumProteinCustom"> {
+  const custom =
+    profile.minimumProteinCustom ??
+    isCustomProteinOverride(profile.minimumProteinGrams, {
+      goal: profile.goal,
+      preference: profile.proteinPreference,
+      weightKg: profile.weightKg,
+      heightCm: profile.heightCm,
+    });
+  if (custom && profile.minimumProteinGrams != null && profile.minimumProteinGrams > 0) {
+    return { minimumProteinGrams: Math.round(profile.minimumProteinGrams), minimumProteinCustom: true };
+  }
+  return {
+    minimumProteinGrams: goalLinkedProteinGrams({
+      goal: profile.goal,
+      preference: profile.proteinPreference,
+      weightKg: profile.weightKg,
+      heightCm: profile.heightCm,
+    }),
+    minimumProteinCustom: false,
+  };
 }

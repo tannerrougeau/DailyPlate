@@ -81,6 +81,10 @@ export type CheckpointState = {
   maxLeftoverStreakDays?: number;
   /** Plan settings changed from a check-in question. */
   planSettings?: PlanSettings;
+  /** Food preferences changed from a like-pattern or avoid-conflict question. */
+  preferredCuisines?: string[];
+  favoriteFoodCustom?: string;
+  dislikedFoodChips?: string[];
 };
 
 /** Plan settings a check-in question can turn on (and a checkpoint can restore). */

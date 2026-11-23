@@ -26,7 +26,7 @@ import {
   daysBetweenDates,
   targetsWithCalories,
 } from "@/utils/adaptiveTdee";
-import { computeDailyTargets } from "@/utils/tdee";
+import { computeDailyTargets, targetsAfterProfileChange } from "@/utils/tdee";
 import { dateKeysForRange, fromDateKey, toDateKey, weekDateKeys } from "@/utils/date";
 import { migrateMealTracking } from "@/utils/mealTracking";
 import {
@@ -57,8 +57,6 @@ import {
 } from "@/utils/personalizationEngine";
 import {
   buildRecipePreferenceInsight,
-  profileUpdatesForDislike,
-  profileUpdatesForFavorite,
 } from "@/utils/recipePreferenceSync";
 import {
   accountExists,
@@ -88,7 +86,9 @@ import {
 } from "@/utils/displayPrefs";
 import {
   applyChange,
+  avoidConflictQuestions,
   enqueue,
+  likePatternQuestions,
   logPlanQuestions,
   recordAnswer,
   tasteQuestions,
@@ -256,6 +256,16 @@ function patchMealInDay(
   }));
 }
 
+/** Remove a recipe's own name from a comma-separated list (older likes/dislikes added it). */
+function removeRecipeToken(list: string | undefined, recipeName: string): string {
+  const name = recipeName.trim().toLowerCase();
+  return (list ?? "")
+    .split(/[,;\n]+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2 && t.toLowerCase() !== name)
+    .join(", ");
+}
+
 /** Record a swap away from `fromId` (ignored when it's the same recipe). */
 function logSwap(log: SwapLogEntry[], fromId: string | undefined, toId: string, dateKey: string): SwapLogEntry[] {
   if (!fromId || fromId === toId) return log;
@@ -285,6 +295,9 @@ function commitCheckpoint(
     ...(after.weeklyMealPrepRepeatCount != null ? { weeklyMealPrepRepeatCount: after.weeklyMealPrepRepeatCount } : {}),
     ...(after.maxLeftoverStreakDays != null ? { maxLeftoverStreakDays: after.maxLeftoverStreakDays } : {}),
     ...(after.planSettings ?? {}),
+    ...(after.preferredCuisines ? { preferredCuisines: after.preferredCuisines } : {}),
+    ...(after.favoriteFoodCustom != null ? { favoriteFoodCustom: after.favoriteFoodCustom } : {}),
+    ...(after.dislikedFoodChips ? { dislikedFoodChips: after.dislikedFoodChips } : {}),
   };
   if (s.userProfile && Object.keys(profileFields).length > 0) {
     patch.userProfile = { ...s.userProfile, ...profileFields };
@@ -1251,8 +1264,11 @@ export const useAppStore = create<AppState>()(
           return;
         }
 
-        const profileUpdates = profileUpdatesForFavorite(state.userProfile, recipe, isAdding);
-        const nextProfile: UserProfile = { ...state.userProfile, ...profileUpdates };
+        // Recipe-level only: favorite it (boosts that recipe). Foods and cuisines are asked about
+        // when a pattern shows up (likePatternQuestions), never added from a single like.
+        const nextProfile: UserProfile = isAdding
+          ? { ...state.userProfile, dislikedFoodCustom: removeRecipeToken(state.userProfile.dislikedFoodCustom, recipe.name) }
+          : { ...state.userProfile, favoriteFoodCustom: removeRecipeToken(state.userProfile.favoriteFoodCustom, recipe.name) };
         const personalizationInsight = buildRecipePreferenceInsight(
           recipe,
           isAdding ? "favorite" : "unfavorite",
@@ -1267,6 +1283,8 @@ export const useAppStore = create<AppState>()(
           personalizationInsight,
         });
         void get().syncAccountSnapshot();
+        // A liked recipe with an avoided food: ask, never remove it automatically.
+        if (isAdding) get().refreshQuestions(avoidConflictQuestions(recipe, state.userProfile, new Date()));
       },
 
       toggleDislike: (recipeId) => {
@@ -1288,8 +1306,11 @@ export const useAppStore = create<AppState>()(
           return;
         }
 
-        const profileUpdates = profileUpdatesForDislike(state.userProfile, recipe, isAdding);
-        const nextProfile: UserProfile = { ...state.userProfile, ...profileUpdates };
+        // Recipe-level only: the recipe is avoided and weighted down. Ingredient avoidance comes
+        // only from the taste-pattern question. Un-disliking clears an older recipe-name entry.
+        const nextProfile: UserProfile = isAdding
+          ? state.userProfile
+          : { ...state.userProfile, dislikedFoodCustom: removeRecipeToken(state.userProfile.dislikedFoodCustom, recipe.name) };
         const personalizationInsight = buildRecipePreferenceInsight(
           recipe,
           isAdding ? "dislike" : "undislike",
@@ -1426,9 +1447,11 @@ export const useAppStore = create<AppState>()(
           plannedMeals: s.plannedMeals,
           todayDateKey: s.todayDateKey,
         });
+        const liked = s.favoriteIds.map((id) => byId.get(id)).filter((r): r is Recipe => r != null);
         const candidates = [
           ...extra,
           ...logPlanQuestions(s.userProfile, logSignals, now),
+          ...likePatternQuestions(liked, s.userProfile, now),
           ...usageQuestions(s.usageEvents, prefs, s.profileAnchoredAt, now),
           ...tasteQuestions(passes, s.userProfile.dislikedFoodCustom ?? "", now),
         ];
@@ -1453,6 +1476,9 @@ export const useAppStore = create<AppState>()(
             ingredientVariety: s.userProfile.ingredientVariety,
             weeklyMealPrepRepeatCount: s.userProfile.weeklyMealPrepRepeatCount,
             maxLeftoverStreakDays: s.userProfile.maxLeftoverStreakDays,
+            preferredCuisines: s.userProfile.preferredCuisines ?? [],
+            favoriteFoodCustom: s.userProfile.favoriteFoodCustom ?? "",
+            dislikedFoodChips: s.userProfile.dislikedFoodChips ?? [],
             planSettings: {
               prioritizeMinProtein: s.userProfile.prioritizeMinProtein,
               weeklyMealPrepEnabled: s.userProfile.weeklyMealPrepEnabled,
@@ -1501,6 +1527,9 @@ export const useAppStore = create<AppState>()(
         if (cp.before.maxLeftoverStreakDays != null) {
           current.maxLeftoverStreakDays = s.userProfile.maxLeftoverStreakDays ?? 2;
         }
+        if (cp.before.preferredCuisines) current.preferredCuisines = s.userProfile.preferredCuisines ?? [];
+        if (cp.before.favoriteFoodCustom != null) current.favoriteFoodCustom = s.userProfile.favoriteFoodCustom ?? "";
+        if (cp.before.dislikedFoodChips) current.dislikedFoodChips = s.userProfile.dislikedFoodChips ?? [];
         if (cp.before.planSettings) {
           const now: Record<string, unknown> = {};
           for (const key of Object.keys(cp.before.planSettings)) {
@@ -1955,7 +1984,8 @@ export const useAppStore = create<AppState>()(
 
         set({
           userProfile: finalProfile,
-          targets: applyProfileToTargets(finalProfile),
+          // A check-in alone never overwrites targets; new calories stay a recommendation with Apply.
+          targets: targetsAfterProfileChange(state.userProfile, finalProfile, state.targets),
           tdeeFeedbackHistory: history,
           lastFeedbackSubmittedAt: submittedAt,
           lastFeedbackPromptDismissedAt: submittedAt,
