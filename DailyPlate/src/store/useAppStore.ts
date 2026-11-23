@@ -97,8 +97,19 @@ import {
   type QuestionAnswer,
   type QuestionLog,
   type UsageEvent,
+  isPaused,
+  nextSkipStreak,
+  pauseUntil,
+  questionsAllowed,
+  nextStepQuestion,
+  easierMealQuestionId,
+  type PauseChoice,
 } from "@/utils/questionQueue";
+import { isBoughtMeal, withSlotSourceOverride, type SlotSourceOverrides } from "@/utils/boughtMeals";
+import { nextStepDue, pickNextStep, type DayLog } from "@/utils/nextBestStep";
+import { applyFitAnswers, type FitAnswers } from "@/utils/fitYourLife";
 import type { FoodItem } from "@/utils/foodTypes";
+import type { MealSourceSlot } from "@/types/profile";
 
 export type NavTab = "today" | "plan" | "recipes" | "grocery" | "guide";
 export type UsageNoteKey = "today" | "plan" | "recipes" | "grocery";
@@ -299,8 +310,10 @@ function commitCheckpoint(
     ...(after.favoriteFoodCustom != null ? { favoriteFoodCustom: after.favoriteFoodCustom } : {}),
     ...(after.dislikedFoodChips ? { dislikedFoodChips: after.dislikedFoodChips } : {}),
   };
-  if (s.userProfile && Object.keys(profileFields).length > 0) {
-    patch.userProfile = { ...s.userProfile, ...profileFields };
+  const nextStepFields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(after.profile ?? {})) nextStepFields[k] = v ?? undefined;
+  if (s.userProfile && Object.keys(profileFields).length + Object.keys(nextStepFields).length > 0) {
+    patch.userProfile = { ...s.userProfile, ...profileFields, ...nextStepFields };
   }
   set(patch);
   return cp;
@@ -428,6 +441,8 @@ function buildGenerateOptions(
     preferredProteinSources: s.userProfile.preferredProteinSources ?? [],
     avoidedProteinSources: s.userProfile.avoidedProteinSources ?? [],
     kitchenEquipment: s.userProfile.kitchenEquipment,
+    cookingLimits: s.userProfile.cookingLimits,
+    budget: s.userProfile.budget,
     ingredientVariety: s.userProfile.ingredientVariety ?? "minimal",
     personalization: {
       profile: s.userProfile,
@@ -510,6 +525,12 @@ export interface AppState {
   questionQueue: Question[];
   questionLog: QuestionLog;
   lastQuestionAskedAt: string | null;
+  /** Skips / "Not now" in a row; 3 or more spaces questions to every 7 days. */
+  questionSkipStreak: number;
+  /** When the last "next best step" suggestion was queued (at most one a week). */
+  lastNextStepAt: string | null;
+  /** One-day changes: "Buy today" / "Cook this instead", by date and meal. */
+  slotSourceOverrides: SlotSourceOverrides;
   /** Every applied display or plan change, restorable from Settings. */
   checkpoints: Checkpoint[];
   /** Foods found by name or typed from a label, saved for reuse and offline. */
@@ -585,6 +606,15 @@ export interface AppState {
   markQuestionsAsked: () => void;
   /** Yes applies the change and returns its checkpoint; Not now / No change nothing. */
   answerQuestion: (id: string, answer: QuestionAnswer) => Checkpoint | null;
+  setBasicMode: (on: boolean) => void;
+  /** Save "fit your life" answers (from onboarding or Settings → How I eat); returns the new profile. */
+  setFitAnswers: (answers: FitAnswers) => UserProfile | null;
+  pauseQuestions: (choice: PauseChoice) => void;
+  resumeQuestions: () => void;
+  /** True when questions and suggestions may be shown (not Basic mode, not paused). */
+  questionsAllowedNow: () => boolean;
+  /** "Buy today" / "Cook this instead" for one date; null clears it. */
+  setSlotSourceOverride: (dateKey: string, slot: MealSourceSlot, source: "buy" | "cook" | null) => void;
   setDisplayPref: (element: DisplayElement, on: boolean) => void;
   applySimplestView: () => Checkpoint;
   /** Restore how things were before a checkpoint (saved as a new checkpoint). */
@@ -696,6 +726,9 @@ export const useAppStore = create<AppState>()(
       questionQueue: [],
       questionLog: {},
       lastQuestionAskedAt: null,
+      questionSkipStreak: 0,
+      lastNextStepAt: null,
+      slotSourceOverrides: {},
       checkpoints: [],
       myFoods: [],
       devForcedQuestionId: null,
@@ -808,6 +841,9 @@ export const useAppStore = create<AppState>()(
           questionQueue: [],
           questionLog: {},
           lastQuestionAskedAt: null,
+          questionSkipStreak: 0,
+          lastNextStepAt: null,
+          slotSourceOverrides: {},
           checkpoints: [],
           myFoods: [],
           favoriteIds: [],
@@ -1425,6 +1461,12 @@ export const useAppStore = create<AppState>()(
         const s = get();
         if (!s.userProfile) return;
         const now = new Date();
+        // An expired pause is cleared; nothing is queued in Basic mode or while paused.
+        if (s.userProfile.questionsPausedUntil && !isPaused(s.userProfile.questionsPausedUntil, now)) {
+          set({ userProfile: { ...s.userProfile, questionsPausedUntil: null } });
+          return get().refreshQuestions(extra);
+        }
+        if (!questionsAllowed(s.userProfile, now)) return;
         const prefs = resolveDisplayPrefs(s.displayPrefs);
         const library = recipesFor(s);
         const byId = new Map(library.map((r) => [r.id, r] as const));
@@ -1455,9 +1497,36 @@ export const useAppStore = create<AppState>()(
           ...usageQuestions(s.usageEvents, prefs, s.profileAnchoredAt, now),
           ...tasteQuestions(passes, s.userProfile.dislikedFoodCustom ?? "", now),
         ];
+        // Next best step: after 7 logged days, at most one a week.
+        let lastNextStepAt = s.lastNextStepAt;
+        if (nextStepDue(s.lastNextStepAt, now) && !s.questionQueue.some((q) => q.source === "next-step")) {
+          const days: DayLog[] = Object.keys(s.mealTracking).map((dateKey) => ({
+            dateKey,
+            meals: mealsForDate(s, dateKey),
+            tracking: s.mealTracking[dateKey],
+            snacks: s.snackLogs[dateKey] ?? [],
+          }));
+          const step = pickNextStep({
+            days,
+            todayKey: s.todayDateKey,
+            targets: s.targets,
+            profile: s.userProfile,
+            boughtLunch: (dateKey) => isBoughtMeal(s.userProfile, s.slotSourceOverrides, dateKey, "lunch"),
+            declinedEasier: (slot) => s.questionLog[easierMealQuestionId(slot)]?.answer === "no",
+          });
+          if (step) {
+            const q = nextStepQuestion(step, s.userProfile, now);
+            if (enqueue(s.questionQueue, s.questionLog, q, now) !== s.questionQueue) {
+              candidates.push(q);
+              lastNextStepAt = now.toISOString();
+            }
+          }
+        }
         let queue = s.questionQueue;
         for (const q of candidates) queue = enqueue(queue, s.questionLog, q, now);
-        if (queue !== s.questionQueue) set({ questionQueue: queue });
+        if (queue !== s.questionQueue || lastNextStepAt !== s.lastNextStepAt) {
+          set({ questionQueue: queue, lastNextStepAt });
+        }
       },
 
       markQuestionsAsked: () => set({ lastQuestionAskedAt: new Date().toISOString() }),
@@ -1467,8 +1536,15 @@ export const useAppStore = create<AppState>()(
         const question = s.questionQueue.find((q) => q.id === id);
         const now = new Date();
         const next = recordAnswer(s.questionQueue, s.questionLog, id, answer, now);
-        set({ questionQueue: next.queue, questionLog: next.log, lastQuestionAskedAt: now.toISOString() });
+        set({
+          questionQueue: next.queue,
+          questionLog: next.log,
+          lastQuestionAskedAt: now.toISOString(),
+          questionSkipStreak: nextSkipStreak(s.questionSkipStreak, answer),
+        });
         if (answer !== "yes" || !question || !s.userProfile) return null;
+        // "Open a check-in" changes nothing; the screen opens the check-in.
+        if (question.change.kind === "openCheckIn") return null;
         const change = applyChange(
           {
             displayPrefs: resolveDisplayPrefs(s.displayPrefs),
@@ -1479,6 +1555,7 @@ export const useAppStore = create<AppState>()(
             preferredCuisines: s.userProfile.preferredCuisines ?? [],
             favoriteFoodCustom: s.userProfile.favoriteFoodCustom ?? "",
             dislikedFoodChips: s.userProfile.dislikedFoodChips ?? [],
+            profile: s.userProfile,
             planSettings: {
               prioritizeMinProtein: s.userProfile.prioritizeMinProtein,
               weeklyMealPrepEnabled: s.userProfile.weeklyMealPrepEnabled,
@@ -1490,6 +1567,46 @@ export const useAppStore = create<AppState>()(
           question.change,
         );
         return commitCheckpoint(set, get, change.what, question.why, change.before, change.after);
+      },
+
+      setFitAnswers: (answers) => {
+        const p = get().userProfile;
+        if (!p) return null;
+        const next = withPlanningDefaults(applyFitAnswers(p, answers));
+        set({ userProfile: next });
+        void get().syncAccountSnapshot();
+        return next;
+      },
+
+      setBasicMode: (on) => {
+        const p = get().userProfile;
+        if (!p) return;
+        set({ userProfile: { ...p, basicMode: on } });
+        void get().syncAccountSnapshot();
+      },
+
+      pauseQuestions: (choice) => {
+        const p = get().userProfile;
+        if (!p) return;
+        set({ userProfile: { ...p, questionsPausedUntil: pauseUntil(choice, new Date()) } });
+        void get().syncAccountSnapshot();
+      },
+
+      resumeQuestions: () => {
+        const p = get().userProfile;
+        if (!p) return;
+        set({ userProfile: { ...p, questionsPausedUntil: null } });
+        void get().syncAccountSnapshot();
+      },
+
+      questionsAllowedNow: () => {
+        const p = get().userProfile;
+        return Boolean(p) && questionsAllowed(p!, new Date());
+      },
+
+      setSlotSourceOverride: (dateKey, slot, source) => {
+        set((s) => ({ slotSourceOverrides: withSlotSourceOverride(s.slotSourceOverrides, dateKey, slot, source, s.todayDateKey) }));
+        void get().syncAccountSnapshot();
       },
 
       setDisplayPref: (element, on) => {
@@ -1530,6 +1647,13 @@ export const useAppStore = create<AppState>()(
         if (cp.before.preferredCuisines) current.preferredCuisines = s.userProfile.preferredCuisines ?? [];
         if (cp.before.favoriteFoodCustom != null) current.favoriteFoodCustom = s.userProfile.favoriteFoodCustom ?? "";
         if (cp.before.dislikedFoodChips) current.dislikedFoodChips = s.userProfile.dislikedFoodChips ?? [];
+        if (cp.before.profile) {
+          const now: Record<string, unknown> = {};
+          for (const key of Object.keys(cp.before.profile)) {
+            now[key] = (s.userProfile as unknown as Record<string, unknown>)[key] ?? null;
+          }
+          current.profile = now as typeof cp.before.profile;
+        }
         if (cp.before.planSettings) {
           const now: Record<string, unknown> = {};
           for (const key of Object.keys(cp.before.planSettings)) {
@@ -2084,6 +2208,9 @@ export const useAppStore = create<AppState>()(
         questionQueue: s.questionQueue,
         questionLog: s.questionLog,
         lastQuestionAskedAt: s.lastQuestionAskedAt,
+        questionSkipStreak: s.questionSkipStreak,
+        lastNextStepAt: s.lastNextStepAt,
+        slotSourceOverrides: s.slotSourceOverrides,
         checkpoints: s.checkpoints,
         myFoods: s.myFoods,
         dismissedUsageNotes: s.dismissedUsageNotes,
@@ -2141,7 +2268,7 @@ function portionedPlans(
         })
         .map((m) => m.slot),
     );
-    return applyGoalPortions(meals, s.targets, { timing, lockedSlots, fixedSlots });
+    return applyGoalPortions(meals, s.targets, { timing, lockedSlots, fixedSlots, addOns: s.userProfile?.slotAddOns });
   };
   let dailyChanged = false;
   let todayChanged = false;

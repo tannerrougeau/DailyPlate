@@ -1,4 +1,5 @@
-import type { KitchenEquipmentId, MealSlotId, Recipe, RecipeMealSlotId } from "@/types";
+import type { CookMethod, KitchenEquipmentId, MealSlotId, Recipe, RecipeMealSlotId } from "@/types";
+import { RECIPE_EFFORT } from "@/recipes/recipeEffort";
 import type {
   IngredientVariety,
   MealsPerDay,
@@ -172,13 +173,28 @@ export function recipeMatchesSnackStyle(recipe: Recipe, style: SnackStyle | unde
   return whole || !packaged;
 }
 
+const METHOD_TOOLS: Record<CookMethod, KitchenEquipmentId[]> = {
+  no_cook: [],
+  microwave: ["microwave"],
+  stovetop: ["stovetop"],
+  oven: ["oven", "toaster_oven"],
+};
+
+/**
+ * The user's kitchen can make the recipe: some way of making it (recipeEffort) uses only tools
+ * they have. Untagged user recipes fall back to their equipment list (any one tool).
+ */
 export function recipeMatchesEquipment(
   recipe: Recipe,
   equipment: KitchenEquipmentId[] | undefined,
 ): boolean {
-  if (!recipe.equipment?.length) return true;
   if (!equipment?.length) return true;
   const have = new Set(equipment);
+  const methods = recipe.effort?.methods ?? RECIPE_EFFORT[recipe.id]?.methods;
+  if (methods) {
+    return methods.some((way) => way.every((m) => METHOD_TOOLS[m].length === 0 || METHOD_TOOLS[m].some((t) => have.has(t))));
+  }
+  if (!recipe.equipment?.length) return true;
   return recipe.equipment.some((item) => have.has(item));
 }
 

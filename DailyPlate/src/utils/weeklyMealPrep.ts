@@ -69,6 +69,11 @@ export function applyWeeklyMealPrepToPlans(
   if (!profile.weeklyMealPrepEnabled || !profile.weeklyMealPrepSlot) {
     return dailyPlans;
   }
+  // A meal the user buys is never batch-cooked.
+  const prepSlot = profile.weeklyMealPrepSlot;
+  if ((prepSlot === "breakfast" || prepSlot === "lunch" || prepSlot === "dinner") && profile.mealSources?.[prepSlot] === "buy") {
+    return dailyPlans;
+  }
 
   const slot = profile.weeklyMealPrepSlot;
   const repeatCount = profile.weeklyMealPrepRepeatCount ?? 3;

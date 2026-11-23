@@ -13,6 +13,8 @@ import {
   type PortionLine,
 } from "@/utils/goalPortions";
 import { addNutrients, gramsForIngredient, type NutrientVector } from "@/utils/ingredientNutrition";
+import { hasLabelNutrition } from "@/utils/labelNutrition";
+import { ADD_ON_NAMES, withSlotAddOns } from "@/utils/slotAddOns";
 import { sidesNutrition, suggestSides, type SideSuggestion } from "@/utils/mealSides";
 import { isSnackPlanSlot } from "@/utils/planningPrefs";
 import { splitMealTargets, type MealTargetSlot } from "@/utils/mealTargets";
@@ -64,7 +66,7 @@ const nutritionCache = new WeakMap<Recipe, Map<string, NutrientVector>>();
 
 /**
  * Food nutrition for the user's serving (recipe + sides), from the rounded amounts and ingredients.json.
- * Stored recipe values are used only when an ingredient is not in the table.
+ * Packaged items use their label; user recipes with an ingredient not in the table use their own values.
  */
 export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
   const m = mealMultipliers(meal);
@@ -83,7 +85,8 @@ export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
   const hit = byRecipe.get(key);
   if (hit) return hit;
   const ingredients = mealIngredients(meal);
-  const matched = ingredients.every((ing) => gramsForIngredient(ing) != null);
+  const label = hasLabelNutrition(meal.recipe, effectiveVariationId(meal));
+  const matched = !label && ingredients.every((ing) => gramsForIngredient(ing) != null);
   const food = matched
     ? (nutritionOfLines(portionLines(ingredients, m)) ?? storedNutrition(meal))
     : scaleNutrients(storedNutrition(meal), (m.protein + m.carb + m.fat) / 3);
@@ -183,9 +186,18 @@ export function applyGoalPortions(
     timing?: MealTimingPreference | null;
     lockedSlots?: Set<MealSlotId>;
     fixedSlots?: Set<MealSlotId>;
+    /** Fixed add-ons per meal from a "next best step" Yes, sized in like sides. */
+    addOns?: Partial<Record<MealSlotId, RecipeIngredient[]>>;
   } = {},
 ): PlannedMeal[] {
   if (meals.length === 0 || !(daily.calories > 0)) return meals;
+  if (opts.addOns !== undefined || meals.some((m) => m.sides?.some((s) => ADD_ON_NAMES.has(s.name)))) {
+    meals = meals.map((m) => {
+      if (opts.lockedSlots?.has(m.slot) || opts.fixedSlots?.has(m.slot)) return m;
+      const sides = withSlotAddOns(m.sides, opts.addOns?.[m.slot]);
+      return JSON.stringify(sides ?? null) === JSON.stringify(m.sides ?? null) ? m : { ...m, sides };
+    });
+  }
   const isFixed = (m: PlannedMeal) =>
     opts.lockedSlots?.has(m.slot) ||
     opts.fixedSlots?.has(m.slot) ||
@@ -275,6 +287,26 @@ function componentPart(line: PortionLine, cookedTogether: boolean): string {
   const g = Math.round(cooked / 5) * 5;
   const cookedLabel = line.state === "raw" || line.state === "dry" || line.state === "cooked" ? " cooked" : "";
   return `${label} ${g} g${cookedLabel}`;
+}
+
+const PART_ORDER: PortionLine["role"][] = ["protein", "carb", "vegetable"];
+
+/** Main parts of a serving cooked separately, e.g. ["Turkey 120 g cooked", "Rice 150 g cooked"]. */
+export function servingParts(meal: PlannedMeal, servings = 1): string[] {
+  return mealPortionLines(meal, servings)
+    .filter((l) => PART_ORDER.includes(l.role) && (l.nutritionGrams ?? 0) > 0)
+    .sort((a, b) => PART_ORDER.indexOf(a.role) - PART_ORDER.indexOf(b.role) || (b.nutritionGrams ?? 0) - (a.nutritionGrams ?? 0))
+    .slice(0, 4)
+    .map((l) => componentPart(l, false));
+}
+
+/** Cooked weight of one serving when the dish is cooked together; null when served as parts or counted. */
+export function mixedServingGrams(meal: PlannedMeal): number | null {
+  if (isPackagedRecipe(meal.recipe)) return null;
+  const lines = mealPortionLines(meal, 1);
+  if (lines.length === 0 || dishCount(meal.recipe, lines) || servedAsComponents(meal.recipe, lines)) return null;
+  const g = cookedWeightOfLines(lines, true);
+  return g > 0 ? g : null;
 }
 
 export type ServingSummary = {
