@@ -4,7 +4,10 @@
 // Planned: align scale with user profile (calorie goal, macros, household size, servings).
 // Recipes are grouped: Breakfast → Lunch → Dinner → Snack; alphabetically by name within each group.
 
-import type { Recipe, RecipeVariationDetail } from "@/types";
+import type { Recipe, RecipeSource, RecipeVariationDetail } from "@/types";
+import { nutritionFromIngredients } from "@/utils/ingredientNutrition";
+import { hasLabelNutrition } from "@/utils/labelNutrition";
+import { defaultVariationId, resolveRecipeIngredients } from "@/utils/recipeDisplay";
 import {
   eggBiteVariationDetails,
   highProteinOvernightOats,
@@ -70,10 +73,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Garnish with parsley if desired.",
     ],
     servingWeightGrams: 505,
-    calories: 575,
-    protein: 45,
-    carbs: 62,
-    fat: 16,
   },
   {
     id: "greek-rice",
@@ -93,10 +92,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Serve over warm rice with a squeeze of lemon.",
     ],
     servingWeightGrams: 530,
-    calories: 595,
-    protein: 48,
-    carbs: 58,
-    fat: 18,
   },
   {
     id: "greek-orzo",
@@ -120,10 +115,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Crumble feta over everything, squeeze lemon on top, and serve from the pan.",
     ],
     servingWeightGrams: 545,
-    calories: 645,
-    protein: 48,
-    carbs: 68,
-    fat: 22,
   },
   {
     id: "mediterranean",
@@ -144,10 +135,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Finish with parsley and serve directly from the sheet pan.",
     ],
     servingWeightGrams: 525,
-    calories: 585,
-    protein: 47,
-    carbs: 46,
-    fat: 24,
   },
   {
     id: "french-onion",
@@ -167,10 +154,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Top chicken and onions with cheese during the last 3–4 minutes until melted; rest 3 minutes before serving.",
     ],
     servingWeightGrams: 530,
-    calories: 615,
-    protein: 49,
-    carbs: 50,
-    fat: 24,
   },
   {
     id: "baked-crack",
@@ -190,10 +173,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Top with remaining cheddar and crumbled bacon during the last 3 minutes; rest 3 minutes and serve.",
     ],
     servingWeightGrams: 540,
-    calories: 685,
-    protein: 52,
-    carbs: 48,
-    fat: 32,
   },
   {
     id: "greek-tzatziki",
@@ -214,10 +193,6 @@ const sheetPanChickenVariations: RecipeVariationDetail[] = [
       "Finish with a squeeze of lemon.",
     ],
     servingWeightGrams: 535,
-    calories: 580,
-    protein: 47,
-    carbs: 46,
-    fat: 19,
   },
 ];
 
@@ -253,10 +228,6 @@ const rotisserieMealPrepVariations: RecipeVariationDetail[] = [
       "Add salsa verde just before eating if using.",
     ],
     servingWeightGrams: 495,
-    calories: 520,
-    protein: 42,
-    carbs: 45,
-    fat: 17,
   },
 ];
 
@@ -312,10 +283,6 @@ const searedChickenThighVariations: RecipeVariationDetail[] = [
       "Rest chicken 3–5 minutes, squeeze lemon over the plate, and serve.",
     ],
     servingWeightGrams: 495,
-    calories: 540,
-    protein: 41,
-    carbs: 28,
-    fat: 29,
   },
   {
     id: "greek-tzatziki",
@@ -337,10 +304,6 @@ const searedChickenThighVariations: RecipeVariationDetail[] = [
       "Squeeze lemon over the plate before eating.",
     ],
     servingWeightGrams: 520,
-    calories: 595,
-    protein: 43,
-    carbs: 30,
-    fat: 32,
   },
 ];
 
@@ -372,10 +335,6 @@ const turkeyHummusWrapVariations: RecipeVariationDetail[] = [
       "Top with herbs if using; roll tightly and slice in half.",
     ],
     servingWeightGrams: 380,
-    calories: 470,
-    protein: 42,
-    carbs: 36,
-    fat: 16,
   },
   {
     id: "peppers-spinach",
@@ -390,10 +349,6 @@ const turkeyHummusWrapVariations: RecipeVariationDetail[] = [
       "Add a squeeze of lemon if desired; roll tightly and slice in half.",
     ],
     servingWeightGrams: 375,
-    calories: 465,
-    protein: 42,
-    carbs: 35,
-    fat: 16,
   },
 ];
 
@@ -425,10 +380,6 @@ const omeletteVariations: RecipeVariationDetail[] = [
       "Add cheese when the omelette is nearly set; fold and melt 30 seconds.",
     ],
     servingWeightGrams: 310,
-    calories: 370,
-    protein: 28,
-    carbs: 4,
-    fat: 26,
   },
   {
     id: "mushroom-peppers",
@@ -443,10 +394,6 @@ const omeletteVariations: RecipeVariationDetail[] = [
       "Fold in cheese when the omelette is nearly set if using.",
     ],
     servingWeightGrams: 315,
-    calories: 355,
-    protein: 26,
-    carbs: 6,
-    fat: 24,
   },
 ];
 
@@ -478,10 +425,6 @@ const frittataVariations: RecipeVariationDetail[] = [
       "Pour in egg mixture; top with feta and parsley before the oven finish.",
     ],
     servingWeightGrams: 255,
-    calories: 340,
-    protein: 33,
-    carbs: 6,
-    fat: 20,
   },
   {
     id: "mushroom-onion",
@@ -495,10 +438,6 @@ const frittataVariations: RecipeVariationDetail[] = [
       "Pour egg mixture over and continue with the base stovetop and oven steps.",
     ],
     servingWeightGrams: 245,
-    calories: 275,
-    protein: 29,
-    carbs: 7,
-    fat: 16,
   },
   {
     id: "turkey-peppers",
@@ -513,10 +452,6 @@ const frittataVariations: RecipeVariationDetail[] = [
       "Pour egg mixture over and continue with the base stovetop and oven steps.",
     ],
     servingWeightGrams: 250,
-    calories: 310,
-    protein: 36,
-    carbs: 6,
-    fat: 15,
   },
 ];
 
@@ -549,10 +484,6 @@ const sirloinBreakfastPlatterVariations: RecipeVariationDetail[] = [
       "Plate the croissant and tomatoes alongside the steak, eggs, and mushrooms.",
     ],
     servingWeightGrams: 580,
-    calories: 820,
-    protein: 52,
-    carbs: 48,
-    fat: 48,
   },
 ];
 
@@ -583,10 +514,6 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
       "Warm the flour tortillas and fill with eggs and turkey bacon as in the classic build.",
     ],
     servingWeightGrams: 280,
-    calories: 405,
-    protein: 26,
-    carbs: 36,
-    fat: 16,
   },
   {
     id: "pork-bacon-corn",
@@ -600,10 +527,6 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
       "Warm corn tortillas briefly on a dry skillet; stack or serve as two smaller tacos with eggs and bacon divided between them.",
     ],
     servingWeightGrams: 265,
-    calories: 310,
-    protein: 24,
-    carbs: 22,
-    fat: 17,
   },
   {
     id: "loaded-toppings",
@@ -624,10 +547,6 @@ const breakfastTacoVariations: RecipeVariationDetail[] = [
       "Finish with cilantro, and add sour cream, hot sauce, or jalapeños to taste.",
     ],
     servingWeightGrams: 340,
-    calories: 555,
-    protein: 28,
-    carbs: 42,
-    fat: 32,
   },
 ];
 
@@ -657,10 +576,6 @@ const breakfastSandwichVariations: RecipeVariationDetail[] = [
       "Build the sandwich on the bagel halves with eggs, bacon, and cheese.",
     ],
     servingWeightGrams: 320,
-    calories: 605,
-    protein: 28,
-    carbs: 54,
-    fat: 26,
   },
   {
     id: "center-cut-biscuit",
@@ -674,10 +589,6 @@ const breakfastSandwichVariations: RecipeVariationDetail[] = [
       "Layer eggs, bacon, and cheese inside the biscuit.",
     ],
     servingWeightGrams: 285,
-    calories: 515,
-    protein: 32,
-    carbs: 32,
-    fat: 33,
   },
   {
     id: "turkey-bacon-bread",
@@ -691,10 +602,6 @@ const breakfastSandwichVariations: RecipeVariationDetail[] = [
       "Stack eggs, turkey bacon, and cheese between the toast slices.",
     ],
     servingWeightGrams: 290,
-    calories: 495,
-    protein: 31,
-    carbs: 30,
-    fat: 25,
   },
   {
     id: "turkey-bacon-bagel",
@@ -708,10 +615,6 @@ const breakfastSandwichVariations: RecipeVariationDetail[] = [
       "Build the sandwich on the bagel with eggs, turkey bacon, and cheese.",
     ],
     servingWeightGrams: 315,
-    calories: 625,
-    protein: 31,
-    carbs: 54,
-    fat: 25,
   },
   {
     id: "turkey-bacon-biscuit",
@@ -725,10 +628,6 @@ const breakfastSandwichVariations: RecipeVariationDetail[] = [
       "Layer eggs, turkey bacon, and cheese inside the biscuit.",
     ],
     servingWeightGrams: 280,
-    calories: 535,
-    protein: 35,
-    carbs: 32,
-    fat: 32,
   },
 ];
 
@@ -761,10 +660,6 @@ const eggHamToastVariations: RecipeVariationDetail[] = [
       "Season with salt and pepper.",
     ],
     servingWeightGrams: 330,
-    calories: 385,
-    protein: 24,
-    carbs: 21,
-    fat: 25,
   },
 ];
 
@@ -788,10 +683,6 @@ const bakedMeatballVariations: RecipeVariationDetail[] = [
       "Roll into 5–6 equal meatballs; turkey can be slightly drier — avoid over-mixing.",
     ],
     servingWeightGrams: 485,
-    calories: 525,
-    protein: 43,
-    carbs: 48,
-    fat: 17,
   },
   {
     id: "beef",
@@ -802,14 +693,10 @@ const bakedMeatballVariations: RecipeVariationDetail[] = [
       "Roll into 5–6 equal meatballs; beef will brown more deeply when baked.",
     ],
     servingWeightGrams: 485,
-    calories: 585,
-    protein: 43,
-    carbs: 48,
-    fat: 24,
   },
 ];
 
-const baseRecipeLibrary: Recipe[] = [
+const baseRecipeLibrary: RecipeSource[] = [
   // Breakfast
   {
     id: "blended-cottage-cheese-pudding-49",
@@ -819,10 +706,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["high_protein", "meal_prep", "breakfast_friendly", "quick"],
     mealSlots: ["breakfast", "snack"],
-    calories: 310,
-    protein: 38,
-    carbs: 18,
-    fat: 8,
     prepMinutes: 8,
     cookMinutes: 0,
     ingredients: [
@@ -849,10 +732,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "breakfast_friendly"],
     mealSlots: ["breakfast", "snack"],
-    calories: 385,
-    protein: 32,
-    carbs: 18,
-    fat: 20,
     prepMinutes: 8,
     cookMinutes: 8,
     ingredients: [
@@ -878,10 +757,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "batch_friendly", "meal_prep"],
     mealSlots: ["breakfast", "lunch"],
-    calories: 390,
-    protein: 35,
-    carbs: 8,
-    fat: 23,
     prepMinutes: 12,
     cookMinutes: 22,
     ingredients: [
@@ -906,11 +781,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "mediterranean",
     tags: ["whole_food", "high_protein", "meal_prep", "breakfast_friendly", "quick"],
     mealSlots: ["breakfast", "snack"],
-    calories: 468,
-    protein: 35,
-    carbs: 42,
-    fat: 19,
-    fiber: 7,
     prepMinutes: 6,
     cookMinutes: 0,
     ingredients: [
@@ -932,11 +802,6 @@ const baseRecipeLibrary: Recipe[] = [
         label: "Classic parfait",
         ingredients: [],
         instructions: [],
-        calories: 468,
-        protein: 35,
-        carbs: 42,
-        fat: 19,
-        fiber: 7,
         mealSlots: ["breakfast", "snack"],
       },
       {
@@ -947,11 +812,6 @@ const baseRecipeLibrary: Recipe[] = [
           { name: "Plain Greek yogurt cup (5.3 oz)", quantity: 1, unit: "cup", category: "Dairy" },
         ],
         instructions: ["Eat the yogurt cup as-is."],
-        calories: 89,
-        protein: 15,
-        carbs: 5,
-        fat: 1,
-        fiber: 0,
         servingWeightGrams: 150,
         mealSlots: ["snack", "breakfast"],
       },
@@ -965,11 +825,6 @@ const baseRecipeLibrary: Recipe[] = [
           { name: "Granola", quantity: 2, unit: "tbsp", category: "Grains" },
         ],
         instructions: ["Layer yogurt, berries, and granola."],
-        calories: 251,
-        protein: 28,
-        carbs: 25,
-        fat: 5,
-        fiber: 5,
         servingWeightGrams: 330,
         mealSlots: ["snack", "breakfast"],
       },
@@ -989,11 +844,6 @@ const baseRecipeLibrary: Recipe[] = [
           "Top with oats, berries, and chia seeds.",
           "Drizzle honey if desired and serve.",
         ],
-        calories: 375,
-        protein: 32,
-        carbs: 50,
-        fat: 7,
-        fiber: 11,
         mealSlots: ["breakfast", "snack"],
       },
     ],
@@ -1006,10 +856,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["high_protein", "meal_prep", "batch_friendly", "breakfast_friendly", "quick"],
     mealSlots: ["breakfast", "snack"],
-    calories: 220,
-    protein: 20,
-    carbs: 4,
-    fat: 14,
     prepMinutes: 10,
     cookMinutes: 25,
     // The ingredient list makes a tray of egg bites: about 3 servings.
@@ -1041,10 +887,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "breakfast_friendly"],
     mealSlots: ["breakfast", "snack"],
-    calories: 385,
-    protein: 30,
-    carbs: 5,
-    fat: 26,
     prepMinutes: 5,
     cookMinutes: 8,
     servingWeightGrams: 320,
@@ -1073,10 +915,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["high_protein", "meal_prep", "batch_friendly", "breakfast_friendly"],
     mealSlots: ["breakfast", "lunch", "snack"],
-    calories: 265,
-    protein: 28,
-    carbs: 5,
-    fat: 14,
     prepMinutes: 10,
     cookMinutes: 20,
     servingWeightGrams: 240,
@@ -1110,10 +948,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "breakfast_friendly"],
     mealSlots: ["breakfast"],
-    calories: 750,
-    protein: 54,
-    carbs: 38,
-    fat: 42,
     prepMinutes: 12,
     cookMinutes: 25,
     servingWeightGrams: 620,
@@ -1148,10 +982,6 @@ const baseRecipeLibrary: Recipe[] = [
     tags: ["whole_food", "high_protein", "quick", "breakfast_friendly"],
     // A meal, not a snack.
     mealSlots: ["breakfast"],
-    calories: 430,
-    protein: 24,
-    carbs: 36,
-    fat: 21,
     prepMinutes: 5,
     cookMinutes: 12,
     servingWeightGrams: 285,
@@ -1182,10 +1012,6 @@ const baseRecipeLibrary: Recipe[] = [
     tags: ["whole_food", "high_protein", "quick", "breakfast_friendly"],
     // A meal, not a snack.
     mealSlots: ["breakfast"],
-    calories: 475,
-    protein: 28,
-    carbs: 30,
-    fat: 26,
     prepMinutes: 5,
     cookMinutes: 12,
     servingWeightGrams: 295,
@@ -1218,10 +1044,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "quick", "high_protein"],
     mealSlots: ["breakfast", "snack"],
-    calories: 305,
-    protein: 23,
-    carbs: 17,
-    fat: 18,
     prepMinutes: 3,
     cookMinutes: 8,
     servingWeightGrams: 280,
@@ -1252,10 +1074,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "italian",
     tags: ["whole_food", "high_protein", "meal_prep", "batch_friendly", "meal_prep_friendly"],
     mealSlots: ["lunch", "dinner"],
-    calories: 530,
-    protein: 43,
-    carbs: 48,
-    fat: 18,
     prepMinutes: 15,
     cookMinutes: 22,
     servingWeightGrams: 485,
@@ -1291,10 +1109,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "asian",
     tags: ["whole_food", "high_protein", "quick", "meal_prep"],
     mealSlots: ["lunch", "dinner"],
-    calories: 545,
-    protein: 36,
-    carbs: 54,
-    fat: 20,
     prepMinutes: 12,
     cookMinutes: 12,
     ingredients: [
@@ -1321,10 +1135,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "asian",
     tags: ["whole_food", "high_protein", "quick", "meal_prep"],
     mealSlots: ["lunch", "dinner"],
-    calories: 535,
-    protein: 40,
-    carbs: 42,
-    fat: 22,
     prepMinutes: 12,
     cookMinutes: 12,
     ingredients: [
@@ -1348,10 +1158,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["high_protein", "meal_prep", "batch_friendly", "comfort"],
     mealSlots: ["lunch", "dinner"],
-    calories: 610,
-    protein: 44,
-    carbs: 62,
-    fat: 20,
     prepMinutes: 20,
     cookMinutes: 30,
     ingredients: [
@@ -1376,10 +1182,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "mexican",
     tags: ["whole_food", "high_protein", "meal_prep", "quick"],
     mealSlots: ["lunch"],
-    calories: 540,
-    protein: 47,
-    carbs: 56,
-    fat: 14,
     prepMinutes: 10,
     cookMinutes: 8,
     ingredients: [
@@ -1405,10 +1207,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "meal_prep", "quick"],
     mealSlots: ["lunch", "dinner"],
-    calories: 460,
-    protein: 47,
-    carbs: 20,
-    fat: 20,
     prepMinutes: 12,
     cookMinutes: 0,
     ingredients: [
@@ -1434,10 +1232,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "meal_prep"],
     mealSlots: ["lunch", "dinner"],
-    calories: 555,
-    protein: 44,
-    carbs: 52,
-    fat: 18,
     prepMinutes: 12,
     cookMinutes: 12,
     ingredients: [
@@ -1462,10 +1256,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "mediterranean",
     tags: ["whole_food", "high_protein", "meal_prep"],
     mealSlots: ["lunch", "dinner"],
-    calories: 565,
-    protein: 46,
-    carbs: 54,
-    fat: 17,
     prepMinutes: 15,
     cookMinutes: 15,
     ingredients: [
@@ -1490,10 +1280,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "batch_friendly"],
     mealSlots: ["lunch", "dinner"],
-    calories: 485,
-    protein: 38,
-    carbs: 42,
-    fat: 18,
     prepMinutes: 10,
     cookMinutes: 20,
     ingredients: [
@@ -1528,10 +1314,6 @@ const baseRecipeLibrary: Recipe[] = [
           "Off heat, sprinkle cheese evenly over the skillet.",
           "Cover 1–2 minutes until melted, then serve.",
         ],
-        calories: 585,
-        protein: 45,
-        carbs: 43,
-        fat: 26,
       },
     ],
   },
@@ -1543,10 +1325,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "asian",
     tags: ["high_protein", "meal_prep", "quick"],
     mealSlots: ["lunch", "dinner"],
-    calories: 575,
-    protein: 43,
-    carbs: 66,
-    fat: 14,
     prepMinutes: 12,
     cookMinutes: 14,
     ingredients: [
@@ -1571,10 +1349,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "japanese",
     tags: ["whole_food", "high_protein", "meal_prep", "quick"],
     mealSlots: ["lunch", "dinner"],
-    calories: 560,
-    protein: 40,
-    carbs: 57,
-    fat: 18,
     prepMinutes: 12,
     cookMinutes: 0,
     ingredients: [
@@ -1599,10 +1373,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "meal_prep", "batch_friendly", "quick"],
     mealSlots: ["lunch", "dinner"],
-    calories: 535,
-    protein: 42,
-    carbs: 50,
-    fat: 14,
     prepMinutes: 12,
     cookMinutes: 22,
     servingWeightGrams: 480,
@@ -1630,10 +1400,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "meal_prep", "batch_friendly"],
     mealSlots: ["lunch", "dinner"],
-    calories: 565,
-    protein: 42,
-    carbs: 32,
-    fat: 30,
     prepMinutes: 15,
     cookMinutes: 30,
     servingWeightGrams: 505,
@@ -1665,10 +1431,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "meal_prep", "batch_friendly"],
     mealSlots: ["lunch", "dinner"],
-    calories: 560,
-    protein: 46,
-    carbs: 52,
-    fat: 15,
     prepMinutes: 12,
     cookMinutes: 28,
     servingWeightGrams: 520,
@@ -1694,10 +1456,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "asian",
     tags: ["whole_food", "high_protein", "meal_prep", "batch_friendly"],
     mealSlots: ["lunch", "dinner"],
-    calories: 545,
-    protein: 42,
-    carbs: 58,
-    fat: 15,
     prepMinutes: 15,
     cookMinutes: 15,
     ingredients: [
@@ -1721,10 +1479,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "mexican",
     tags: ["whole_food", "high_protein", "meal_prep", "batch_friendly", "comfort"],
     mealSlots: ["lunch", "dinner"],
-    calories: 455,
-    protein: 35,
-    carbs: 48,
-    fat: 14,
     prepMinutes: 12,
     cookMinutes: 35,
     ingredients: [
@@ -1751,10 +1505,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "meal_prep"],
     mealSlots: ["lunch"],
-    calories: 475,
-    protein: 43,
-    carbs: 38,
-    fat: 16,
     prepMinutes: 10,
     cookMinutes: 0,
     servingWeightGrams: 385,
@@ -1784,10 +1534,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "meal_prep"],
     mealSlots: ["lunch", "dinner"],
-    calories: 485,
-    protein: 40,
-    carbs: 18,
-    fat: 28,
     prepMinutes: 10,
     cookMinutes: 12,
     servingWeightGrams: 420,
@@ -1818,10 +1564,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "batch_friendly", "meal_prep", "comfort"],
     mealSlots: ["lunch", "dinner"],
-    calories: 430,
-    protein: 40,
-    carbs: 22,
-    fat: 18,
     prepMinutes: 12,
     cookMinutes: 35,
     ingredients: [
@@ -1861,10 +1603,6 @@ const baseRecipeLibrary: Recipe[] = [
           "Stir in corn after the turkey is browned.",
           "Simmer until all vegetables are tender and the chili is thick.",
         ],
-        calories: 505,
-        protein: 42,
-        carbs: 38,
-        fat: 18,
       },
     ],
   },
@@ -1877,10 +1615,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["whole_food", "high_protein", "meal_prep"],
     mealSlots: ["dinner"],
-    calories: 560,
-    protein: 42,
-    carbs: 38,
-    fat: 26,
     prepMinutes: 12,
     cookMinutes: 22,
     ingredients: [
@@ -1906,11 +1640,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["beverage", "whole_food", "quick"],
     mealSlots: ["breakfast", "lunch", "dinner", "snack"],
-    calories: 122,
-    protein: 8,
-    carbs: 12,
-    fat: 5,
-    fiber: 0,
     prepMinutes: 0,
     cookMinutes: 0,
     servingWeightGrams: 244,
@@ -1930,11 +1659,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["beverage", "whole_food", "quick"],
     mealSlots: ["breakfast", "lunch", "dinner", "snack"],
-    calories: 83,
-    protein: 8,
-    carbs: 12,
-    fat: 0,
-    fiber: 0,
     prepMinutes: 0,
     cookMinutes: 0,
     servingWeightGrams: 245,
@@ -1954,11 +1678,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["beverage", "quick"],
     mealSlots: ["breakfast", "lunch", "dinner", "snack"],
-    calories: 140,
-    protein: 0,
-    carbs: 39,
-    fat: 0,
-    fiber: 0,
     prepMinutes: 0,
     cookMinutes: 0,
     servingWeightGrams: 355,
@@ -1978,11 +1697,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["beverage", "whole_food", "quick"],
     mealSlots: ["breakfast", "lunch", "dinner", "snack"],
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    fiber: 0,
     prepMinutes: 0,
     cookMinutes: 0,
     servingWeightGrams: 237,
@@ -2002,11 +1716,6 @@ const baseRecipeLibrary: Recipe[] = [
     cuisine: "american",
     tags: ["beverage", "quick"],
     mealSlots: ["breakfast", "lunch", "dinner", "snack"],
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    fiber: 0,
     prepMinutes: 0,
     cookMinutes: 0,
     servingWeightGrams: 355,
@@ -2021,4 +1730,26 @@ const baseRecipeLibrary: Recipe[] = [
   },
 ];
 
-export const recipeLibrary: Recipe[] = [...baseRecipeLibrary, ...snackRecipes];
+/**
+ * Built-in nutrition comes from ingredients.json (the default build), never from stored numbers.
+ * Packaged items keep their label values. `npm run nutrition:check` guards that every build matches.
+ */
+export function withComputedNutrition(source: RecipeSource): Recipe {
+  const draft = { calories: 0, protein: 0, carbs: 0, fat: 0, ...source } as Recipe;
+  if (hasLabelNutrition(source)) return draft;
+  const n = nutritionFromIngredients(resolveRecipeIngredients(draft, defaultVariationId(draft)), 1);
+  if (!n) throw new Error(`Recipe "${source.name}" has an ingredient missing from ingredients.json`);
+  return {
+    ...draft,
+    calories: Math.round(n.calories),
+    protein: Math.round(n.protein),
+    carbs: Math.round(n.carbs),
+    fat: Math.round(n.fat),
+    fiber: Math.round(n.fiber),
+  };
+}
+
+/** Built-in recipes as authored (before nutrition is computed). */
+export const recipeSources: RecipeSource[] = [...baseRecipeLibrary, ...snackRecipes];
+
+export const recipeLibrary: Recipe[] = recipeSources.map(withComputedNutrition);

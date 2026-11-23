@@ -106,6 +106,13 @@ export interface Recipe {
   isUserRecipe?: boolean;
 }
 
+/**
+ * A built-in recipe as authored: nutrition is computed from ingredients.json at load, so only
+ * packaged items (label values) carry calories and macros.
+ */
+export type RecipeSource = Omit<Recipe, "calories" | "protein" | "carbs" | "fat"> &
+  Partial<Pick<Recipe, "calories" | "protein" | "carbs" | "fat">>;
+
 /** Links meals cooked in one batch across multiple days. */
 export type MealPrepSource = "weekly_prep" | "low_complexity" | "manual";
 

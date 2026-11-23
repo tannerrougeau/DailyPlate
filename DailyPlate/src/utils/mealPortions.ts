@@ -13,6 +13,7 @@ import {
   type PortionLine,
 } from "@/utils/goalPortions";
 import { addNutrients, gramsForIngredient, type NutrientVector } from "@/utils/ingredientNutrition";
+import { hasLabelNutrition } from "@/utils/labelNutrition";
 import { sidesNutrition, suggestSides, type SideSuggestion } from "@/utils/mealSides";
 import { isSnackPlanSlot } from "@/utils/planningPrefs";
 import { splitMealTargets, type MealTargetSlot } from "@/utils/mealTargets";
@@ -64,7 +65,7 @@ const nutritionCache = new WeakMap<Recipe, Map<string, NutrientVector>>();
 
 /**
  * Food nutrition for the user's serving (recipe + sides), from the rounded amounts and ingredients.json.
- * Stored recipe values are used only when an ingredient is not in the table.
+ * Packaged items use their label; user recipes with an ingredient not in the table use their own values.
  */
 export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
   const m = mealMultipliers(meal);
@@ -83,7 +84,8 @@ export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
   const hit = byRecipe.get(key);
   if (hit) return hit;
   const ingredients = mealIngredients(meal);
-  const matched = ingredients.every((ing) => gramsForIngredient(ing) != null);
+  const label = hasLabelNutrition(meal.recipe, effectiveVariationId(meal));
+  const matched = !label && ingredients.every((ing) => gramsForIngredient(ing) != null);
   const food = matched
     ? (nutritionOfLines(portionLines(ingredients, m)) ?? storedNutrition(meal))
     : scaleNutrients(storedNutrition(meal), (m.protein + m.carb + m.fat) / 3);
