@@ -11,7 +11,9 @@ import {
   UNIFORM_MULTIPLIERS,
   type PortionLine,
 } from "@/utils/goalPortions";
-import { gramsForIngredient, type NutrientVector } from "@/utils/ingredientNutrition";
+import { addNutrients, gramsForIngredient, type NutrientVector } from "@/utils/ingredientNutrition";
+import { sidesNutrition, suggestSides, type SideSuggestion } from "@/utils/mealSides";
+import { isSnackPlanSlot } from "@/utils/planningPrefs";
 import { splitMealTargets, type MealTargetSlot } from "@/utils/mealTargets";
 import {
   effectiveCarbVariationId,
@@ -60,7 +62,7 @@ function storedNutrition(meal: PlannedMeal): NutrientVector {
 const nutritionCache = new WeakMap<Recipe, Map<string, NutrientVector>>();
 
 /**
- * Food nutrition for the user's serving, from the rounded portion amounts and ingredients.json.
+ * Food nutrition for the user's serving (recipe + sides), from the rounded amounts and ingredients.json.
  * Stored recipe values are used only when an ingredient is not in the table.
  */
 export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
@@ -70,6 +72,7 @@ export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
     effectiveCarbVariationId(meal),
     effectiveFatVariationId(meal),
     m.protein, m.carb, m.fat, m.vegetable,
+    JSON.stringify(meal.sides ?? []),
   ].join("|");
   let byRecipe = nutritionCache.get(meal.recipe);
   if (!byRecipe) {
@@ -80,9 +83,10 @@ export function mealFoodNutrition(meal: PlannedMeal): NutrientVector {
   if (hit) return hit;
   const ingredients = mealIngredients(meal);
   const matched = ingredients.every((ing) => gramsForIngredient(ing) != null);
-  const value = matched
+  const food = matched
     ? (nutritionOfLines(portionLines(ingredients, m)) ?? storedNutrition(meal))
     : scaleNutrients(storedNutrition(meal), (m.protein + m.carb + m.fat) / 3);
+  const value = addNutrients(food, sidesNutrition(meal.sides));
   byRecipe.set(key, value);
   return value;
 }
@@ -97,21 +101,45 @@ export function batchServings(meal: Pick<PlannedMeal, "mealPrep">, householdMult
   return Math.max(1, householdMult) * Math.max(1, meal.mealPrep?.portionsCooked ?? 1);
 }
 
-/** Size one meal to its target. Packaged items keep their label amounts. */
-export function sizeMealToTarget(meal: PlannedMeal, target: DailyTargets): PlannedMeal {
+/**
+ * Size one meal to its target. Packaged items keep their label amounts; snacks are judged on
+ * calories only. With `autoSide`, a meal that cannot fit gets one or two sides when that makes it fit.
+ */
+export function sizeMealToTarget(
+  meal: PlannedMeal,
+  target: DailyTargets,
+  opts: { autoSide?: boolean } = {},
+): PlannedMeal {
+  const { generated: _generated, ...rest } = meal;
   if (isPackagedRecipe(meal.recipe)) {
-    const n = mealFoodNutrition({ ...meal, portion: undefined, scale: 1 });
+    const n = mealFoodNutrition({ ...rest, portion: undefined, scale: 1 });
     return {
-      ...meal,
+      ...rest,
       scale: 1,
       portion: { multipliers: { ...UNIFORM_MULTIPLIERS }, target: toTargets(n), kcalGap: 0, fits: true },
     };
   }
-  const r = sizePortion(mealIngredients(meal), target, storedNutrition(meal));
-  return {
-    ...meal,
+  const ingredients = mealIngredients(meal);
+  const stored = storedNutrition(meal);
+  const caloriesOnly = isSnackPlanSlot(meal.slot);
+  const r = sizePortion(ingredients, target, stored, {
+    extra: sidesNutrition(meal.sides),
+    caloriesOnly,
+  });
+  const sized: PlannedMeal = {
+    ...rest,
     scale: 1,
     portion: { multipliers: r.multipliers, target, kcalGap: r.kcalGap, fits: r.fits },
+  };
+  if (!opts.autoSide || r.fits || meal.sides?.length) return sized;
+  const side = suggestSides(r.nutrition, target, meal.slot);
+  if (!side?.fits) return sized;
+  const withSide = sizePortion(ingredients, target, stored, { extra: side.nutrition, caloriesOnly });
+  if (!withSide.fits) return sized;
+  return {
+    ...sized,
+    sides: side.sides,
+    portion: { multipliers: withSide.multipliers, target, kcalGap: withSide.kcalGap, fits: true },
   };
 }
 
@@ -142,53 +170,44 @@ function drinkTotals(meals: PlannedMeal[]): DailyTargets {
 }
 
 /**
- * Size every meal of a day to its share of the daily targets. Drinks, packaged snacks, and locked
- * meals count first. A kept meal that cannot fit stays at its closest fit and the other meals share
- * what is left.
+ * Size every meal of a day to its share of the daily targets. Drinks, packaged snacks, and fixed
+ * meals count first. Fixed meals are never changed: locked meals, meals already logged as eaten
+ * (`fixedSlots`), and kept meals. Meals fresh from plan generation get an automatic side when
+ * that makes them fit.
  */
 export function applyGoalPortions(
   meals: PlannedMeal[],
   daily: DailyTargets,
-  opts: { timing?: MealTimingPreference | null; lockedSlots?: Set<MealSlotId> } = {},
+  opts: {
+    timing?: MealTimingPreference | null;
+    lockedSlots?: Set<MealSlotId>;
+    fixedSlots?: Set<MealSlotId>;
+  } = {},
 ): PlannedMeal[] {
   if (meals.length === 0 || !(daily.calories > 0)) return meals;
-  const locked = opts.lockedSlots ?? new Set<MealSlotId>();
+  const isFixed = (m: PlannedMeal) =>
+    opts.lockedSlots?.has(m.slot) ||
+    opts.fixedSlots?.has(m.slot) ||
+    (m.kept === true && m.portion != null);
   const drinks = drinkTotals(meals);
   const packaged = new Map<MealSlotId, PlannedMeal>();
   for (const m of meals) {
-    if (isPackagedRecipe(m.recipe) && !locked.has(m.slot)) packaged.set(m.slot, sizeMealToTarget(m, daily));
+    if (isPackagedRecipe(m.recipe) && !isFixed(m)) packaged.set(m.slot, sizeMealToTarget(m, daily));
   }
-
-  const fixedSlot = (m: PlannedMeal): MealTargetSlot => ({
-    slot: m.slot,
-    kind: "fixed",
-    nutrition: toTargets(mealFoodNutrition(packaged.get(m.slot) ?? m)),
+  const slots = meals.map((m): MealTargetSlot => {
+    if (isFixed(m) || packaged.has(m.slot)) {
+      return { slot: m.slot, kind: "fixed", nutrition: toTargets(mealFoodNutrition(packaged.get(m.slot) ?? m)) };
+    }
+    return { slot: m.slot, kind: "cooked" };
   });
-
-  const sizeWith = (fixed: Set<MealSlotId>, sized: Map<MealSlotId, PlannedMeal>) => {
-    const slots = meals.map((m) =>
-      locked.has(m.slot) || packaged.has(m.slot)
-        ? fixedSlot(m)
-        : fixed.has(m.slot)
-          ? fixedSlot(sized.get(m.slot) ?? m)
-          : ({ slot: m.slot, kind: "cooked" } as MealTargetSlot),
-    );
-    const targets = splitMealTargets({ daily, slots, drinks, timing: opts.timing });
-    return meals.map((m) => {
-      if (locked.has(m.slot)) return m;
-      const pkg = packaged.get(m.slot);
-      if (pkg) return pkg;
-      if (fixed.has(m.slot)) return sized.get(m.slot) ?? m;
-      const t = targets[m.slot];
-      return t ? sizeMealToTarget(m, t) : m;
-    });
-  };
-
-  const first = sizeWith(new Set(), new Map());
-  const keptMisses = first.filter((m) => m.kept && m.portion && !m.portion.fits).map((m) => m.slot);
-  if (keptMisses.length === 0) return first;
-  const sized = new Map(first.map((m) => [m.slot, m] as const));
-  return sizeWith(new Set(keptMisses), sized);
+  const targets = splitMealTargets({ daily, slots, drinks, timing: opts.timing });
+  return meals.map((m) => {
+    if (isFixed(m)) return m;
+    const pkg = packaged.get(m.slot);
+    if (pkg) return pkg;
+    const t = targets[m.slot];
+    return t ? sizeMealToTarget(m, t, { autoSide: m.generated === true }) : m;
+  });
 }
 
 /** True when the portion signature differs (used to avoid store update loops). */
@@ -197,7 +216,11 @@ export function samePortions(a: PlannedMeal[], b: PlannedMeal[]): boolean {
   return a.every((m, i) => {
     const o = b[i]!;
     if (m.slot !== o.slot || m.recipe.id !== o.recipe.id || m.scale !== o.scale) return false;
-    return JSON.stringify(m.portion ?? null) === JSON.stringify(o.portion ?? null);
+    return (
+      m.generated === o.generated &&
+      JSON.stringify(m.portion ?? null) === JSON.stringify(o.portion ?? null) &&
+      JSON.stringify(m.sides ?? null) === JSON.stringify(o.sides ?? null)
+    );
   });
 }
 
@@ -305,4 +328,11 @@ export function fitNotice(meal: PlannedMeal): string | null {
     return `This meal is about ${gap} kcal over your target.`;
   }
   return "This meal is a little under your protein target.";
+}
+
+/** Side to offer on the notice when the meal is more than 10% under its calorie target. */
+export function sideSuggestionFor(meal: PlannedMeal): SideSuggestion | null {
+  const p = meal.portion;
+  if (!p || p.fits || meal.kept || isPackagedRecipe(meal.recipe)) return null;
+  return suggestSides(mealFoodNutrition(meal), p.target, meal.slot);
 }

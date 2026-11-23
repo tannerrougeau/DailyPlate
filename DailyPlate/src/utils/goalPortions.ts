@@ -311,9 +311,15 @@ export function nutritionOfLines(lines: PortionLine[], servings = 1): NutrientVe
   };
 }
 
-export function fitsTarget(n: Pick<NutrientVector, "calories" | "protein">, target: DailyTargets): boolean {
+/** Snacks are checked on calories only (`caloriesOnly`). */
+export function fitsTarget(
+  n: Pick<NutrientVector, "calories" | "protein">,
+  target: DailyTargets,
+  opts: { caloriesOnly?: boolean } = {},
+): boolean {
   if (!(target.calories > 0)) return true;
   const kcalOk = Math.abs(n.calories - target.calories) <= target.calories * FIT_KCAL_TOLERANCE;
+  if (opts.caloriesOnly) return kcalOk;
   const proteinOk = n.protein >= target.protein - FIT_PROTEIN_ALLOWANCE_G;
   return kcalOk && proteinOk;
 }
@@ -328,33 +334,44 @@ export function sizePortion(
   ingredients: RecipeIngredient[],
   target: DailyTargets,
   storedFallback: NutrientVector,
+  opts: { extra?: NutrientVector; caloriesOnly?: boolean } = {},
 ): PortionResult {
+  const extra = opts.extra ?? ZERO_NUTRIENTS;
+  const fitOpts = { caloriesOnly: opts.caloriesOnly };
+  // Sides are fixed amounts: size the recipe to what is left, then judge the meal as a whole.
+  const inner: DailyTargets = {
+    calories: Math.max(0, target.calories - extra.calories),
+    protein: Math.max(0, target.protein - extra.protein),
+    carbs: Math.max(0, target.carbs - extra.carbs),
+    fat: Math.max(0, target.fat - extra.fat),
+    fiber: Math.max(0, (target.fiber ?? 0) - extra.fiber),
+  };
   const matched = ingredients.every((ing) => gramsForIngredient(ing) != null);
   if (!matched) {
     const u = storedFallback.calories > 0
-      ? clamp(target.calories / storedFallback.calories, ROLE_LIMITS.carb.min, ROLE_LIMITS.carb.max)
+      ? clamp(inner.calories / storedFallback.calories, ROLE_LIMITS.carb.min, ROLE_LIMITS.carb.max)
       : 1;
     const multipliers = { protein: u, carb: u, fat: u, vegetable: 1 };
-    const nutrition = scaleNutrients(storedFallback, u);
+    const nutrition = addNutrients(scaleNutrients(storedFallback, u), extra);
     return {
       multipliers,
       target,
       nutrition,
       lines: portionLines(ingredients, multipliers),
       kcalGap: Math.round(nutrition.calories - target.calories),
-      fits: fitsTarget(nutrition, target),
+      fits: fitsTarget(nutrition, target, fitOpts),
     };
   }
-  const multipliers = solveRoleMultipliers(ingredients, target);
+  const multipliers = solveRoleMultipliers(ingredients, inner);
   const lines = portionLines(ingredients, multipliers);
-  const nutrition = nutritionOfLines(lines) ?? scaleNutrients(storedFallback, 1);
+  const nutrition = addNutrients(nutritionOfLines(lines) ?? scaleNutrients(storedFallback, 1), extra);
   return {
     multipliers,
     target,
     nutrition,
     lines,
     kcalGap: Math.round(nutrition.calories - target.calories),
-    fits: fitsTarget(nutrition, target),
+    fits: fitsTarget(nutrition, target, fitOpts),
   };
 }
 

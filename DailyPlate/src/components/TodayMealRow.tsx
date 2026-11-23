@@ -18,7 +18,8 @@ import {
   mealMacrosWithBeverage,
   resolveBeverage,
 } from "@/utils/beverages";
-import { fitNotice, servingSummary } from "@/utils/mealPortions";
+import { fitNotice, servingSummary, sideSuggestionFor } from "@/utils/mealPortions";
+import { sideLabel } from "@/utils/mealSides";
 import {
   countsFromOverride,
   formatHouseholdServesLine,
@@ -92,6 +93,7 @@ export function TodayMealRow({
   const setMealFatVariation = useAppStore((s) => s.setMealFatVariation);
   const setMealBeverage = useAppStore((s) => s.setMealBeverage);
   const keepMeal = useAppStore((s) => s.keepMeal);
+  const addMealSides = useAppStore((s) => s.addMealSides);
   const replaceMealSlot = useAppStore((s) => s.replaceMealSlot);
   const dayMeals = useAppStore((s) => s.dailyPlans[dateKey]);
 
@@ -103,6 +105,7 @@ export function TodayMealRow({
   const macros = mealMacrosWithBeverage(meal);
   const serving = servingSummary(meal, householdMult);
   const notice = fitNotice(meal);
+  const side = notice ? sideSuggestionFor(meal) : null;
   const fav = favoriteIds.includes(recipe.id);
   const dislike = dislikedIds.includes(recipe.id);
   const kcal = Math.round(macros.calories);
@@ -220,12 +223,26 @@ export function TodayMealRow({
               {serving.text}
             </button>
           )}
+          {meal.sides?.length ? (
+            <p className="mt-0.5 text-[11px] font-medium leading-snug text-slate-600">
+              With {meal.sides.map(sideLabel).join(" + ")}
+            </p>
+          ) : null}
           {servingLine && (
             <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{servingLine}</p>
           )}
           {notice && (
             <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/60 px-2.5 py-2">
               <p className="min-w-0 flex-1 text-xs font-medium text-amber-950">{notice}</p>
+            {side && (
+              <button
+                type="button"
+                onClick={() => addMealSides(dateKey, slot, side.sides)}
+                className="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-950"
+              >
+                Add {side.label} (+{Math.round(side.nutrition.calories)} kcal)
+              </button>
+            )}
               <button
                 type="button"
                 onClick={() => setSwapOpen(true)}

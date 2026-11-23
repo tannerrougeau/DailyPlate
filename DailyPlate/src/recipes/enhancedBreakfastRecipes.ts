@@ -429,7 +429,8 @@ export const highProteinSmoothie: Recipe = {
   searchAliases: ["protein smoothie", "high protein smoothie"],
   cuisine: "american",
   tags: ["high_protein", "quick", "breakfast_friendly"],
-  mealSlots: ["breakfast", "snack"],
+  // Snack or drink alongside a meal (see BEVERAGES), not a main meal by itself.
+  mealSlots: ["snack"],
   calories: 118,
   protein: 23,
   carbs: 3,

@@ -120,6 +120,7 @@ export type BeverageId =
   | "milk"
   | "fat_free_milk"
   | "sweetened"
+  | "protein_drink"
   | "none";
 
 export interface PlannedMeal {
@@ -139,8 +140,12 @@ export interface PlannedMeal {
   portion?: GoalPortion;
   /** User chose Keep on the "doesn't fit" notice for this meal. */
   kept?: boolean;
-  /** Actual cooked batch weight the user entered (g). */
+  /** Actual cooked batch weight the user entered (g). Shared by every day of the same batch. */
   weighedBatchGrams?: number;
+  /** Whole-food sides added to reach the meal target (user's serving only). */
+  sides?: RecipeIngredient[];
+  /** Set by plan generation until goal portions (and any automatic side) are applied. */
+  generated?: boolean;
 }
 
 export interface RoleMultipliers {

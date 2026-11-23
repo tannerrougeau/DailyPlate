@@ -186,9 +186,10 @@ export interface GenerateOptions {
 function toPlannedMeals(
   raw: { slot: MealSlotId; recipe: Recipe; variationId?: string }[],
 ): PlannedMeal[] {
-  return raw.map(({ slot, recipe, variationId }) =>
-    createPlannedMeal(slot, recipe, { scale: 1, selectedVariationId: variationId }),
-  );
+  return raw.map(({ slot, recipe, variationId }) => ({
+    ...createPlannedMeal(slot, recipe, { scale: 1, selectedVariationId: variationId }),
+    generated: true,
+  }));
 }
 
 /**

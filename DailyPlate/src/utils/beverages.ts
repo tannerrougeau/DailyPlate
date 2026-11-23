@@ -11,6 +11,7 @@ import type {
 
 export type { BeverageId };
 import { mealFoodNutrition } from "@/utils/mealPortions";
+import { gramsPerUnit, nutritionForGrams } from "@/utils/ingredientNutrition";
 
 export interface Beverage {
   id: BeverageId;
@@ -87,8 +88,26 @@ export const BEVERAGES: Beverage[] = [
       category: "Pantry",
     },
   },
+  proteinDrinkBeverage(),
   { id: "none", label: "None", calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
 ];
+
+/** Protein Drink alongside a meal: 1 scoop whey in water, from ingredients.json. */
+function proteinDrinkBeverage(): Beverage {
+  const grams = gramsPerUnit("Whey protein powder", "scoop") ?? 31;
+  const n = nutritionForGrams("Whey protein powder", grams);
+  return {
+    id: "protein_drink",
+    label: "Protein Drink",
+    calories: Math.round(n?.calories ?? 0),
+    protein: Math.round(n?.protein ?? 0),
+    carbs: Math.round(n?.carbs ?? 0),
+    fat: Math.round(n?.fat ?? 0),
+    fiber: Math.round(n?.fiber ?? 0),
+    servingLabel: "1 scoop whey in water",
+    grocery: { name: "Whey protein powder", quantity: 1, unit: "scoop", category: "Pantry" },
+  };
+}
 
 export function isBeverageRecipe(recipe: Pick<Recipe, "id" | "tags">): boolean {
   return recipe.tags.includes("beverage") || recipe.id.startsWith("bev-");

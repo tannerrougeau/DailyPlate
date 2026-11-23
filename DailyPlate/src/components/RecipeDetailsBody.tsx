@@ -22,6 +22,7 @@ import {
   servingSummary,
 } from "@/utils/mealPortions";
 import { prepTips, stepsWithAmounts } from "@/utils/prepSteps";
+import { sideLabel, sideLines } from "@/utils/mealSides";
 import { NutritionDetails } from "@/components/NutritionDetails";
 import { MicronutrientDetails } from "@/components/MicronutrientDetails";
 import { notableMicronutrients } from "@/utils/micronutrients";
@@ -73,6 +74,7 @@ export function RecipeDetailsBody({
   const storedProfile = useAppStore((s) => s.userProfile);
   const profile = userProfile ?? storedProfile;
   const setWeighedBatch = useAppStore((s) => s.setWeighedBatch);
+  const removeMealSide = useAppStore((s) => s.removeMealSide);
   const [openTip, setOpenTip] = useState<string | null>(null);
   const avoids = profileAvoidLists(profile);
   const labels = visibleVariationLabels(recipe, avoids.chips, avoids.custom);
@@ -304,6 +306,31 @@ export function RecipeDetailsBody({
           </ul>
         </div>
       )}
+
+      {meal?.sides?.length ? (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Side (your serving)
+          </p>
+          <ul className="mt-1 space-y-1 text-sm text-slate-700">
+            {sideLines(meal.sides).map((line, i) => (
+              <li key={`${portionLineKey(line)}-${i}`} className="flex items-center justify-between gap-2">
+                <span>{formatPortionLine(line)}</span>
+                {dateKey && (
+                  <button
+                    type="button"
+                    onClick={() => removeMealSide(dateKey, meal.slot, i)}
+                    aria-label={`Remove ${sideLabel(meal.sides![i]!)}`}
+                    className="shrink-0 text-xs font-semibold text-slate-500"
+                  >
+                    Remove
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-slate-700">
         {instructions.map((step, idx) => (

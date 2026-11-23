@@ -1,6 +1,7 @@
 import type { GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
 import { groceryItemForBeverage, resolveBeverage } from "@/utils/beverages";
 import { batchServings, mealPortionLines } from "@/utils/mealPortions";
+import { sideLines } from "@/utils/mealSides";
 import {
   formatPracticalQty,
   roundIngredientQuantity,
@@ -27,14 +28,17 @@ export function groceriesFromMeals(
       else map.set(drinkItem.key, { ...drinkItem });
     }
 
-    if (meal.mealPrep) {
-      if (countedBatches.has(meal.mealPrep.batchId)) continue;
-      countedBatches.add(meal.mealPrep.batchId);
-    }
+    // Sides belong to each day's serving, so they are counted before batch de-duplication.
+    const sides = sideLines(meal.sides).map((line) => line.ingredient);
 
-    const ingredients = mealPortionLines(meal, batchServings(meal, householdMultiplier)).map(
-      (line) => line.ingredient,
-    );
+    let ingredients: RecipeIngredient[] = sides;
+    if (!meal.mealPrep || !countedBatches.has(meal.mealPrep.batchId)) {
+      if (meal.mealPrep) countedBatches.add(meal.mealPrep.batchId);
+      ingredients = [
+        ...mealPortionLines(meal, batchServings(meal, householdMultiplier)).map((line) => line.ingredient),
+        ...sides,
+      ];
+    }
 
     for (const ing of ingredients) {
       if (/^(water|ice)$/i.test(ing.name.trim())) continue;
