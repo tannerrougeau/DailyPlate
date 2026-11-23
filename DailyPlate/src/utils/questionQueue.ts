@@ -4,7 +4,9 @@ import type { CheckInEntry } from "@/types/tdeeFeedback";
 import { CUISINE_OPTIONS, logPlanPatterns, type PersonalizationSignals } from "@/utils/personalizationEngine";
 import { customTokens, DISLIKE_MATCHERS, DISLIKED_FOOD_CHIPS } from "@/utils/chipMatching";
 import { checkInScale } from "@/utils/checkInScale";
-import type { CheckpointState, DisplayPrefs, PlanSettings } from "@/utils/displayPrefs";
+import type { CheckpointState, DisplayPrefs, NextStepProfileFields, PlanSettings } from "@/utils/displayPrefs";
+import type { NextStep } from "@/utils/nextBestStep";
+import { mealsPerDayFromSelections } from "@/utils/planningPrefs";
 import { ingredientRole } from "@/utils/ingredientNutrition";
 import { shortIngredientName } from "@/utils/recipeDisplay";
 
@@ -25,7 +27,9 @@ export type QuestionChange =
   | { kind: "planSettings"; set: PlanSettings; what: string }
   | { kind: "preferCuisine"; cuisine: string; label: string }
   | { kind: "favoriteFood"; food: string }
-  | { kind: "unavoid"; chip?: string; token?: string; label: string };
+  | { kind: "unavoid"; chip?: string; token?: string; label: string }
+  | { kind: "profile"; set: NextStepProfileFields; what: string }
+  | { kind: "openCheckIn" };
 
 export type Question = {
   /** Stable id: the same question is never queued twice. */
@@ -33,7 +37,7 @@ export type Question = {
   text: string;
   /** Saved with the checkpoint when answered Yes. */
   why: string;
-  source: "usage" | "check-in" | "taste";
+  source: "usage" | "check-in" | "taste" | "next-step";
   change: QuestionChange;
   addedAt: string;
 };
@@ -416,9 +420,18 @@ export function applyChange(
     preferredCuisines?: string[];
     favoriteFoodCustom?: string;
     dislikedFoodChips?: string[];
+    profile?: UserProfile | null;
   },
   change: QuestionChange,
 ): { before: CheckpointState; after: CheckpointState; what: string } {
+  if (change.kind === "profile") {
+    const before: NextStepProfileFields = {};
+    for (const key of Object.keys(change.set) as (keyof NextStepProfileFields)[]) {
+      (before as Record<string, unknown>)[key] = current.profile?.[key] ?? null;
+    }
+    return { before: { profile: before }, after: { profile: { ...change.set } }, what: change.what };
+  }
+  if (change.kind === "openCheckIn") return { before: {}, after: {}, what: "Opened a check-in" };
   if (change.kind === "preferCuisine") {
     const was = current.preferredCuisines ?? [];
     return {
@@ -594,4 +607,63 @@ function conflict(recipeName: string, label: string, which: { chip?: string; tok
     change: { kind: "unavoid", ...which, label },
     addedAt: at,
   };
+}
+
+const STEP_PLURAL = { breakfast: "breakfasts", lunch: "lunches", dinner: "dinners" } as const;
+
+/** The "next best step" as a queued question: one sentence, one concrete action on Yes. */
+export function nextStepQuestion(step: NextStep, profile: UserProfile, now: Date): Question {
+  const base = { text: step.text, why: "From your last 7 logged days", source: "next-step" as const, addedAt: now.toISOString() };
+  const eaten = profile.eatenMeals ?? ["breakfast", "lunch", "dinner"];
+  const snacks = profile.snacksPerDay ?? 0;
+  switch (step.kind) {
+    case "slotAddOn":
+      return {
+        ...base,
+        id: `next:protein:${step.slot}`,
+        change: {
+          kind: "profile",
+          set: { slotAddOns: { ...(profile.slotAddOns ?? {}), [step.slot]: [step.option.item] } },
+          what: `Added ${step.option.label} to your ${STEP_PLURAL[step.slot]}`,
+        },
+      };
+    case "dropMeal": {
+      const next = eaten.filter((s) => s !== step.slot);
+      return {
+        ...base,
+        id: `next:skip:${step.slot}`,
+        change: {
+          kind: "profile",
+          set: { eatenMeals: next, mealsPerDay: mealsPerDayFromSelections(next, snacks) },
+          what: `Plans without ${step.slot}`,
+        },
+      };
+    }
+    case "addSnack":
+      return {
+        ...base,
+        id: "next:under",
+        change: {
+          kind: "profile",
+          set: { snacksPerDay: snacks + 1, mealsPerDay: mealsPerDayFromSelections(eaten, snacks + 1) },
+          what: "Added a planned snack",
+        },
+      };
+    case "openCheckIn":
+      return { ...base, id: "next:over", change: { kind: "openCheckIn" } };
+    case "prepLunch":
+      return {
+        ...base,
+        id: "next:prep-lunch",
+        change: {
+          kind: "profile",
+          set: {
+            mealSources: { ...(profile.mealSources ?? {}), lunch: "prep" },
+            weeklyMealPrepEnabled: true,
+            weeklyMealPrepSlot: "lunch",
+          },
+          what: "Prep lunches for the week",
+        },
+      };
+  }
 }

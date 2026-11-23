@@ -8,6 +8,7 @@ import {
 import { UsageNote } from "@/components/UsageNote";
 import { RollingWeekCalendar } from "@/components/RollingWeekCalendar";
 import { ClearDatesButton } from "@/components/ClearDatesButton";
+import { cookedMeals } from "@/utils/boughtMeals";
 import { useAppStore } from "@/store/useAppStore";
 import { formatQty, groceriesFromMeals, groceryVolumeLabel, mergeGroceryLists, simplifyGroceryList } from "@/utils/grocery";
 import {
@@ -57,6 +58,7 @@ export function GroceryScreen() {
   const plannedMeals = useAppStore((s) => s.plannedMeals);
   const todayDateKey = useAppStore((s) => s.todayDateKey);
   const userProfile = useAppStore((s) => s.userProfile);
+  const slotSourceOverrides = useAppStore((s) => s.slotSourceOverrides);
   const purchasedKeys = useAppStore((s) => s.groceryCheckedKeys);
   const ownedKeys = useAppStore((s) => s.groceryOwnedKeys);
   const todayHouseholdOverride = useAppStore((s) => s.todayHouseholdOverride);
@@ -114,12 +116,20 @@ export function GroceryScreen() {
 
   const items = useMemo(() => {
     const lists = groceryDateKeys.map((key) => {
-      const meals = mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey);
+      // Bought meals (usual setting or "Buy today") add nothing to the list.
+      const meals = cookedMeals(
+        mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey),
+        userProfile,
+        slotSourceOverrides,
+        key,
+      );
       const mult = key === todayDateKey ? todayMult : profileMult;
       return groceriesFromMeals(meals, mult);
     });
     return simplifyGroceryList(mergeGroceryLists(lists));
   }, [
+    slotSourceOverrides,
+    userProfile,
     dailyPlans,
     plannedMeals,
     todayDateKey,

@@ -141,6 +141,8 @@ export function TodayScreen() {
   function handleAnswer(q: Question, answer: Parameters<typeof answerQuestion>[1]) {
     setQuestion(null);
     const cp = answerQuestion(q.id, answer);
+    // "Open a check-in?" changes nothing by itself; Yes opens the check-in.
+    if (answer === "yes" && q.change.kind === "openCheckIn") setFeedbackOpen(true);
     if (cp) {
       showUndo({ message: `${cp.what}.`, undo: () => restoreCheckpoint(cp.id) }, 10000);
     }

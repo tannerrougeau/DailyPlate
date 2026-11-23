@@ -7,7 +7,7 @@ import {
   type GenerateOptions,
 } from "@/utils/generateDayPlan";
 import { recipeExcludedByDislikeChips } from "@/utils/chipMatching";
-import { isMealLocked } from "@/utils/mealLocks";
+import { isMealLocked, mealLockKey } from "@/utils/mealLocks";
 import {
   cookingEventsPerWeek,
   leftoverStreakDays,
@@ -264,6 +264,8 @@ export function applyLowComplexityToPlans(
 
   const eligibleDays = [...dateKeys].sort().filter((k) => !lockedDays.includes(k));
   if (eligibleDays.length === 0) return dailyPlans;
+  // Bought meals are never part of a cook event: treat them like locked meals here.
+  lockedMeals = [...lockedMeals, ...boughtMealKeys(eligibleDays, profile)];
 
   let next = { ...dailyPlans };
   next = simplifyBreakfasts(
@@ -280,6 +282,13 @@ export function applyLowComplexityToPlans(
   return next;
 }
 
+/** Lock keys for meals the user usually buys, so they're left out of cook groups and batches. */
+export function boughtMealKeys(dateKeys: string[], profile: UserProfile): string[] {
+  const sources = profile.mealSources ?? {};
+  const slots = (["breakfast", "lunch", "dinner"] as const).filter((s) => sources[s] === "buy");
+  return dateKeys.flatMap((k) => slots.map((s) => mealLockKey(k, s)));
+}
+
 /** After single-day generation, extend leftovers into later days in the same week. */
 export function applyLowComplexityFromDay(
   cookDateKey: string,
@@ -294,6 +303,7 @@ export function applyLowComplexityFromDay(
   if (!options.lowComplexity) return dailyPlans;
 
   const eligibleWeekKeys = weekKeys.filter((k) => !lockedDays.includes(k)).sort();
+  lockedMeals = [...lockedMeals, ...boughtMealKeys(eligibleWeekKeys, profile)];
   const cookDayIdx = eligibleWeekKeys.indexOf(cookDateKey);
   if (cookDayIdx < 0) return dailyPlans;
 

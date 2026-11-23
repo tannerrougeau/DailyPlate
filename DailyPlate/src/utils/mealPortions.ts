@@ -14,6 +14,7 @@ import {
 } from "@/utils/goalPortions";
 import { addNutrients, gramsForIngredient, type NutrientVector } from "@/utils/ingredientNutrition";
 import { hasLabelNutrition } from "@/utils/labelNutrition";
+import { ADD_ON_NAMES, withSlotAddOns } from "@/utils/slotAddOns";
 import { sidesNutrition, suggestSides, type SideSuggestion } from "@/utils/mealSides";
 import { isSnackPlanSlot } from "@/utils/planningPrefs";
 import { splitMealTargets, type MealTargetSlot } from "@/utils/mealTargets";
@@ -185,9 +186,18 @@ export function applyGoalPortions(
     timing?: MealTimingPreference | null;
     lockedSlots?: Set<MealSlotId>;
     fixedSlots?: Set<MealSlotId>;
+    /** Fixed add-ons per meal from a "next best step" Yes, sized in like sides. */
+    addOns?: Partial<Record<MealSlotId, RecipeIngredient[]>>;
   } = {},
 ): PlannedMeal[] {
   if (meals.length === 0 || !(daily.calories > 0)) return meals;
+  if (opts.addOns !== undefined || meals.some((m) => m.sides?.some((s) => ADD_ON_NAMES.has(s.name)))) {
+    meals = meals.map((m) => {
+      if (opts.lockedSlots?.has(m.slot) || opts.fixedSlots?.has(m.slot)) return m;
+      const sides = withSlotAddOns(m.sides, opts.addOns?.[m.slot]);
+      return JSON.stringify(sides ?? null) === JSON.stringify(m.sides ?? null) ? m : { ...m, sides };
+    });
+  }
   const isFixed = (m: PlannedMeal) =>
     opts.lockedSlots?.has(m.slot) ||
     opts.fixedSlots?.has(m.slot) ||

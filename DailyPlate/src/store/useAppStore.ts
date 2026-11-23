@@ -101,9 +101,11 @@ import {
   nextSkipStreak,
   pauseUntil,
   questionsAllowed,
+  nextStepQuestion,
   type PauseChoice,
 } from "@/utils/questionQueue";
-import { withSlotSourceOverride, type SlotSourceOverrides } from "@/utils/boughtMeals";
+import { isBoughtMeal, withSlotSourceOverride, type SlotSourceOverrides } from "@/utils/boughtMeals";
+import { nextStepDue, pickNextStep, type DayLog } from "@/utils/nextBestStep";
 import { applyFitAnswers, type FitAnswers } from "@/utils/fitYourLife";
 import type { FoodItem } from "@/utils/foodTypes";
 import type { MealSourceSlot } from "@/types/profile";
@@ -307,8 +309,10 @@ function commitCheckpoint(
     ...(after.favoriteFoodCustom != null ? { favoriteFoodCustom: after.favoriteFoodCustom } : {}),
     ...(after.dislikedFoodChips ? { dislikedFoodChips: after.dislikedFoodChips } : {}),
   };
-  if (s.userProfile && Object.keys(profileFields).length > 0) {
-    patch.userProfile = { ...s.userProfile, ...profileFields };
+  const nextStepFields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(after.profile ?? {})) nextStepFields[k] = v ?? undefined;
+  if (s.userProfile && Object.keys(profileFields).length + Object.keys(nextStepFields).length > 0) {
+    patch.userProfile = { ...s.userProfile, ...profileFields, ...nextStepFields };
   }
   set(patch);
   return cp;
@@ -1492,9 +1496,35 @@ export const useAppStore = create<AppState>()(
           ...usageQuestions(s.usageEvents, prefs, s.profileAnchoredAt, now),
           ...tasteQuestions(passes, s.userProfile.dislikedFoodCustom ?? "", now),
         ];
+        // Next best step: after 7 logged days, at most one a week.
+        let lastNextStepAt = s.lastNextStepAt;
+        if (nextStepDue(s.lastNextStepAt, now) && !s.questionQueue.some((q) => q.source === "next-step")) {
+          const days: DayLog[] = Object.keys(s.mealTracking).map((dateKey) => ({
+            dateKey,
+            meals: mealsForDate(s, dateKey),
+            tracking: s.mealTracking[dateKey],
+            snacks: s.snackLogs[dateKey] ?? [],
+          }));
+          const step = pickNextStep({
+            days,
+            todayKey: s.todayDateKey,
+            targets: s.targets,
+            profile: s.userProfile,
+            boughtLunch: (dateKey) => isBoughtMeal(s.userProfile, s.slotSourceOverrides, dateKey, "lunch"),
+          });
+          if (step) {
+            const q = nextStepQuestion(step, s.userProfile, now);
+            if (enqueue(s.questionQueue, s.questionLog, q, now) !== s.questionQueue) {
+              candidates.push(q);
+              lastNextStepAt = now.toISOString();
+            }
+          }
+        }
         let queue = s.questionQueue;
         for (const q of candidates) queue = enqueue(queue, s.questionLog, q, now);
-        if (queue !== s.questionQueue) set({ questionQueue: queue });
+        if (queue !== s.questionQueue || lastNextStepAt !== s.lastNextStepAt) {
+          set({ questionQueue: queue, lastNextStepAt });
+        }
       },
 
       markQuestionsAsked: () => set({ lastQuestionAskedAt: new Date().toISOString() }),
@@ -1511,6 +1541,8 @@ export const useAppStore = create<AppState>()(
           questionSkipStreak: nextSkipStreak(s.questionSkipStreak, answer),
         });
         if (answer !== "yes" || !question || !s.userProfile) return null;
+        // "Open a check-in" changes nothing; the screen opens the check-in.
+        if (question.change.kind === "openCheckIn") return null;
         const change = applyChange(
           {
             displayPrefs: resolveDisplayPrefs(s.displayPrefs),
@@ -1521,6 +1553,7 @@ export const useAppStore = create<AppState>()(
             preferredCuisines: s.userProfile.preferredCuisines ?? [],
             favoriteFoodCustom: s.userProfile.favoriteFoodCustom ?? "",
             dislikedFoodChips: s.userProfile.dislikedFoodChips ?? [],
+            profile: s.userProfile,
             planSettings: {
               prioritizeMinProtein: s.userProfile.prioritizeMinProtein,
               weeklyMealPrepEnabled: s.userProfile.weeklyMealPrepEnabled,
@@ -1612,6 +1645,13 @@ export const useAppStore = create<AppState>()(
         if (cp.before.preferredCuisines) current.preferredCuisines = s.userProfile.preferredCuisines ?? [];
         if (cp.before.favoriteFoodCustom != null) current.favoriteFoodCustom = s.userProfile.favoriteFoodCustom ?? "";
         if (cp.before.dislikedFoodChips) current.dislikedFoodChips = s.userProfile.dislikedFoodChips ?? [];
+        if (cp.before.profile) {
+          const now: Record<string, unknown> = {};
+          for (const key of Object.keys(cp.before.profile)) {
+            now[key] = (s.userProfile as unknown as Record<string, unknown>)[key] ?? null;
+          }
+          current.profile = now as typeof cp.before.profile;
+        }
         if (cp.before.planSettings) {
           const now: Record<string, unknown> = {};
           for (const key of Object.keys(cp.before.planSettings)) {
@@ -2226,7 +2266,7 @@ function portionedPlans(
         })
         .map((m) => m.slot),
     );
-    return applyGoalPortions(meals, s.targets, { timing, lockedSlots, fixedSlots });
+    return applyGoalPortions(meals, s.targets, { timing, lockedSlots, fixedSlots, addOns: s.userProfile?.slotAddOns });
   };
   let dailyChanged = false;
   let todayChanged = false;

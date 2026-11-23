@@ -85,7 +85,17 @@ export type CheckpointState = {
   preferredCuisines?: string[];
   favoriteFoodCustom?: string;
   dislikedFoodChips?: string[];
+  /** Plan fields changed by a "next best step" Yes (add-ons, meals, snacks, meal sources). */
+  profile?: NextStepProfileFields;
 };
+
+/** Profile fields a "next best step" can change (and a checkpoint can restore). */
+export type NextStepProfileFields = Partial<
+  Pick<
+    import("@/types/profile").UserProfile,
+    "slotAddOns" | "eatenMeals" | "snacksPerDay" | "mealsPerDay" | "mealSources" | "weeklyMealPrepEnabled" | "weeklyMealPrepSlot"
+  >
+>;
 
 /** Plan settings a check-in question can turn on (and a checkpoint can restore). */
 export type PlanSettings = {
