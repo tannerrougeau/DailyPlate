@@ -14,7 +14,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export type QuestionChange =
   | { kind: "display"; set: Partial<DisplayPrefs> }
   | { kind: "avoid"; ingredient: string }
-  | { kind: "variety" };
+  | { kind: "variety" }
+  | { kind: "shorterBatches"; days: number };
 
 export type Question = {
   /** Stable id: the same question is never queued twice. */
@@ -123,7 +124,22 @@ export function usageQuestions(
   return out;
 }
 
-export function checkInQuestions(entry: CheckInEntry, prefs: DisplayPrefs, profile: UserProfile | null, now: Date): Question[] {
+/** Batches longer than 2 days in the plan (weekly meal prep or planned leftovers). */
+export function usesLongBatches(profile: UserProfile | null): boolean {
+  if (!profile) return false;
+  const prep = profile.weeklyMealPrepEnabled === true && (profile.weeklyMealPrepRepeatCount ?? 3) > 2;
+  const leftovers = profile.lowComplexityEnabled === true && (profile.maxLeftoverStreakDays ?? 2) > 2;
+  return prep || leftovers;
+}
+
+export function checkInQuestions(
+  entry: CheckInEntry,
+  prefs: DisplayPrefs,
+  profile: UserProfile | null,
+  now: Date,
+  /** The plan has batches longer than 2 days (passed separately so plans with batches in progress count). */
+  hasLongBatches = usesLongBatches(profile),
+): Question[] {
   const at = now.toISOString();
   const out: Question[] = [];
   if (checkInScale(entry, "planEaseOfUse") <= 2 && prefs.cardMacros) {
@@ -143,6 +159,17 @@ export function checkInQuestions(entry: CheckInEntry, prefs: DisplayPrefs, profi
       why: "Your check-in said meals felt repetitive.",
       source: "check-in",
       change: { kind: "variety" },
+      addedAt: at,
+    });
+  }
+  // Batches are never shortened automatically; ask instead.
+  if (checkInScale(entry, "mealVarietySatisfaction") <= 2 && hasLongBatches) {
+    out.push({
+      id: "shorter-batches",
+      text: "Want shorter batches? (e.g., 2 days instead of 4)",
+      why: "Your check-in said meals felt repetitive, and your plan uses batch cooking.",
+      source: "check-in",
+      change: { kind: "shorterBatches", days: 2 },
       addedAt: at,
     });
   }
@@ -216,9 +243,28 @@ function appendToken(existing: string | undefined, token: string): string {
 
 /** The state before and after applying a change; only the affected fields are captured. */
 export function applyChange(
-  current: { displayPrefs: DisplayPrefs; dislikedFoodCustom: string; ingredientVariety?: UserProfile["ingredientVariety"] },
+  current: {
+    displayPrefs: DisplayPrefs;
+    dislikedFoodCustom: string;
+    ingredientVariety?: UserProfile["ingredientVariety"];
+    weeklyMealPrepRepeatCount?: UserProfile["weeklyMealPrepRepeatCount"];
+    maxLeftoverStreakDays?: number;
+  },
   change: QuestionChange,
 ): { before: CheckpointState; after: CheckpointState; what: string } {
+  if (change.kind === "shorterBatches") {
+    return {
+      before: {
+        weeklyMealPrepRepeatCount: current.weeklyMealPrepRepeatCount ?? 3,
+        maxLeftoverStreakDays: current.maxLeftoverStreakDays ?? 2,
+      },
+      after: {
+        weeklyMealPrepRepeatCount: Math.max(2, Math.min(current.weeklyMealPrepRepeatCount ?? 3, change.days)) as 2 | 3 | 4,
+        maxLeftoverStreakDays: Math.min(current.maxLeftoverStreakDays ?? 2, change.days),
+      },
+      what: `Shorter batches (${change.days} days)`,
+    };
+  }
   if (change.kind === "display") {
     const next = { ...current.displayPrefs, ...change.set };
     const turnedOn = Object.values(change.set).some(Boolean);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { QuestionCard } from "@/components/QuestionCard";
 import { resolveDisplayPrefs, type Checkpoint } from "@/utils/displayPrefs";
-import { checkInQuestions, MAX_IN_CHECK_IN, nextQuestions, type Question } from "@/utils/questionQueue";
+import { checkInQuestions, MAX_IN_CHECK_IN, nextQuestions, usesLongBatches, type Question } from "@/utils/questionQueue";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { ChevronDown, X } from "lucide-react";
 import { CHECK_IN_DISCLAIMER } from "@/checkIn/questionnaire";
@@ -147,7 +147,19 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
     // Checkpoint: up to two questions from this check-in and the queue.
     const now = new Date();
     const st = useAppStore.getState();
-    refreshQuestions(checkInQuestions(checkInResult.entry, resolveDisplayPrefs(st.displayPrefs), st.userProfile, now));
+    // Plans with batches longer than 2 days, from settings or from batches already planned ahead.
+    const plannedLongBatch = Object.entries(st.dailyPlans).some(
+      ([key, meals]) => key >= st.todayDateKey && meals.some((m) => (m.mealPrep?.portionsCooked ?? 1) > 2),
+    );
+    refreshQuestions(
+      checkInQuestions(
+        checkInResult.entry,
+        resolveDisplayPrefs(st.displayPrefs),
+        st.userProfile,
+        now,
+        usesLongBatches(st.userProfile) || plannedLongBatch,
+      ),
+    );
     const after = useAppStore.getState();
     setQuestions(nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN));
     setPhase("results");

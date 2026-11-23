@@ -57,8 +57,12 @@ export function isLowScore(n: number): boolean {
   return n <= 2;
 }
 
+/**
+ * Low enough to act on: 1–2 of 5. A neutral 3 never changes a plan, queues a question, or adds
+ * a suggestion. (Same as isLowScore; kept as its own name for the existing call sites.)
+ */
 export function isMidLowScore(n: number): boolean {
-  return n <= 3;
+  return n <= 2;
 }
 
 export function isHighScore(n: number): boolean {

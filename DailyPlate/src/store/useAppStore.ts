@@ -279,12 +279,14 @@ function commitCheckpoint(
   const cp: Checkpoint = { id: crypto.randomUUID(), at: new Date().toISOString(), what, why, before, after };
   const patch: Partial<AppState> = { checkpoints: [cp, ...s.checkpoints].slice(0, 100) };
   if (after.displayPrefs) patch.displayPrefs = after.displayPrefs;
-  if (s.userProfile && (after.dislikedFoodCustom != null || after.ingredientVariety != null)) {
-    patch.userProfile = {
-      ...s.userProfile,
-      ...(after.dislikedFoodCustom != null ? { dislikedFoodCustom: after.dislikedFoodCustom } : {}),
-      ...(after.ingredientVariety != null ? { ingredientVariety: after.ingredientVariety } : {}),
-    };
+  const profileFields = {
+    ...(after.dislikedFoodCustom != null ? { dislikedFoodCustom: after.dislikedFoodCustom } : {}),
+    ...(after.ingredientVariety != null ? { ingredientVariety: after.ingredientVariety } : {}),
+    ...(after.weeklyMealPrepRepeatCount != null ? { weeklyMealPrepRepeatCount: after.weeklyMealPrepRepeatCount } : {}),
+    ...(after.maxLeftoverStreakDays != null ? { maxLeftoverStreakDays: after.maxLeftoverStreakDays } : {}),
+  };
+  if (s.userProfile && Object.keys(profileFields).length > 0) {
+    patch.userProfile = { ...s.userProfile, ...profileFields };
   }
   set(patch);
   return cp;
@@ -498,6 +500,8 @@ export interface AppState {
   checkpoints: Checkpoint[];
   /** Foods found by name or typed from a label, saved for reuse and offline. */
   myFoods: FoodItem[];
+  /** Dev panel: a question to show on Today right away (not persisted). */
+  devForcedQuestionId: string | null;
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];
@@ -574,6 +578,11 @@ export interface AppState {
   /** Starting display switches from onboarding. */
   setStartingDisplay: (kind: "basic" | "detailed") => void;
   saveMyFood: (food: FoodItem) => void;
+  /** Dev panel: show the next queued question on Today now, ignoring spacing. */
+  devShowNextQuestion: () => string | null;
+  /** Dev panel: clear the 3-day spacing and every Not now / No snooze. */
+  devResetQuestionTimers: () => void;
+  clearDevForcedQuestion: () => void;
   removeSnackLog: (dateKey: string, loggedAt: string) => void;
   saveSnack: (snack: Omit<SavedSnack, "id">) => SavedSnack;
   deleteSavedSnack: (id: string) => void;
@@ -675,6 +684,7 @@ export const useAppStore = create<AppState>()(
       lastQuestionAskedAt: null,
       checkpoints: [],
       myFoods: [],
+      devForcedQuestionId: null,
       dismissedUsageNotes: {
         today: false,
         plan: false,
@@ -1433,6 +1443,8 @@ export const useAppStore = create<AppState>()(
             displayPrefs: resolveDisplayPrefs(s.displayPrefs),
             dislikedFoodCustom: s.userProfile.dislikedFoodCustom ?? "",
             ingredientVariety: s.userProfile.ingredientVariety,
+            weeklyMealPrepRepeatCount: s.userProfile.weeklyMealPrepRepeatCount,
+            maxLeftoverStreakDays: s.userProfile.maxLeftoverStreakDays,
           },
           question.change,
         );
@@ -1468,10 +1480,27 @@ export const useAppStore = create<AppState>()(
         if (cp.before.displayPrefs) current.displayPrefs = resolveDisplayPrefs(s.displayPrefs);
         if (cp.before.dislikedFoodCustom != null) current.dislikedFoodCustom = s.userProfile.dislikedFoodCustom ?? "";
         if (cp.before.ingredientVariety != null) current.ingredientVariety = s.userProfile.ingredientVariety;
+        if (cp.before.weeklyMealPrepRepeatCount != null) {
+          current.weeklyMealPrepRepeatCount = s.userProfile.weeklyMealPrepRepeatCount ?? 3;
+        }
+        if (cp.before.maxLeftoverStreakDays != null) {
+          current.maxLeftoverStreakDays = s.userProfile.maxLeftoverStreakDays ?? 2;
+        }
         return commitCheckpoint(set, get, `Restored: ${cp.what}`, "Restored from Display history", current, cp.before);
       },
 
       setStartingDisplay: (kind) => set({ displayPrefs: startingDisplayPrefs(kind) }),
+
+      devShowNextQuestion: () => {
+        get().refreshQuestions();
+        const id = get().questionQueue[0]?.id ?? null;
+        set({ devForcedQuestionId: id });
+        return id;
+      },
+
+      devResetQuestionTimers: () => set({ lastQuestionAskedAt: null, questionLog: {} }),
+
+      clearDevForcedQuestion: () => set({ devForcedQuestionId: null }),
 
       saveMyFood: (food) => {
         set((s) => ({ myFoods: [food, ...s.myFoods.filter((f) => f.id !== food.id)].slice(0, 200) }));

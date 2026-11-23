@@ -120,9 +120,9 @@ export function AddSnackSheet({
                 target={remaining ?? null}
                 forLabel="for what's left today"
                 onBack={() => setPicked(null)}
-                onLog={(servings) => {
-                  saveMyFood(picked);
-                  log(foodToSnackItem(picked), servings);
+                onLog={(servings, sized) => {
+                  saveMyFood(sized);
+                  log(foodToSnackItem(sized), servings);
                 }}
               />
             ) : (

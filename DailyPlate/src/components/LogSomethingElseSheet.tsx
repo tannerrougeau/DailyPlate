@@ -122,9 +122,9 @@ export function LogSomethingElseSheet({
                 target={meal.portion?.target ?? null}
                 forLabel={`for ${SLOT_LABELS[meal.slot].toLowerCase()}`}
                 onBack={() => setPicked(null)}
-                onLog={(servings) => {
-                  saveMyFood(picked);
-                  onSave(foodLogFromFood(dateKey, meal.slot, picked, servings));
+                onLog={(servings, sized) => {
+                  saveMyFood(sized);
+                  onSave(foodLogFromFood(dateKey, meal.slot, sized, servings));
                   onClose();
                 }}
               />

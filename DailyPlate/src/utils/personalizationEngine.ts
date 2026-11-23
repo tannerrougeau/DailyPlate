@@ -22,7 +22,10 @@ export type PersonalizationSignals = {
   recentRecipeIds: Set<string>;
   /** Swapped away within the last 30 days. */
   swappedRecipeIds: Set<string>;
-  /** How many days each recipe is planned in the window 7 days back to 7 days ahead. */
+  /**
+   * Cook events per recipe from 7 days back to 7 days ahead. A batch (meal prep, planned
+   * leftovers, Low Complexity) counts once, however many days it's eaten.
+   */
   recentCounts: Map<string, number>;
   /** Latest check-in said meals felt repetitive (variety 1–2 of 5). */
   wantsMoreVariety: boolean;
@@ -105,15 +108,19 @@ export function analyzePersonalizationSignals(input: {
     (input.swapLog ?? []).filter((s) => s.dateKey >= swapCutoff).map((s) => s.recipeId),
   );
 
-  // Repeats: count planned days per recipe from 7 days back to 7 days ahead.
-  const recentCounts = new Map<string, number>();
+  // Repeats: cook events per recipe from 7 days back to 7 days ahead. Every day of one batch
+  // shares the batch id, so a 4-day batch is one event, not four repeats.
+  const cookEvents = new Map<string, Set<string>>();
   for (let offset = -6; offset <= 7; offset++) {
     const key = toDateKey(addDays(anchor, offset));
-    const ids = new Set(
-      mealsForDateKey(key, input.dailyPlans, input.plannedMeals, input.todayDateKey).map((m) => m.recipe.id),
-    );
-    for (const id of ids) recentCounts.set(id, (recentCounts.get(id) ?? 0) + 1);
+    for (const meal of mealsForDateKey(key, input.dailyPlans, input.plannedMeals, input.todayDateKey)) {
+      const event = meal.mealPrep?.batchId ? `batch:${meal.mealPrep.batchId}` : `day:${key}`;
+      const events = cookEvents.get(meal.recipe.id) ?? new Set<string>();
+      events.add(event);
+      cookEvents.set(meal.recipe.id, events);
+    }
   }
+  const recentCounts = new Map([...cookEvents].map(([id, events]) => [id, events.size] as const));
 
   const wantsMoreVariety =
     input.latestCheckIn != null && checkInScale(input.latestCheckIn, "mealVarietySatisfaction") <= 2;

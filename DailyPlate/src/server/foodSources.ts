@@ -3,7 +3,7 @@
  * Runs on the server only: the USDA key never reaches the browser, and the Open Food Facts
  * User-Agent can be set (browsers don't allow it).
  */
-import type { FoodItem } from "../utils/foodTypes";
+import type { FoodItem, FoodPortion } from "../utils/foodTypes";
 
 export const OFF_USER_AGENT = "DailyPlate/1.0 (tannerrougeau@gmail.com)";
 export const OFF_CREDIT = "Open Food Facts";
@@ -65,7 +65,40 @@ export function normalizeUsda(food: UsdaFood): FoodItem | null {
     fat: fat100 != null ? Math.round(fat100 * f * 10) / 10 : undefined,
     source: "usda",
     sourceId: String(food.fdcId),
+    generic: !branded && food.dataType !== "Branded",
   };
+}
+
+type UsdaPortion = {
+  amount?: number;
+  modifier?: string;
+  portionDescription?: string;
+  gramWeight?: number;
+  measureUnit?: { name?: string };
+};
+
+/** Household portions from a USDA detail record, sensible ones first ("1 sandwich", "1 cup"). */
+export function normalizePortions(portions: UsdaPortion[] | undefined): FoodPortion[] {
+  const out: FoodPortion[] = [];
+  for (const p of portions ?? []) {
+    const grams = p.gramWeight;
+    if (!(typeof grams === "number" && grams > 1)) continue;
+    const unit = p.measureUnit?.name && p.measureUnit.name !== "undetermined" ? p.measureUnit.name : "";
+    const label = (p.portionDescription?.trim() || `${p.amount ?? 1} ${p.modifier?.trim() || unit}`).trim();
+    if (!label || /quantity not specified|not specified/i.test(label)) continue;
+    if (out.some((x) => x.label === label)) continue;
+    out.push({ label, grams: Math.round(grams * 10) / 10 });
+  }
+  return out;
+}
+
+export async function usdaPortions(fdcId: string, apiKey: string, fetchImpl: Fetch = fetch): Promise<FoodPortion[]> {
+  const url = new URL(`https://api.nal.usda.gov/fdc/v1/food/${encodeURIComponent(fdcId)}`);
+  url.searchParams.set("api_key", apiKey);
+  const res = await fetchImpl(url.toString());
+  if (!res.ok) throw new Error(`USDA details failed (${res.status})`);
+  const body = (await res.json()) as { foodPortions?: UsdaPortion[] };
+  return normalizePortions(body.foodPortions);
 }
 
 export async function searchUsda(query: string, apiKey: string, fetchImpl: Fetch = fetch): Promise<FoodItem[]> {

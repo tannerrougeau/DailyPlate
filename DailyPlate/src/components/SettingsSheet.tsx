@@ -24,6 +24,8 @@ import {
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import { DisplaySettings } from "@/components/DisplaySettings";
+import { DevPanel } from "@/components/DevPanel";
+import { BUILD_INFO } from "@/utils/buildInfo";
 import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 import { MealTimingPreferenceSection } from "@/components/MealTimingPreferenceSection";
 import { CuisinePreferenceSection } from "@/components/CuisinePreferenceSection";
@@ -52,6 +54,9 @@ import {
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const display = useDisplayPrefs();
+  // Hidden Dev panel: tap the version 5 times.
+  const [versionTaps, setVersionTaps] = useState(0);
+  const [devOpen, setDevOpen] = useState(false);
   const userProfile = useAppStore((s) => s.userProfile);
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const setTargets = useAppStore((s) => s.setTargets);
@@ -393,9 +398,25 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             Save
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = versionTaps + 1;
+            if (next >= 5) {
+              setVersionTaps(0);
+              setDevOpen(true);
+            } else {
+              setVersionTaps(next);
+            }
+          }}
+          className="mt-6 block w-full text-center text-xs text-slate-400"
+        >
+          Version {BUILD_INFO.version} ({BUILD_INFO.commit})
+        </button>
       </div>
     </div>
     {feedbackOpen && <CheckInSheet onClose={() => setFeedbackOpen(false)} />}
+    {devOpen && <DevPanel onClose={() => setDevOpen(false)} />}
     </>
   );
 }

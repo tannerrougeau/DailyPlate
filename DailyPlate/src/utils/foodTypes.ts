@@ -15,4 +15,9 @@ export type FoodItem = {
   sourceId: string;
   /** Shown with Open Food Facts results. */
   credit?: string;
+  /** Generic USDA food (Survey, SR Legacy, Foundation): values are per 100 g until a portion is chosen. */
+  generic?: boolean;
 };
+
+/** A household portion from USDA details, e.g. "1 sandwich" = 230 g. */
+export type FoodPortion = { label: string; grams: number };

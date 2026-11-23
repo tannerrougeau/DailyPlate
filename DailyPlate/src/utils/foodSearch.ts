@@ -1,5 +1,5 @@
 import type { DailyTargets } from "@/types";
-import type { FoodItem } from "@/utils/foodTypes";
+import type { FoodItem, FoodPortion } from "@/utils/foodTypes";
 import { commonSnackItems, type SnackItem } from "@/utils/snackItems";
 
 export const FOOD_SEARCH_URL = "/.netlify/functions/food-search";
@@ -206,5 +206,59 @@ export function foodLogFromFood(
     carbs: Math.round((food.carbs ?? 0) * servings),
     fat: Math.round((food.fat ?? 0) * servings),
     fiber: 0,
+  };
+}
+
+/**
+ * Household portions for a generic USDA food, through the same Netlify Function, cached a day.
+ * Returns [] when there are none (then per 100 g is used) or the request fails.
+ */
+export async function fetchPortions(
+  food: FoodItem,
+  deps: { fetchImpl?: typeof fetch; cache?: CacheStore | null; now?: number } = {},
+): Promise<FoodPortion[]> {
+  if (food.source !== "usda" || !food.generic) return [];
+  const now = deps.now ?? Date.now();
+  const cache = deps.cache === undefined ? safeLocalStorage() : deps.cache;
+  const key = `details:${food.sourceId}`;
+  try {
+    const raw = cache?.getItem(CACHE_PREFIX + key);
+    if (raw) {
+      const hit = JSON.parse(raw) as { at: number; portions: FoodPortion[] };
+      if (now - hit.at < DAY_MS) return hit.portions;
+    }
+  } catch {
+    /* ignore a bad cache entry */
+  }
+  try {
+    const res = await (deps.fetchImpl ?? fetch)(`${FOOD_SEARCH_URL}?fdcId=${encodeURIComponent(food.sourceId)}`);
+    if (!res.ok) return [];
+    const portions = ((await res.json()) as { portions?: FoodPortion[] }).portions ?? [];
+    try {
+      cache?.setItem(CACHE_PREFIX + key, JSON.stringify({ at: now, portions }));
+    } catch {
+      /* storage full or blocked */
+    }
+    return portions;
+  } catch {
+    return [];
+  }
+}
+
+/** A generic food (values per 100 g) sized to a portion or a gram amount. */
+export function applyPortion(food: FoodItem, portion: FoodPortion): FoodItem {
+  if (!food.generic) return food;
+  const f = portion.grams / 100;
+  const r1 = (v: number | undefined) => (v == null ? undefined : Math.round(v * f * 10) / 10);
+  return {
+    ...food,
+    generic: false,
+    id: `${food.id}@${Math.round(portion.grams)}g`,
+    servingLabel: `${portion.label} (${Math.round(portion.grams)} g)`,
+    servingGrams: portion.grams,
+    calories: Math.round(food.calories * f),
+    protein: r1(food.protein)!,
+    carbs: r1(food.carbs),
+    fat: r1(food.fat),
   };
 }

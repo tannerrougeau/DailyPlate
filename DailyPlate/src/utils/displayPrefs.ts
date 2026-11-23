@@ -1,4 +1,4 @@
-import type { IngredientVariety } from "@/types/profile";
+import type { IngredientVariety, WeeklyMealPrepRepeatCount } from "@/types/profile";
 
 /** Optional display elements, each with its own switch. Core actions are always shown. */
 export type DisplayElement =
@@ -75,6 +75,10 @@ export type CheckpointState = {
   displayPrefs?: DisplayPrefs;
   dislikedFoodCustom?: string;
   ingredientVariety?: IngredientVariety;
+  /** Weekly meal-prep batch length (days). */
+  weeklyMealPrepRepeatCount?: WeeklyMealPrepRepeatCount;
+  /** Longest run of planned leftovers (days). */
+  maxLeftoverStreakDays?: number;
 };
 
 export type Checkpoint = {

@@ -126,6 +126,15 @@ export function TodayScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Dev panel: show a forced question right away.
+  const devForcedQuestionId = useAppStore((s) => s.devForcedQuestionId);
+  useEffect(() => {
+    if (!devForcedQuestionId) return;
+    const forced = useAppStore.getState().questionQueue.find((x) => x.id === devForcedQuestionId);
+    if (forced) setQuestion(forced);
+    useAppStore.getState().clearDevForcedQuestion();
+  }, [devForcedQuestionId]);
+
   function handleAnswer(q: Question, answer: Parameters<typeof answerQuestion>[1]) {
     setQuestion(null);
     const cp = answerQuestion(q.id, answer);
