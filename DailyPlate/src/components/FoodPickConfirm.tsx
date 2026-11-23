@@ -105,6 +105,11 @@ export function FoodPickConfirm({
 
       {target && <p className="mt-2 text-sm leading-relaxed text-slate-700">{fitLine(sized, target, forLabel)}</p>}
       {topUp && <p className="mt-1 text-sm leading-relaxed text-slate-700">{topUp}</p>}
+      {food.sourceName && food.sourceName !== food.name && (
+        <p className="mt-1 text-[11px] text-slate-400">
+          {food.source === "usda" ? "USDA" : "Listed as"}: {food.sourceName}
+        </p>
+      )}
       {food.credit && <p className="mt-1 text-[11px] text-slate-400">Data: {food.credit}</p>}
       <div className="mt-3 flex gap-2">
         <button

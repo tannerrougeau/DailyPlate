@@ -51,6 +51,13 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Netlify Functions are never served the app shell or cached: opening
+        // /.netlify/functions/... shows the function's JSON, and fetch() goes to the network.
+        navigateFallbackDenylist: [/^\/\.netlify\//],
+        // A new deploy takes over right away and old precaches are removed.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

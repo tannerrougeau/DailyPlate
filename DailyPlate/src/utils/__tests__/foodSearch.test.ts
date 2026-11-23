@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   handleFoodSearchRequest,
+  isNearDuplicate,
   normalizeOff,
   normalizeUsda,
   OFF_USER_AGENT,
+  rankAndDedupe,
   searchRemote,
   setOffRetryMs,
+  tidyCase,
+  tidyUsdaName,
   USDA_DATA_TYPES,
   USDA_ENOUGH,
 } from "@/server/foodSources";
@@ -53,7 +57,8 @@ describe("server sources", () => {
     expect(branded.servingLabel).toBe("1 container (150 g)");
     expect(branded.calories).toBe(120);
     expect(branded.protein).toBe(12);
-    expect(branded.brand).toBe("Chobani");
+    expect(branded.name).toBe("Chobani Vanilla Yogurt");
+    expect(branded.brand).toBeUndefined(); // already in the name
     const generic = normalizeUsda(usdaFood(2, false))!;
     expect(generic.servingLabel).toBe("100 g");
     expect(generic.calories).toBe(80);
@@ -229,5 +234,67 @@ describe("when search fails", () => {
     const again = await searchFoods("snickers", { myFoods: [], fetchImpl: ok, cache, online: true });
     expect(ok).toHaveBeenCalledTimes(1);
     expect(again.remote).toHaveLength(1);
+  });
+});
+
+describe("search results cleanup", () => {
+  const usda = (fdcId: number, description: string, dataType: string, kcal: number, brandName?: string) => ({
+    fdcId,
+    description,
+    dataType,
+    brandName,
+    servingSize: 50,
+    servingSizeUnit: "g",
+    foodNutrients: [
+      { nutrientId: 1008, value: kcal },
+      { nutrientId: 1003, value: 7 },
+    ],
+  });
+  // Real USDA results for "snickers" (abridged), in USDA's order.
+  const snickers = [
+    usda(1, "Candies, MARS SNACKFOOD US, SNICKERS CRUNCHER", "SR Legacy", 488),
+    usda(2, "Nutrition bar (Snickers Marathon Protein Bar)", "Survey (FNDDS)", 415),
+    usda(3, "SNICKERS LIQUID CREAMER SINGLES, SNICKERS", "Branded", 273, "COFFEE-MATE"),
+    usda(4, "Formulated bar, MARS SNACKFOOD US, SNICKERS MARATHON Protein Performance Bar, Caramel Nut Rush", "SR Legacy", 415),
+    usda(5, "Candies, MARS SNACKFOOD US, SNICKERS Bar", "SR Legacy", 491),
+  ].map((f) => normalizeUsda(f)!);
+
+  it("tidies USDA names and capitalization; the original name is kept", () => {
+    expect(snickers[4]!.name).toBe("Snickers Bar");
+    expect(snickers[4]!.brand).toBe("Mars Snackfood");
+    expect(snickers[4]!.sourceName).toBe("Candies, MARS SNACKFOOD US, SNICKERS Bar");
+    expect(snickers[1]!.name).toBe("Snickers Marathon Protein Bar");
+    expect(snickers[2]!.name).toBe("Snickers Liquid Creamer Singles");
+    expect(snickers[2]!.brand).toBe("Coffee-Mate");
+    expect(tidyUsdaName({ description: "SNICKERS, SNICKERS MINIS", dataType: "Branded", brandName: "SNICKERS" })).toEqual({
+      name: "Snickers Minis",
+      brand: undefined,
+    });
+    expect(tidyUsdaName({ description: "Yogurt, Greek, nonfat, vanilla, CHOBANI", dataType: "SR Legacy" })).toEqual({
+      name: "Yogurt, Greek, nonfat, vanilla",
+      brand: "Chobani",
+    });
+    expect(tidyCase("18TH STREET SELECT")).toBe("18th Street Select");
+    expect(tidyCase("Turkey sandwich on wheat")).toBe("Turkey sandwich on wheat");
+    expect(normalizeOff({ ...offProduct, product_name: "SNICKERS", brands: "MARS" })!.name).toBe("Snickers");
+  });
+
+  it("closest names first: Snickers Bar before the creamer and the Marathon bars", () => {
+    const names = rankAndDedupe("snickers", snickers).map((f) => f.name);
+    expect(names[0]).toBe("Snickers Bar");
+    expect(names.indexOf("Snickers Bar")).toBeLessThan(names.indexOf("Snickers Liquid Creamer Singles"));
+    expect(names.indexOf("Snickers Bar")).toBeLessThan(names.indexOf("Snickers Marathon Protein Bar"));
+  });
+
+  it("the same food in two USDA datasets with matching calories appears once", () => {
+    const out = rankAndDedupe("snickers", snickers);
+    expect(out).toHaveLength(4);
+    expect(out.filter((f) => /Marathon Protein/.test(f.name))).toHaveLength(1);
+    expect(isNearDuplicate(snickers[1]!, snickers[3]!)).toBe(true);
+    // Different calories, or the same dataset: kept.
+    expect(isNearDuplicate(snickers[0]!, snickers[4]!)).toBe(false);
+    const a = normalizeUsda(usda(8, "Turkey sandwich on wheat", "Survey (FNDDS)", 187))!;
+    const b = normalizeUsda(usda(9, "Turkey sandwich on wheat, with cheese", "Survey (FNDDS)", 187))!;
+    expect(isNearDuplicate(a, b)).toBe(false);
   });
 });

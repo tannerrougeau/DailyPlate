@@ -39,8 +39,118 @@ function nutrient(food: UsdaFood, ids: number[]): number | null {
   return null;
 }
 
-const titleCase = (s: string) =>
-  s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+/** Words kept upper case when tidying names. */
+const KEEP_UPPER = new Set(["US", "USA", "UK", "BBQ", "LLC", "II", "III", "XL"]);
+
+/** "SNICKERS Bar" → "Snickers Bar": all-caps words get normal capitalization; mixed case is kept. */
+export function tidyCase(s: string): string {
+  return s
+    .split(/(\s+|-|\/)/)
+    .map((w) => {
+      if (!/[A-Z]{2,}/.test(w) || /[a-z]/.test(w) || KEEP_UPPER.has(w)) return w;
+      if (/\d/.test(w)) return w.toLowerCase(); // "18TH" → "18th", "2PK" → "2pk"
+      return w.charAt(0) + w.slice(1).toLowerCase();
+    })
+    .join("");
+}
+
+const isAllCaps = (s: string) => /[A-Z]/.test(s) && !/[a-z]/.test(s);
+
+/**
+ * Readable USDA names, keeping the brand separate:
+ * - SR Legacy "Candies, MARS SNACKFOOD US, SNICKERS Bar" → "Snickers Bar"
+ * - SR Legacy "Yogurt, Greek, nonfat, vanilla, CHOBANI" → "Yogurt, Greek, nonfat, vanilla" (brand Chobani)
+ * - Branded "SNICKERS, SNICKERS MINIS" (brand SNICKERS) → "Snickers Minis"
+ * - FNDDS "Nutrition bar (Snickers Marathon Protein Bar)" → "Snickers Marathon Protein Bar"
+ */
+export function tidyUsdaName(food: Pick<UsdaFood, "description" | "dataType" | "brandName" | "brandOwner">): {
+  name: string;
+  brand?: string;
+} {
+  const desc = food.description.trim();
+  const brandRaw = food.brandName || food.brandOwner || "";
+  if (food.dataType === "Branded") {
+    const brandKey = brandRaw.trim().toLowerCase();
+    const parts = desc.split(/,\s*/).filter(Boolean);
+    const kept = parts.filter((p) => p.toLowerCase() !== brandKey);
+    // Drop a trailing part whose words are already in the name ("…CREAMER SINGLES, SNICKERS").
+    const named = (kept.length > 0 ? kept : parts).filter((p, i, all) => {
+      if (i === 0) return true;
+      const before = new Set(words(all.slice(0, i).join(" ")));
+      return !words(p).every((w) => before.has(w));
+    });
+    const name = tidyCase(named.join(", "));
+    // Brand shown only when the name doesn't already start with it ("Snickers Minis", not "… · Snickers").
+    const brand = brandRaw && !name.toLowerCase().startsWith(brandKey) ? tidyCase(brandRaw) : undefined;
+    return { name, brand };
+  }
+  // FNDDS: "Generic (Specific Product Name)" when the parenthetical is a proper name.
+  const paren = desc.match(/^[^()]+\(([^()]+)\)$/);
+  if (paren && /^[A-Z]/.test(paren[1]!.trim()) && /[A-Z].*\s.*[A-Z]/.test(paren[1]!)) {
+    return { name: paren[1]!.trim() };
+  }
+  const parts = desc.split(/,\s*/);
+  // SR Legacy branded: "Category, BRAND OWNER, PRODUCT…"
+  if (parts.length >= 3 && isAllCaps(parts[1]!) && parts[1]!.split(/\s+/).length >= 2) {
+    const owner = parts[1]!.replace(/\s+(US|USA|INC\.?|LLC)$/i, "");
+    return { name: tidyCase(parts.slice(2).join(", ")), brand: tidyCase(owner) };
+  }
+  // Brand at the end: "Yogurt, Greek, nonfat, vanilla, CHOBANI"
+  const last = parts[parts.length - 1]!;
+  if (parts.length >= 2 && isAllCaps(last) && last.length >= 3) {
+    return { name: parts.slice(0, -1).join(", "), brand: tidyCase(last) };
+  }
+  return { name: desc };
+}
+
+// ---------- Ranking and duplicates ----------
+
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+
+/** Lower is closer: exact name, then names starting with the query, then all words present; fewer extra words first. */
+export function matchScore(query: string, food: Pick<FoodItem, "name">): number {
+  const q = words(query);
+  const n = words(food.name);
+  const qs = q.join(" ");
+  const ns = n.join(" ");
+  const tier = ns === qs ? 0 : ns.startsWith(qs) ? 1 : q.every((w) => n.includes(w)) ? 2 : 3;
+  const extra = n.filter((w) => !q.includes(w)).length;
+  return tier * 1000 + extra * 20 + Math.min(ns.length, 19);
+}
+
+/**
+ * The same food in two USDA datasets: different datasets, calories per 100 g within 1%, and one
+ * name's words contain the other's.
+ */
+export function isNearDuplicate(a: FoodItem, b: FoodItem): boolean {
+  if (a.source !== "usda" || b.source !== "usda" || a.kcalPer100g == null || b.kcalPer100g == null) return false;
+  if (!a.dataset || !b.dataset || a.dataset === b.dataset) return false;
+  const k = Math.max(a.kcalPer100g, b.kcalPer100g, 1);
+  if (Math.abs(a.kcalPer100g - b.kcalPer100g) / k > 0.01) return false;
+  const wa = new Set(words(a.name));
+  const wb = new Set(words(b.name));
+  const [small, big] = wa.size <= wb.size ? [wa, wb] : [wb, wa];
+  return small.size >= 2 && [...small].every((w) => big.has(w));
+}
+
+/** USDA before Open Food Facts; within each, closest names first (stable). Then near-duplicates are dropped. */
+export function rankAndDedupe(query: string, foods: FoodItem[]): FoodItem[] {
+  const sourceOrder = (f: FoodItem) => (f.source === "usda" ? 0 : 1);
+  const ranked = foods
+    .map((f, i) => ({ f, i, s: sourceOrder(f) * 100000 + matchScore(query, f) }))
+    .sort((x, y) => x.s - y.s || x.i - y.i)
+    .map((x) => x.f);
+  const out: FoodItem[] = [];
+  for (const f of ranked) {
+    if (!out.some((kept) => isNearDuplicate(kept, f))) out.push(f);
+  }
+  return out;
+}
 
 /** USDA search values are per 100 g; branded foods are converted to their label serving. */
 export function normalizeUsda(food: UsdaFood): FoodItem | null {
@@ -59,10 +169,14 @@ export function normalizeUsda(food: UsdaFood): FoodItem | null {
       ? `${food.householdServingFullText} (${amount})`
       : amount
     : "100 g";
+  const tidy = tidyUsdaName(food);
   return {
     id: `usda:${food.fdcId}`,
-    name: food.dataType === "Branded" ? titleCase(food.description) : food.description,
-    brand: food.brandName || food.brandOwner || undefined,
+    name: tidy.name,
+    brand: tidy.brand,
+    sourceName: food.description,
+    kcalPer100g: kcal100,
+    dataset: food.dataType,
     servingLabel,
     servingGrams: grams,
     calories: Math.round(kcal100 * f),
@@ -158,8 +272,9 @@ export function normalizeOff(p: OffProduct): FoodItem | null {
   const servingLabel = perServing || servingG ? p.serving_size || `${servingG} g` : "100 g";
   return {
     id: `off:${p.code}`,
-    name: p.product_name,
-    brand: p.brands?.split(",")[0]?.trim() || undefined,
+    name: tidyCase(p.product_name),
+    brand: p.brands?.split(",")[0]?.trim() ? tidyCase(p.brands.split(",")[0]!.trim()) : undefined,
+    sourceName: p.product_name,
     servingLabel,
     servingGrams: servingG ?? (perServing ? null : 100),
     calories: Math.round(kcal),
@@ -230,11 +345,11 @@ export async function searchRemote(
       errors.push(e instanceof Error ? e.message : String(e));
     }
   }
-  const results = [...usda, ...off];
+  const results = rankAndDedupe(query, [...usda, ...off]);
   return {
     results,
-    usdaCount: usda.length,
-    offCount: off.length,
+    usdaCount: results.filter((f) => f.source === "usda").length,
+    offCount: results.filter((f) => f.source === "off").length,
     errors,
     failed: results.length === 0 && !usdaOk && !offOk,
   };
