@@ -360,9 +360,10 @@ export const snackRecipes: Recipe[] = [
       { name: "Cherry tomatoes", quantity: 1, unit: "cup", category: "Produce" },
       { name: "Mozzarella pearls", quantity: 1, unit: "oz", category: "Dairy" },
       { name: "Fresh basil", quantity: 4, unit: "leaves", category: "Produce" },
+      { name: "Olive oil", quantity: 1, unit: "tsp", category: "Pantry" },
     ],
     instructions: [
-      "Toss tomatoes, mozzarella, and basil. Salt if you like.",
+      "Toss tomatoes, mozzarella, and basil. Drizzle with 1 tsp olive oil and salt if you like.",
     ],
   },
   {

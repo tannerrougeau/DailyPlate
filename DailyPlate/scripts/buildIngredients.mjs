@@ -34,7 +34,7 @@ add({
   query: "Beef, ground, 93% lean meat / 7% fat, raw",
   per100g: { calories: 152, protein: 20.85, carbs: 0, fat: 7, fiber: 0 },
   grams: g(null, null, null, OZ, null),
-  aliases: ["Lean ground beef (93%)", "Lean beef strips"],
+  aliases: ["Lean ground beef (93%)"],
 });
 
 add({
@@ -89,7 +89,7 @@ add({
   query: "Beef, top sirloin, separable lean only, trimmed to 1/8 inch fat, raw",
   per100g: { calories: 157, protein: 21.8, carbs: 0, fat: 7.4, fiber: 0 },
   grams: g(null, null, null, OZ, null),
-  aliases: ["Sirloin steak"],
+  aliases: ["Sirloin steak", "Lean beef strips"],
 });
 
 add({
@@ -681,7 +681,8 @@ add({
   fdcId: 170043,
   query: "Potatoes, hash brown, frozen, plain, unprepared",
   per100g: { calories: 82, protein: 2.06, carbs: 17.72, fat: 0.62, fiber: 1.7 },
-  grams: g(null, null, null, OZ, null),
+  // Loosely measured frozen shreds; USDA's ½ cup = 105 g portion is packed.
+  grams: g(85, null, null, OZ, null),
   aliases: ["Shredded hash browns (cooked)"],
 });
 add({

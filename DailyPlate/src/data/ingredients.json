@@ -54,8 +54,7 @@
       "g": 1
     },
     "aliases": [
-      "Lean ground beef (93%)",
-      "Lean beef strips"
+      "Lean ground beef (93%)"
     ],
     "role": "protein",
     "state": "raw",
@@ -234,7 +233,8 @@
       "g": 1
     },
     "aliases": [
-      "Sirloin steak"
+      "Sirloin steak",
+      "Lean beef strips"
     ],
     "role": "protein",
     "state": "raw",
@@ -2294,7 +2294,7 @@
       "fiber": 1.4
     },
     "grams": {
-      "cup": 210,
+      "cup": 85,
       "tbsp": null,
       "tsp": null,
       "oz": 28.3495,
