@@ -76,6 +76,9 @@ function fiberForIngredient(ing: RecipeIngredient): number {
   if (/lentil/.test(name)) return cup(15.6) || q * 8;
   if (/\bbeans?\b/.test(name) && !/green bean/.test(name)) return cup(12) || q * 6;
   if (/edamame/.test(name)) return cup(8) || q * 4;
+  if (/almond milk|oat milk|soy milk|coconut milk|cashew milk/.test(name)) {
+    return cup(0.5) || 0;
+  }
 
   if (/rolled oats|oats|oatmeal/.test(name)) return cup(8) || q * 4;
   if (/quinoa/.test(name)) return cup(5) || q * 2.5;

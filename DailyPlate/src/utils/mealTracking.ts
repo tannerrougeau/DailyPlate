@@ -1,12 +1,21 @@
 import type {
   DailyTargets,
   DayMealTracking,
+  FoodLogSource,
+  MealSlotId,
   MealTrackingEntry,
   MealTrackingStatus,
   PlannedMeal,
+  Recipe,
 } from "@/types";
 import { mealMacrosWithBeverage } from "@/utils/beverages";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
+import {
+  effectiveVariationId,
+  recipeFiberGrams,
+  resolveRecipeMacros,
+  resolveVariationId,
+} from "@/utils/recipeDisplay";
 
 export function mealsForDateKey(
   dateKey: string,
@@ -25,6 +34,8 @@ export function trackingMultiplier(status: MealTrackingStatus): number {
       return 1;
     case "half":
       return 0.5;
+    case "extra":
+      return 1.5;
     case "skipped":
       return 0;
   }
@@ -32,6 +43,173 @@ export function trackingMultiplier(status: MealTrackingStatus): number {
 
 export function macrosForMeal(meal: PlannedMeal): DailyTargets {
   return mealMacrosWithBeverage(meal);
+}
+
+function statusForPortion(portionMultiplier: number): MealTrackingStatus {
+  if (portionMultiplier <= 0) return "skipped";
+  if (portionMultiplier === 0.5) return "half";
+  if (portionMultiplier === 1.5) return "extra";
+  return "all";
+}
+
+function scaledMacros(macros: DailyTargets, portionMultiplier: number): DailyTargets {
+  return {
+    calories: Math.round(macros.calories * portionMultiplier),
+    protein: Math.round(macros.protein * portionMultiplier),
+    carbs: Math.round(macros.carbs * portionMultiplier),
+    fat: Math.round(macros.fat * portionMultiplier),
+    fiber: Math.round((macros.fiber ?? 0) * portionMultiplier),
+  };
+}
+
+/** Logged amounts for the planned meal (including its drink), already scaled. */
+export function foodLogFromPlannedMeal(
+  date: string,
+  meal: PlannedMeal,
+  portionMultiplier: number,
+): MealTrackingEntry {
+  const macros = scaledMacros(macrosForMeal(meal), portionMultiplier);
+  return {
+    status: statusForPortion(portionMultiplier),
+    loggedAt: new Date().toISOString(),
+    date,
+    slot: meal.slot,
+    source: "recipe",
+    recipeId: meal.recipe.id,
+    variationId: effectiveVariationId(meal),
+    portionMultiplier,
+    ...macros,
+  };
+}
+
+/** Ate a different recipe than the one planned for this slot. */
+export function foodLogFromRecipe(
+  date: string,
+  slot: MealSlotId,
+  recipe: Recipe,
+): MealTrackingEntry {
+  const variationId = resolveVariationId(recipe, undefined);
+  const macros = resolveRecipeMacros(recipe, variationId);
+  return {
+    status: "custom",
+    note: recipe.name,
+    loggedAt: new Date().toISOString(),
+    date,
+    slot,
+    source: "recipe",
+    recipeId: recipe.id,
+    variationId,
+    portionMultiplier: 1,
+    calories: Math.round(macros.calories),
+    protein: Math.round(macros.protein),
+    carbs: Math.round(macros.carbs),
+    fat: Math.round(macros.fat),
+    fiber: Math.round(recipeFiberGrams(recipe, variationId)),
+  };
+}
+
+/** Approximate calories and protein typed in by hand. Carbs, fat, and fiber stay 0. */
+export function foodLogManual(
+  date: string,
+  slot: MealSlotId,
+  calories: number,
+  protein: number,
+): MealTrackingEntry {
+  return {
+    status: "custom",
+    note: `${calories} kcal · ${protein}g protein`,
+    loggedAt: new Date().toISOString(),
+    date,
+    slot,
+    source: "manual",
+    portionMultiplier: 1,
+    calories,
+    protein,
+    carbs: 0,
+    fat: 0,
+    fiber: 0,
+  };
+}
+
+function entryHasFoodLog(entry: MealTrackingEntry): boolean {
+  return (
+    (entry.source === "recipe" || entry.source === "manual" || entry.source === "scan") &&
+    typeof entry.portionMultiplier === "number" &&
+    typeof entry.calories === "number"
+  );
+}
+
+/**
+ * Fill date, slot, source, recipe, portion, and macros on older eaten/skipped
+ * rows that only stored a status. Snapshot macros from the meal that was planned
+ * that day. Rows that already have the food-log fields are left as logged.
+ */
+export function migrateMealTracking(
+  tracking: Record<string, DayMealTracking>,
+  dailyPlans: Record<string, PlannedMeal[]>,
+  plannedMeals: PlannedMeal[],
+  todayDateKey: string,
+): Record<string, DayMealTracking> {
+  let changed = false;
+  const next: Record<string, DayMealTracking> = {};
+  for (const [date, day] of Object.entries(tracking)) {
+    const meals =
+      dailyPlans[date] ?? (date === todayDateKey ? plannedMeals : []);
+    const nextDay: DayMealTracking = {};
+    for (const [slot, entry] of Object.entries(day) as [MealSlotId, MealTrackingEntry][]) {
+      if (!entry) continue;
+      if (entryHasFoodLog(entry) && entry.date && entry.slot) {
+        nextDay[slot] = entry;
+        continue;
+      }
+      changed = true;
+      const meal = meals.find((item) => item.slot === slot);
+      if (entry.status === "custom" && typeof entry.calories === "number") {
+        const source: FoodLogSource = entry.recipeId ? "recipe" : "manual";
+        nextDay[slot] = {
+          ...entry,
+          date,
+          slot,
+          source: entry.source ?? source,
+          portionMultiplier: entry.portionMultiplier ?? 1,
+          protein: entry.protein ?? 0,
+          carbs: entry.carbs ?? 0,
+          fat: entry.fat ?? 0,
+          fiber: entry.fiber ?? 0,
+        };
+        continue;
+      }
+      const portionMultiplier = entry.portionMultiplier ?? trackingMultiplier(entry.status);
+      if (!meal) {
+        nextDay[slot] = {
+          ...entry,
+          date,
+          slot,
+          source: entry.source ?? "recipe",
+          portionMultiplier,
+          calories: entry.calories ?? 0,
+          protein: entry.protein ?? 0,
+          carbs: entry.carbs ?? 0,
+          fat: entry.fat ?? 0,
+          fiber: entry.fiber ?? 0,
+        };
+        continue;
+      }
+      const macros = scaledMacros(macrosForMeal(meal), portionMultiplier);
+      nextDay[slot] = {
+        ...entry,
+        date,
+        slot,
+        source: "recipe",
+        recipeId: entry.recipeId ?? meal.recipe.id,
+        variationId: entry.variationId ?? effectiveVariationId(meal),
+        portionMultiplier,
+        ...macros,
+      };
+    }
+    next[date] = nextDay;
+  }
+  return changed ? next : tracking;
 }
 
 export function sumTrackedMacros(
@@ -54,6 +232,14 @@ export function sumTrackedMacros(
   for (const meal of meals) {
     const entry = tracking[meal.slot];
     if (!entry) continue;
+    if (entryHasFoodLog(entry) || (entry.status === "custom" && entry.calories != null)) {
+      eaten.calories += entry.calories ?? 0;
+      eaten.protein += entry.protein ?? 0;
+      eaten.carbs += entry.carbs ?? 0;
+      eaten.fat += entry.fat ?? 0;
+      eaten.fiber = (eaten.fiber ?? 0) + (entry.fiber ?? 0);
+      continue;
+    }
     const mult = trackingMultiplier(entry.status);
     const m = macrosForMeal(meal);
     eaten.calories += m.calories * mult;
@@ -68,13 +254,15 @@ export function sumTrackedMacros(
 export function trackingLabel(entry: MealTrackingEntry): string {
   switch (entry.status) {
     case "all":
-      return "Ate all";
+      return "Eaten";
     case "half":
       return "Ate half";
+    case "extra":
+      return "Ate 1.5×";
     case "skipped":
       return "Skipped";
     case "custom":
-      return entry.note?.trim() ? entry.note.trim() : "Logged";
+      return entry.note?.trim() ? entry.note.trim() : "Something else";
   }
 }
 
@@ -84,6 +272,7 @@ export function trackingBadgeClass(status: MealTrackingStatus): string {
     case "custom":
       return "bg-emerald-50 text-emerald-800 ring-emerald-200";
     case "half":
+    case "extra":
       return "bg-amber-50 text-amber-900 ring-amber-200";
     case "skipped":
       return "bg-slate-100 text-slate-600 ring-slate-200";

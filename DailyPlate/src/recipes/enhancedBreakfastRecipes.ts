@@ -15,6 +15,7 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Top with extra blueberries when serving if desired.",
     ],
     servingWeightGrams: 420,
+    fiber: 11,
   },
   {
     id: "chocolate-banana-nut",
@@ -31,6 +32,7 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Stir before eating so chocolate melts slightly into the oats.",
     ],
     servingWeightGrams: 435,
+    fiber: 12,
   },
   {
     id: "cinnamon-maple",
@@ -46,6 +48,7 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Stir well before eating.",
     ],
     servingWeightGrams: 415,
+    fiber: 10,
   },
   {
     id: "apple-pecan",
@@ -61,6 +64,7 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Best after chilling overnight so apples soften slightly.",
     ],
     servingWeightGrams: 425,
+    fiber: 13,
   },
   {
     id: "strawberry",
@@ -76,6 +80,7 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Top with extra strawberry pieces when serving if desired.",
     ],
     servingWeightGrams: 415,
+    fiber: 11,
   },
   {
     id: "coconut-chocolate-banana",
@@ -91,6 +96,7 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Stir before eating so coconut and chocolate distribute evenly.",
     ],
     servingWeightGrams: 430,
+    fiber: 13,
   },
 ];
 
@@ -389,6 +395,7 @@ export const highProteinOvernightOats: Recipe = {
   protein: 32,
   carbs: 42,
   fat: 10,
+  fiber: 10,
   prepMinutes: 10,
   cookMinutes: 0,
   servingWeightGrams: 415,

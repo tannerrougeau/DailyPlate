@@ -467,6 +467,17 @@ export function formatHouseholdPlanningLine(
 }
 
 /** One-line label for Today / Grocery (e.g. "Cooking for 2 adults, 1 child"). */
+export function formatHouseholdChip(
+  profile: UserProfile | null | undefined,
+  countsOverride?: HouseholdDayCounts | null,
+): string {
+  const { adults, children } = resolveHouseholdCounts(profile, countsOverride);
+  const adultPart = adults === 1 ? "1 adult" : `${adults} adults`;
+  if (children <= 0) return adultPart;
+  const childPart = children === 1 ? "1 child" : `${children} children`;
+  return `${adultPart} · ${childPart}`;
+}
+
 export function formatHouseholdCookingLine(
   profile: HouseholdProfileFields | null,
   countsOverride?: HouseholdDayCounts | null,

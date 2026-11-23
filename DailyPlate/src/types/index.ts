@@ -141,12 +141,37 @@ export interface DailyTargets {
   fiber?: number;
 }
 
-export type MealTrackingStatus = "all" | "half" | "skipped" | "custom";
+export type MealTrackingStatus = "all" | "half" | "extra" | "skipped" | "custom";
+
+/**
+ * Stable food log. Another app can append entries in this shape.
+ * The store groups them as mealTracking[date][slot]; date and slot are
+ * also stored on the entry so a flat export stays readable.
+ *
+ * source: "recipe" (planned or chosen recipe), "manual" (typed kcal/protein),
+ *         "scan" (reserved; this app does not write scans yet).
+ * recipeId + variationId: set when source is "recipe".
+ * portionMultiplier: 0 skipped, 0.5 half, 1 eaten, 1.5 extra. Manual and scan use 1.
+ * calories/protein/carbs/fat/fiber: logged amounts, already multiplied.
+ */
+export type FoodLogSource = "recipe" | "manual" | "scan";
 
 export interface MealTrackingEntry {
+  /** UI label. Prefer source + portionMultiplier for new readers. */
   status: MealTrackingStatus;
   note?: string;
   loggedAt: string;
+  date?: string;
+  slot?: MealSlotId;
+  source?: FoodLogSource;
+  recipeId?: string;
+  variationId?: string;
+  portionMultiplier?: number;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  fiber?: number;
 }
 
 /** Per-day meal logs keyed by slot. */

@@ -28,6 +28,7 @@ import {
 } from "@/utils/adaptiveTdee";
 import { computeDailyTargets } from "@/utils/tdee";
 import { dateKeysForRange, fromDateKey, toDateKey, weekDateKeys } from "@/utils/date";
+import { migrateMealTracking } from "@/utils/mealTracking";
 import {
   applyWeeklyMealPrepToPlans,
   groupDateKeysByWeek,
@@ -591,6 +592,12 @@ export const useAppStore = create<AppState>()(
           plannedMeals,
           favoriteIds: migrateRecipeIdList(state.favoriteIds),
           dislikedIds: migrateRecipeIdList(state.dislikedIds),
+          mealTracking: migrateMealTracking(
+            state.mealTracking,
+            dailyPlans,
+            plannedMeals,
+            state.todayDateKey,
+          ),
           targets: nextProfile
             ? targetsWithCalories(nextProfile, state.targets.calories)
             : state.targets,

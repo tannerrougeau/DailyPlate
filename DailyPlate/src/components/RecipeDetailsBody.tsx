@@ -11,7 +11,8 @@ import {
   resolveRecipeInstructions,
   resolveRecipeMacros,
   scaledIngredientsForMeal,
-  shouldShowProteinAdjustNote,
+  describeProteinForwardAdjustments,
+  formatIngredientListHeading,
 } from "@/utils/recipeDisplay";
 import { NutritionDetails } from "@/components/NutritionDetails";
 import { MicronutrientDetails } from "@/components/MicronutrientDetails";
@@ -19,9 +20,11 @@ import { notableMicronutrients } from "@/utils/micronutrients";
 import { variationIsMealPrep } from "@/utils/mealPrep";
 import { profileAvoidLists, visibleVariationLabels } from "@/utils/variationPrefs";
 import { useAppStore } from "@/store/useAppStore";
+import { resolveBeverage } from "@/utils/beverages";
 import type { CarbVariationId, FatVariationId, PlannedMeal, Recipe } from "@/types";
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
+import { useState } from "react";
 
 export function RecipeDetailsBody({
   recipe,
@@ -58,6 +61,7 @@ export function RecipeDetailsBody({
 }) {
   const storedProfile = useAppStore((s) => s.userProfile);
   const profile = userProfile ?? storedProfile;
+  const [yourPortion, setYourPortion] = useState(false);
   const avoids = profileAvoidLists(profile);
   const labels = visibleVariationLabels(recipe, avoids.chips, avoids.custom);
   const selectedId =
@@ -84,11 +88,36 @@ export function RecipeDetailsBody({
     selectedCarbId,
     selectedFatId,
   );
-  const fiber = Math.round(recipeFiberGrams(recipe, selectedId, selectedCarbId) * mealScale);
+  const fiber = Math.round(recipeFiberGrams(recipe, selectedId, selectedCarbId, selectedFatId) * mealScale);
   const serveLine = formatHouseholdServesLine(profile, countsOverride);
-  const proteinNote =
-    meal && shouldShowProteinAdjustNote(profile ?? null, meal);
+  const proteinNote = describeProteinForwardAdjustments(
+    recipe,
+    selectedId,
+    mealScale,
+    householdMult,
+    profile?.prioritizeMinProtein === true,
+    selectedCarbId,
+    selectedFatId,
+  );
   const micros = notableMicronutrients(recipe, selectedId, mealScale);
+  const drink = meal ? resolveBeverage(meal.beverageId) : null;
+  const food = {
+    calories: Math.round(macros.calories * mealScale),
+    protein: Math.round(macros.protein * mealScale),
+    carbs: Math.round(macros.carbs * mealScale),
+    fat: Math.round(macros.fat * mealScale),
+    fiber,
+  };
+  const drinkAdds =
+    drink != null &&
+    (drink.calories > 0 || drink.protein > 0 || drink.carbs > 0 || drink.fat > 0 || drink.fiber > 0);
+  const shownIngredients = yourPortion
+    ? ingredients.map((ing) => ({
+        ...ing,
+        quantity: ing.quantity / Math.max(householdMult, 0.01),
+      }))
+    : ingredients;
+  const canTogglePortion = householdMult > 1.05;
 
   return (
     <>
@@ -179,21 +208,50 @@ export function RecipeDetailsBody({
 
       {proteinNote && (
         <p className="mt-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold leading-snug text-blue-950">
-          Protein-forward: protein scaled up a little; oats and fats trimmed.
+          {proteinNote}
         </p>
       )}
 
       <NutritionDetails
-        calories={Math.round(macros.calories * mealScale)}
-        protein={Math.round(macros.protein * mealScale)}
-        carbs={Math.round(macros.carbs * mealScale)}
-        fat={Math.round(macros.fat * mealScale)}
-        fiber={fiber}
+        calories={food.calories + (drinkAdds && drink ? drink.calories : 0)}
+        protein={food.protein + (drinkAdds && drink ? drink.protein : 0)}
+        carbs={food.carbs + (drinkAdds && drink ? drink.carbs : 0)}
+        fat={food.fat + (drinkAdds && drink ? drink.fat : 0)}
+        fiber={food.fiber + (drinkAdds && drink ? drink.fiber : 0)}
+        parts={
+          drinkAdds && drink
+            ? [
+                { label: "Meal", ...food },
+                {
+                  label: drink.label,
+                  calories: drink.calories,
+                  protein: drink.protein,
+                  carbs: drink.carbs,
+                  fat: drink.fat,
+                  fiber: drink.fiber,
+                },
+              ]
+            : undefined
+        }
       />
       <MicronutrientDetails items={micros} />
 
-      <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
-        {ingredients.map((ing) => (
+      <div className="mt-3 flex items-baseline justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          {formatIngredientListHeading(householdMult, serveLine, yourPortion && canTogglePortion)}
+        </p>
+        {canTogglePortion && (
+          <button
+            type="button"
+            onClick={() => setYourPortion((open) => !open)}
+            className="shrink-0 text-xs font-semibold text-[#2563EB]"
+          >
+            {yourPortion ? "Show full recipe" : "Show your portion"}
+          </button>
+        )}
+      </div>
+      <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
+        {shownIngredients.map((ing) => (
           <li key={`${ing.name}-${ing.unit}`}>
             {formatQty(ing.quantity)} {ing.unit} {ing.name}
           </li>

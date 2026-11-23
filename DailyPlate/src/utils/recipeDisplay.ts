@@ -16,6 +16,7 @@ import {
   type HouseholdDayCounts,
 } from "@/utils/household";
 import { estimateFiberFromIngredients } from "@/utils/fiberEstimate";
+import { nutritionFromIngredients } from "@/utils/ingredientNutrition";
 import {
   applyCarbSwapToIngredients,
   applyCarbSwapToInstructions,
@@ -149,18 +150,23 @@ export function variationLabels(recipe: Recipe): { id: string; label: string }[]
   }));
 }
 
-/** Fiber per recipe serving, from ingredients after carb/fat swaps so sides are counted and meat-and-oil plates stay near 0. */
+/** Fiber per recipe serving from USDA ingredient totals, then authored fiber, then the estimator. */
 export function recipeFiberGrams(
   recipe: Recipe,
   variationId?: string,
   carbVariationId?: CarbVariationId,
   fatVariationId?: FatVariationId,
 ): number {
+  const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
+  const computed = nutritionFromIngredients(ingredients, 1);
+  if (computed) return Math.max(0, computed.fiber);
   const v = getVariationDetail(recipe, variationId);
   if (typeof v?.fiber === "number" && Number.isFinite(v.fiber)) {
     return Math.max(0, v.fiber);
   }
-  const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
+  if (typeof recipe.fiber === "number" && Number.isFinite(recipe.fiber) && !v) {
+    return Math.max(0, Math.round(recipe.fiber));
+  }
   const fromIngredients = estimateFiberFromIngredients(ingredients);
   if (fromIngredients > 0) return fromIngredients;
   if (typeof recipe.fiber === "number" && Number.isFinite(recipe.fiber)) {
@@ -173,7 +179,18 @@ export function resolveRecipeMacros(
   recipe: Recipe,
   variationId?: string,
   carbVariationId?: CarbVariationId,
+  fatVariationId?: FatVariationId,
 ): Pick<Recipe, "calories" | "protein" | "carbs" | "fat"> {
+  const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
+  const computed = nutritionFromIngredients(ingredients, 1);
+  if (computed) {
+    return {
+      calories: computed.calories,
+      protein: computed.protein,
+      carbs: computed.carbs,
+      fat: computed.fat,
+    };
+  }
   const v = getVariationDetail(recipe, variationId);
   const base = {
     calories: v?.calories ?? recipe.calories,
@@ -222,19 +239,26 @@ export function resolveRecipeInstructions(
   );
 }
 
-/** Per-ingredient multiplier when boosting protein without over-scaling carbs/fats. */
+function isProteinForwardBoost(ing: RecipeIngredient): boolean {
+  return ing.category === "Protein" || PROTEIN_INGREDIENT_HINT.test(ing.name);
+}
+
+function isProteinForwardTrim(ing: RecipeIngredient): boolean {
+  return ing.category === "Grains" || CARB_FAT_ADJUST_HINT.test(ing.name);
+}
+
+/**
+ * Per-ingredient multiplier when boosting protein without over-scaling carbs.
+ * The 8% / 6% nudge is relative to the full batch (meal scale × household).
+ */
 export function proteinAwareIngredientMultiplier(
   ing: RecipeIngredient,
   totalMult: number,
   prioritizeProtein: boolean,
 ): number {
   if (!prioritizeProtein || totalMult <= 1.05) return totalMult;
-  if (PROTEIN_INGREDIENT_HINT.test(ing.name)) {
-    return Math.min(totalMult * 1.08, RECIPE_SCALE_MAX);
-  }
-  if (CARB_FAT_ADJUST_HINT.test(ing.name)) {
-    return Math.max(totalMult * 0.94, RECIPE_SCALE_MIN);
-  }
+  if (isProteinForwardBoost(ing)) return totalMult * 1.08;
+  if (isProteinForwardTrim(ing)) return totalMult * 0.94;
   return totalMult;
 }
 
@@ -406,6 +430,122 @@ export function shouldShowProteinAdjustNote(
 ): boolean {
   if (!profile?.prioritizeMinProtein) return false;
   return clampMealScaleForRecipe(meal.scale) > 1.05;
+}
+
+const PROTEIN_NAME_KEYWORDS = [
+  "turkey",
+  "chicken",
+  "beef",
+  "salmon",
+  "tuna",
+  "shrimp",
+  "egg",
+  "yogurt",
+  "cottage",
+  "oats",
+  "rice",
+  "pasta",
+  "oil",
+  "butter",
+  "banana",
+  "honey",
+  "maple",
+  "granola",
+  "cheese",
+  "beans",
+  "broccoli",
+  "protein",
+];
+
+const PROTEIN_NAME_STOP = new Set([
+  "and",
+  "with",
+  "low",
+  "fat",
+  "plain",
+  "cooked",
+  "raw",
+  "fresh",
+  "sliced",
+  "diced",
+  "chopped",
+  "unsweetened",
+  "lean",
+  "ground",
+  "white",
+  "boneless",
+]);
+
+export function shortIngredientName(name: string): string {
+  const first = name
+    .split(/\s+or\s+/i)[0]!
+    .replace(/\([^)]*\)/g, " ")
+    .toLowerCase();
+  for (const keyword of PROTEIN_NAME_KEYWORDS) {
+    if (first.includes(keyword)) return keyword;
+  }
+  const words = first.split(/[^a-z]+/).filter((word) => word.length > 2 && !PROTEIN_NAME_STOP.has(word));
+  return words[words.length - 1] ?? first.trim();
+}
+
+/** Describes ingredient amounts that protein-forward scaling actually changed. */
+export function describeProteinForwardAdjustments(
+  recipe: Recipe,
+  variationId: string | undefined,
+  mealScale: number,
+  householdMult: number,
+  prioritizeProtein: boolean,
+  carbVariationId?: CarbVariationId,
+  fatVariationId?: FatVariationId,
+): string | null {
+  if (!prioritizeProtein) return null;
+  const uniform = scaledIngredientsForMeal(
+    recipe,
+    variationId,
+    mealScale,
+    householdMult,
+    false,
+    carbVariationId,
+    fatVariationId,
+  );
+  const adjusted = scaledIngredientsForMeal(
+    recipe,
+    variationId,
+    mealScale,
+    householdMult,
+    true,
+    carbVariationId,
+    fatVariationId,
+  );
+  const increased: string[] = [];
+  const reduced: string[] = [];
+  for (const next of adjusted) {
+    const prev = uniform.find((row) => row.name === next.name && row.unit === next.unit);
+    if (!prev || !(prev.quantity > 0)) continue;
+    const ratio = next.quantity / prev.quantity;
+    const label = shortIngredientName(next.name);
+    if (ratio > 1.03) increased.push(label);
+    else if (ratio < 0.97) reduced.push(label);
+  }
+  const parts = [
+    ...[...new Set(increased)].map((name) => `${name} increased`),
+    ...[...new Set(reduced)].map((name) => `${name} reduced`),
+  ];
+  if (parts.length === 0) return null;
+  return `Protein-forward: ${parts.join(", ")}.`;
+}
+
+export function formatIngredientListHeading(
+  householdMult: number,
+  servesLine: string | null,
+  yourPortion: boolean,
+): string {
+  if (yourPortion) return "Ingredients — your portion";
+  const rounded = Math.round(householdMult * 10) / 10;
+  const count = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  const servingWord = count === "1" ? "serving" : "servings";
+  const who = servesLine ? servesLine.replace(/^Serves\s+/i, "") : "you";
+  return `Ingredients — total for ${count} ${servingWord} (${who})`;
 }
 
 export function recipeIsMixedBatch(recipe: Recipe): boolean {
