@@ -38,6 +38,7 @@ import {
   mealDisplayName,
 } from "@/utils/recipeDisplay";
 import { MealMacroLine } from "@/components/MealMacroLine";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 import { trackingBadgeClass, trackingLabel } from "@/utils/mealTracking";
 import { variationIsMealPrep } from "@/utils/mealPrep";
 import { isLowComplexityLeftover, isMealPrepBatchBadge } from "@/utils/mealPrepDisplay";
@@ -492,6 +493,7 @@ function MealCardMainContent({
   onEaten?: () => void;
   onSkip?: () => void;
 }) {
+  const display = useDisplayPrefs();
   return (
     <div className="min-w-0 flex-1 px-3 py-3">
       <p className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
@@ -536,8 +538,10 @@ function MealCardMainContent({
         carbs={carbs}
         fat={fat}
         fiber={fiber}
+        showCarbsFat={display.cardMacros}
+        showFiber={display.cardFiber}
       />
-      {portionLine && (
+      {portionLine && display.servingLine && (
         <span
           role="button"
           tabIndex={0}
@@ -563,6 +567,7 @@ function MealCardMainContent({
       {servingLine && (
         <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-slate-500">{servingLine}</p>
       )}
+      {display.drinkPicker && (
       <label className="mt-1.5 flex min-w-0 items-center gap-1 text-[11px] leading-snug text-slate-600">
         <span className="shrink-0 font-medium text-slate-500">Drink:</span>
         <select
@@ -582,6 +587,7 @@ function MealCardMainContent({
           ))}
         </select>
       </label>
+      )}
       {showEatenSkip && (
         <div className="mt-2.5 flex gap-1.5">
           <button

@@ -76,6 +76,29 @@ import {
 import type { AuthSession, LoginResult, RegisterResult } from "@/auth/types";
 import type { HouseholdDayOverride } from "@/utils/household";
 import type { SavedSnack } from "@/utils/snackItems";
+import type { SwapLogEntry } from "@/utils/personalizationEngine";
+import {
+  DISPLAY_ELEMENTS,
+  resolveDisplayPrefs,
+  simplestView,
+  startingDisplayPrefs,
+  type Checkpoint,
+  type CheckpointState,
+  type DisplayElement,
+  type DisplayPrefs,
+} from "@/utils/displayPrefs";
+import {
+  applyChange,
+  enqueue,
+  recordAnswer,
+  tasteQuestions,
+  usageQuestions,
+  type Question,
+  type QuestionAnswer,
+  type QuestionLog,
+  type UsageEvent,
+} from "@/utils/questionQueue";
+import type { FoodItem } from "@/utils/foodTypes";
 
 export type NavTab = "today" | "plan" | "recipes" | "grocery" | "guide";
 export type UsageNoteKey = "today" | "plan" | "recipes" | "grocery";
@@ -233,6 +256,40 @@ function patchMealInDay(
   }));
 }
 
+/** Record a swap away from `fromId` (ignored when it's the same recipe). */
+function logSwap(log: SwapLogEntry[], fromId: string | undefined, toId: string, dateKey: string): SwapLogEntry[] {
+  if (!fromId || fromId === toId) return log;
+  const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+  return [
+    ...log.filter((e) => new Date(e.at).getTime() >= cutoff),
+    { recipeId: fromId, dateKey, at: new Date().toISOString() },
+  ];
+}
+
+/** Apply a checkpoint's `after` state and save the checkpoint. Changes happen only through here. */
+function commitCheckpoint(
+  set: (partial: Partial<AppState>) => void,
+  get: () => AppState,
+  what: string,
+  why: string,
+  before: CheckpointState,
+  after: CheckpointState,
+): Checkpoint {
+  const s = get();
+  const cp: Checkpoint = { id: crypto.randomUUID(), at: new Date().toISOString(), what, why, before, after };
+  const patch: Partial<AppState> = { checkpoints: [cp, ...s.checkpoints].slice(0, 100) };
+  if (after.displayPrefs) patch.displayPrefs = after.displayPrefs;
+  if (s.userProfile && (after.dislikedFoodCustom != null || after.ingredientVariety != null)) {
+    patch.userProfile = {
+      ...s.userProfile,
+      ...(after.dislikedFoodCustom != null ? { dislikedFoodCustom: after.dislikedFoodCustom } : {}),
+      ...(after.ingredientVariety != null ? { ingredientVariety: after.ingredientVariety } : {}),
+    };
+  }
+  set(patch);
+  return cp;
+}
+
 export type DayPlanBuildResult = {
   meals: PlannedMeal[];
   redistributed: boolean;
@@ -316,7 +373,8 @@ function buildGenerateOptions(
     | "dailyPlans"
     | "plannedMeals"
     | "todayDateKey"
-  >,
+  > &
+    Partial<Pick<AppState, "swapLog" | "tdeeFeedbackHistory">>,
   overrides?: GenerateOverrides,
 ): GenerateOptions | null {
   if (!s.userProfile) return null;
@@ -326,6 +384,8 @@ function buildGenerateOptions(
     dailyPlans: s.dailyPlans,
     plannedMeals: s.plannedMeals,
     todayDateKey: s.todayDateKey,
+    swapLog: s.swapLog,
+    latestCheckIn: s.tdeeFeedbackHistory?.at(-1) ?? null,
   });
   const lowComplexity =
     overrides?.lowComplexity ?? s.userProfile.lowComplexityEnabled === true;
@@ -425,6 +485,19 @@ export interface AppState {
   snackLogs: Record<string, MealTrackingEntry[]>;
   /** Custom snacks saved for reuse. */
   savedSnacks: SavedSnack[];
+  /** Recipes swapped away (Replace / New meal), for generation and taste questions. */
+  swapLog: SwapLogEntry[];
+  /** Optional display switches; null = profile from before display settings (everything on). */
+  displayPrefs: Partial<DisplayPrefs> | null;
+  /** Rolling 14-day usage, used only to queue questions. */
+  usageEvents: UsageEvent[];
+  questionQueue: Question[];
+  questionLog: QuestionLog;
+  lastQuestionAskedAt: string | null;
+  /** Every applied display or plan change, restorable from Settings. */
+  checkpoints: Checkpoint[];
+  /** Foods found by name or typed from a label, saved for reuse and offline. */
+  myFoods: FoodItem[];
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];
@@ -486,6 +559,21 @@ export interface AppState {
   /** Keep a meal that cannot fit its target: use the closest fit and stop showing the notice. */
   keepMeal: (dateKey: string, slot: MealSlotId) => void;
   addSnackLog: (dateKey: string, entry: MealTrackingEntry) => void;
+  /** Count a usage event (details opened, Adjust used, meal cards shown). */
+  recordUsage: (kind: UsageEvent["kind"], n?: number) => void;
+  /** Queue questions from usage and taste patterns (and any extra, e.g. from a check-in). */
+  refreshQuestions: (extra?: Question[]) => void;
+  /** Mark questions as asked now (for the 3-day spacing). */
+  markQuestionsAsked: () => void;
+  /** Yes applies the change and returns its checkpoint; Not now / No change nothing. */
+  answerQuestion: (id: string, answer: QuestionAnswer) => Checkpoint | null;
+  setDisplayPref: (element: DisplayElement, on: boolean) => void;
+  applySimplestView: () => Checkpoint;
+  /** Restore how things were before a checkpoint (saved as a new checkpoint). */
+  restoreCheckpoint: (id: string) => Checkpoint | null;
+  /** Starting display switches from onboarding. */
+  setStartingDisplay: (kind: "basic" | "detailed") => void;
+  saveMyFood: (food: FoodItem) => void;
   removeSnackLog: (dateKey: string, loggedAt: string) => void;
   saveSnack: (snack: Omit<SavedSnack, "id">) => SavedSnack;
   deleteSavedSnack: (id: string) => void;
@@ -579,6 +667,14 @@ export const useAppStore = create<AppState>()(
       mealTracking: {},
       snackLogs: {},
       savedSnacks: [],
+      swapLog: [],
+      displayPrefs: null,
+      usageEvents: [],
+      questionQueue: [],
+      questionLog: {},
+      lastQuestionAskedAt: null,
+      checkpoints: [],
+      myFoods: [],
       dismissedUsageNotes: {
         today: false,
         plan: false,
@@ -682,6 +778,14 @@ export const useAppStore = create<AppState>()(
           mealTracking: {},
           snackLogs: {},
           savedSnacks: [],
+          swapLog: [],
+          displayPrefs: null,
+          usageEvents: [],
+          questionQueue: [],
+          questionLog: {},
+          lastQuestionAskedAt: null,
+          checkpoints: [],
+          myFoods: [],
           favoriteIds: [],
           dislikedIds: [],
           profileAnchoredAt: null,
@@ -1274,6 +1378,105 @@ export const useAppStore = create<AppState>()(
         void get().syncAccountSnapshot();
       },
 
+      recordUsage: (kind, n) => {
+        const now = new Date();
+        const cutoff = now.getTime() - 14 * 24 * 60 * 60 * 1000;
+        set((s) => ({
+          usageEvents: [
+            ...s.usageEvents.filter((e) => new Date(e.at).getTime() >= cutoff),
+            { kind, at: now.toISOString(), ...(n != null ? { n } : {}) },
+          ],
+        }));
+      },
+
+      refreshQuestions: (extra = []) => {
+        const s = get();
+        if (!s.userProfile) return;
+        const now = new Date();
+        const prefs = resolveDisplayPrefs(s.displayPrefs);
+        const library = recipesFor(s);
+        const byId = new Map(library.map((r) => [r.id, r] as const));
+        const passes: { recipe: Recipe; at: string }[] = [];
+        for (const [dateKey, day] of Object.entries(s.mealTracking)) {
+          const meals = mealsForDate(s, dateKey);
+          for (const [slot, entry] of Object.entries(day ?? {})) {
+            if (entry?.status !== "skipped") continue;
+            const meal = meals.find((m) => m.slot === slot);
+            if (meal) passes.push({ recipe: meal.recipe, at: entry.loggedAt });
+          }
+        }
+        for (const swap of s.swapLog) {
+          const recipe = byId.get(swap.recipeId);
+          if (recipe) passes.push({ recipe, at: swap.at });
+        }
+        const candidates = [
+          ...extra,
+          ...usageQuestions(s.usageEvents, prefs, s.profileAnchoredAt, now),
+          ...tasteQuestions(passes, s.userProfile.dislikedFoodCustom ?? "", now),
+        ];
+        let queue = s.questionQueue;
+        for (const q of candidates) queue = enqueue(queue, s.questionLog, q, now);
+        if (queue !== s.questionQueue) set({ questionQueue: queue });
+      },
+
+      markQuestionsAsked: () => set({ lastQuestionAskedAt: new Date().toISOString() }),
+
+      answerQuestion: (id, answer) => {
+        const s = get();
+        const question = s.questionQueue.find((q) => q.id === id);
+        const now = new Date();
+        const next = recordAnswer(s.questionQueue, s.questionLog, id, answer, now);
+        set({ questionQueue: next.queue, questionLog: next.log, lastQuestionAskedAt: now.toISOString() });
+        if (answer !== "yes" || !question || !s.userProfile) return null;
+        const change = applyChange(
+          {
+            displayPrefs: resolveDisplayPrefs(s.displayPrefs),
+            dislikedFoodCustom: s.userProfile.dislikedFoodCustom ?? "",
+            ingredientVariety: s.userProfile.ingredientVariety,
+          },
+          question.change,
+        );
+        return commitCheckpoint(set, get, change.what, question.why, change.before, change.after);
+      },
+
+      setDisplayPref: (element, on) => {
+        const before = resolveDisplayPrefs(get().displayPrefs);
+        if (before[element] === on) return;
+        const label = DISPLAY_ELEMENTS.find((e) => e.id === element)?.label ?? element;
+        commitCheckpoint(
+          set,
+          get,
+          `${on ? "Turned on" : "Turned off"}: ${label}`,
+          "Changed in Settings",
+          { displayPrefs: before },
+          { displayPrefs: { ...before, [element]: on } },
+        );
+      },
+
+      applySimplestView: () => {
+        const before = resolveDisplayPrefs(get().displayPrefs);
+        return commitCheckpoint(set, get, "Simplest view", "Chosen in Settings", { displayPrefs: before }, {
+          displayPrefs: simplestView(),
+        });
+      },
+
+      restoreCheckpoint: (id) => {
+        const s = get();
+        const cp = s.checkpoints.find((c) => c.id === id);
+        if (!cp || !s.userProfile) return null;
+        const current: CheckpointState = {};
+        if (cp.before.displayPrefs) current.displayPrefs = resolveDisplayPrefs(s.displayPrefs);
+        if (cp.before.dislikedFoodCustom != null) current.dislikedFoodCustom = s.userProfile.dislikedFoodCustom ?? "";
+        if (cp.before.ingredientVariety != null) current.ingredientVariety = s.userProfile.ingredientVariety;
+        return commitCheckpoint(set, get, `Restored: ${cp.what}`, "Restored from Display history", current, cp.before);
+      },
+
+      setStartingDisplay: (kind) => set({ displayPrefs: startingDisplayPrefs(kind) }),
+
+      saveMyFood: (food) => {
+        set((s) => ({ myFoods: [food, ...s.myFoods.filter((f) => f.id !== food.id)].slice(0, 200) }));
+      },
+
       addSnackLog: (dateKey, entry) => {
         set((s) => ({
           snackLogs: { ...s.snackLogs, [dateKey]: [...(s.snackLogs[dateKey] ?? []), entry] },
@@ -1478,6 +1681,7 @@ export const useAppStore = create<AppState>()(
 
         set((s) => ({
           ...setDayMeals(s, targetDateKey, regenerated),
+          swapLog: logSwap(s.swapLog, base.find((m) => m.slot === slot)?.recipe.id, pick.id, targetDateKey),
           mealTracking: clearSlotTracking(s.mealTracking, targetDateKey, slot),
           macroRedistributionNotices: built.redistributed
             ? [...new Set([...s.macroRedistributionNotices, targetDateKey])]
@@ -1498,8 +1702,10 @@ export const useAppStore = create<AppState>()(
         const built = buildSlotReplacementMeals(state, dateKey, slot, recipe);
         if (!built) return;
 
+        const swappedFrom = base.find((m) => m.slot === slot)?.recipe.id;
         set((s) => ({
           ...setDayMeals(s, dateKey, built.meals),
+          swapLog: logSwap(s.swapLog, swappedFrom, recipe.id, dateKey),
           mealTracking: clearSlotTracking(s.mealTracking, dateKey, slot),
           macroRedistributionNotices: built.redistributed
             ? [...new Set([...s.macroRedistributionNotices, dateKey])]
@@ -1802,6 +2008,14 @@ export const useAppStore = create<AppState>()(
         mealTracking: s.mealTracking,
         snackLogs: s.snackLogs,
         savedSnacks: s.savedSnacks,
+        swapLog: s.swapLog,
+        displayPrefs: s.displayPrefs,
+        usageEvents: s.usageEvents,
+        questionQueue: s.questionQueue,
+        questionLog: s.questionLog,
+        lastQuestionAskedAt: s.lastQuestionAskedAt,
+        checkpoints: s.checkpoints,
+        myFoods: s.myFoods,
         dismissedUsageNotes: s.dismissedUsageNotes,
         favoriteIds: s.favoriteIds,
         dislikedIds: s.dislikedIds,

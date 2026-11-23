@@ -5,6 +5,8 @@ export function MealMacroLine({
   fiber,
   kcal,
   compact = false,
+  showCarbsFat = true,
+  showFiber = true,
 }: {
   protein: number;
   carbs: number;
@@ -12,6 +14,8 @@ export function MealMacroLine({
   fiber: number;
   kcal?: number;
   compact?: boolean;
+  showCarbsFat?: boolean;
+  showFiber?: boolean;
 }) {
   const cell = compact
     ? "text-[11px] leading-snug text-slate-600"
@@ -27,15 +31,21 @@ export function MealMacroLine({
         <span className={cell}>
           Protein <span className="font-semibold text-slate-800">{protein}g</span>
         </span>
-        <span className={cell}>
-          Carbs <span className="font-semibold text-slate-800">{carbs}g</span>
-        </span>
-        <span className={cell}>
-          Fat <span className="font-semibold text-slate-800">{fat}g</span>
-        </span>
-        <span className={cell}>
-          Fiber <span className="font-semibold text-slate-800">{fiber}g</span>
-        </span>
+        {showCarbsFat && (
+          <>
+            <span className={cell}>
+              Carbs <span className="font-semibold text-slate-800">{carbs}g</span>
+            </span>
+            <span className={cell}>
+              Fat <span className="font-semibold text-slate-800">{fat}g</span>
+            </span>
+          </>
+        )}
+        {showFiber && (
+          <span className={cell}>
+            Fiber <span className="font-semibold text-slate-800">{fiber}g</span>
+          </span>
+        )}
       </div>
     </div>
   );

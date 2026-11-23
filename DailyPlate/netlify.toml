@@ -1,0 +1,5 @@
+# Netlify reads this file from the site's base directory (DailyPlate).
+# Build settings stay in the Netlify UI; this only adds the food-search function.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"

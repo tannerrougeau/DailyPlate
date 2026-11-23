@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";
 import { RecipeImage } from "@/components/RecipeImage";
+import { FoodPickConfirm } from "@/components/FoodPickConfirm";
+import { FoodSearchPanel } from "@/components/FoodSearchPanel";
+import type { FoodItem } from "@/utils/foodTypes";
+import { foodLogFromFood } from "@/utils/foodSearch";
+import { SLOT_LABELS } from "@/utils/planningPrefs";
 import { allRecipes } from "@/recipes/recipePool";
 import { useAppStore } from "@/store/useAppStore";
 import type { MealTrackingEntry, PlannedMeal } from "@/types";
@@ -21,7 +26,9 @@ export function LogSomethingElseSheet({
   onSave: (entry: MealTrackingEntry) => void;
 }) {
   useOverlayBack(true, onClose);
-  const [tab, setTab] = useState<"recipe" | "amounts">("recipe");
+  const [tab, setTab] = useState<"search" | "recipe" | "amounts">("search");
+  const [picked, setPicked] = useState<FoodItem | null>(null);
+  const saveMyFood = useAppStore((s) => s.saveMyFood);
   const [query, setQuery] = useState("");
   const [kcal, setKcal] = useState("");
   const [protein, setProtein] = useState("");
@@ -84,11 +91,12 @@ export function LogSomethingElseSheet({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-1 px-4 pt-3">
+        <div className="grid grid-cols-3 gap-1 px-4 pt-3">
           {(
             [
-              ["recipe", "Choose a recipe"],
-              ["amounts", "Enter amounts"],
+              ["search", "Search foods"],
+              ["recipe", "A recipe"],
+              ["amounts", "Amounts"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -106,7 +114,25 @@ export function LogSomethingElseSheet({
           ))}
         </div>
 
-        {tab === "recipe" ? (
+        {tab === "search" ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+            {picked ? (
+              <FoodPickConfirm
+                food={picked}
+                target={meal.portion?.target ?? null}
+                forLabel={`for ${SLOT_LABELS[meal.slot].toLowerCase()}`}
+                onBack={() => setPicked(null)}
+                onLog={(servings) => {
+                  saveMyFood(picked);
+                  onSave(foodLogFromFood(dateKey, meal.slot, picked, servings));
+                  onClose();
+                }}
+              />
+            ) : (
+              <FoodSearchPanel onPick={setPicked} />
+            )}
+          </div>
+        ) : tab === "recipe" ? (
           <div className="flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3">
             <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3">
               <Search className="h-4 w-4 shrink-0 text-slate-400" />

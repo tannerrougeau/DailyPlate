@@ -13,10 +13,19 @@ export const CUISINE_OPTIONS = [
   { id: "japanese", label: "Japanese" },
 ] as const;
 
+/** A recipe the user swapped away from (Replace or "New meal"). */
+export type SwapLogEntry = { recipeId: string; dateKey: string; at: string };
+
 export type PersonalizationSignals = {
   skippedRecipeIds: Set<string>;
   enjoyedRecipeIds: Set<string>;
   recentRecipeIds: Set<string>;
+  /** Swapped away within the last 30 days. */
+  swappedRecipeIds: Set<string>;
+  /** How many days each recipe is planned in the window 7 days back to 7 days ahead. */
+  recentCounts: Map<string, number>;
+  /** Latest check-in said meals felt repetitive (variety 1–2 of 5). */
+  wantsMoreVariety: boolean;
   skippedLongPrepCount: number;
   enjoyedBatchCount: number;
   loggedMealCount: number;
@@ -48,6 +57,8 @@ export function analyzePersonalizationSignals(input: {
   plannedMeals: PlannedMeal[];
   todayDateKey: string;
   lookbackDays?: number;
+  swapLog?: SwapLogEntry[];
+  latestCheckIn?: CheckInEntry | null;
 }): PersonalizationSignals {
   const lookback = input.lookbackDays ?? 14;
   const anchor = fromDateKey(input.todayDateKey);
@@ -89,10 +100,31 @@ export function analyzePersonalizationSignals(input: {
     }
   }
 
+  const swapCutoff = toDateKey(addDays(anchor, -29));
+  const swappedRecipeIds = new Set(
+    (input.swapLog ?? []).filter((s) => s.dateKey >= swapCutoff).map((s) => s.recipeId),
+  );
+
+  // Repeats: count planned days per recipe from 7 days back to 7 days ahead.
+  const recentCounts = new Map<string, number>();
+  for (let offset = -6; offset <= 7; offset++) {
+    const key = toDateKey(addDays(anchor, offset));
+    const ids = new Set(
+      mealsForDateKey(key, input.dailyPlans, input.plannedMeals, input.todayDateKey).map((m) => m.recipe.id),
+    );
+    for (const id of ids) recentCounts.set(id, (recentCounts.get(id) ?? 0) + 1);
+  }
+
+  const wantsMoreVariety =
+    input.latestCheckIn != null && checkInScale(input.latestCheckIn, "mealVarietySatisfaction") <= 2;
+
   return {
     skippedRecipeIds,
     enjoyedRecipeIds,
     recentRecipeIds,
+    swappedRecipeIds,
+    recentCounts,
+    wantsMoreVariety,
     skippedLongPrepCount,
     enjoyedBatchCount,
     loggedMealCount: logged,
@@ -127,8 +159,9 @@ export function recipePersonalizationBoost(
   }
 
   if (signals.skippedRecipeIds.has(recipe.id)) boost -= 45;
+  if (signals.swappedRecipeIds?.has(recipe.id)) boost -= 30;
   if (signals.enjoyedRecipeIds.has(recipe.id)) boost += 16;
-  if (signals.recentRecipeIds.has(recipe.id)) boost -= 12;
+  if (signals.recentRecipeIds.has(recipe.id)) boost -= signals.wantsMoreVariety ? 24 : 12;
 
   if (favoriteIds.includes(recipe.id) && signals.enjoyedRecipeIds.has(recipe.id)) {
     boost += 10;

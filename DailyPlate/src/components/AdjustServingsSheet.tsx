@@ -2,6 +2,8 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { formatServings, servingsFromGrams } from "@/utils/mealTracking";
+import { useAppStore } from "@/store/useAppStore";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 
 const OPTIONS = [0.5, 1, 1.5, 2];
 
@@ -23,10 +25,14 @@ export function AdjustServingsSheet({
   onClose: () => void;
 }) {
   useOverlayBack(true, onClose);
+  const display = useDisplayPrefs();
+  const recordUsage = useAppStore((s) => s.recordUsage);
+  const gramsWeight = display.adjustGrams ? servingGrams : null;
   const [grams, setGrams] = useState("");
-  const fromGrams = servingsFromGrams(Number(grams), servingGrams);
+  const fromGrams = servingsFromGrams(Number(grams), gramsWeight);
 
   function choose(servings: number) {
+    recordUsage("adjust");
     onChoose(servings);
     onClose();
   }
@@ -72,7 +78,7 @@ export function AdjustServingsSheet({
         </div>
         <p className="mt-1 text-center text-xs text-slate-400">servings</p>
 
-        {servingGrams != null && servingGrams > 0 && (
+        {gramsWeight != null && gramsWeight > 0 && (
           <div className="mt-3 border-t border-slate-100 pt-3">
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <span className="shrink-0">Grams eaten</span>
@@ -82,7 +88,7 @@ export function AdjustServingsSheet({
                 min={1}
                 value={grams}
                 onChange={(e) => setGrams(e.target.value)}
-                placeholder={`1 serving ≈ ${Math.round(servingGrams)} g`}
+                placeholder={`1 serving ≈ ${Math.round(gramsWeight)} g`}
                 className="min-h-[44px] w-full rounded-xl border border-slate-200 px-3 text-base outline-none focus:border-[#2563EB]"
               />
             </label>

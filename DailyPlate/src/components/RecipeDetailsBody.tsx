@@ -23,6 +23,7 @@ import {
 } from "@/utils/mealPortions";
 import { prepTips, stepsWithAmounts } from "@/utils/prepSteps";
 import { sideLabel, sideLines } from "@/utils/mealSides";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 import { NutritionDetails } from "@/components/NutritionDetails";
 import { MicronutrientDetails } from "@/components/MicronutrientDetails";
 import { notableMicronutrients } from "@/utils/micronutrients";
@@ -33,7 +34,7 @@ import { resolveBeverage } from "@/utils/beverages";
 import type { CarbVariationId, FatVariationId, PlannedMeal, Recipe } from "@/types";
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export function RecipeDetailsBody({
   recipe,
@@ -75,6 +76,13 @@ export function RecipeDetailsBody({
   const profile = userProfile ?? storedProfile;
   const setWeighedBatch = useAppStore((s) => s.setWeighedBatch);
   const removeMealSide = useAppStore((s) => s.removeMealSide);
+  const recordUsage = useAppStore((s) => s.recordUsage);
+  const display = useDisplayPrefs();
+  useEffect(() => {
+    if (meal) recordUsage("details");
+    // Count one open per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [openTip, setOpenTip] = useState<string | null>(null);
   const avoids = profileAvoidLists(profile);
   const labels = visibleVariationLabels(recipe, avoids.chips, avoids.custom);
@@ -149,7 +157,7 @@ export function RecipeDetailsBody({
 
   return (
     <>
-      {labels.length > 0 && (
+      {display.recipeChoices && labels.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Variation
@@ -182,7 +190,7 @@ export function RecipeDetailsBody({
         </div>
       )}
 
-      {carbLabels.length > 0 && (
+      {display.recipeChoices && carbLabels.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Carb base
@@ -206,7 +214,7 @@ export function RecipeDetailsBody({
         </div>
       )}
 
-      {fatLabels.length > 0 && (
+      {display.recipeChoices && fatLabels.length > 0 && (
         <div className="mt-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Cooking fat
@@ -235,6 +243,7 @@ export function RecipeDetailsBody({
       )}
 
 
+      {display.nutritionDetails && (
       <NutritionDetails
         calories={food.calories + (drinkAdds && drink ? drink.calories : 0)}
         protein={food.protein + (drinkAdds && drink ? drink.protein : 0)}
@@ -257,12 +266,13 @@ export function RecipeDetailsBody({
             : undefined
         }
       />
-      <MicronutrientDetails items={micros} />
+      )}
+      {display.micronutrients && <MicronutrientDetails items={micros} />}
 
       {serving && (
         <p className="mt-3 text-sm font-semibold text-slate-800">{serving.text}</p>
       )}
-      {canWeigh && meal && dateKey && (
+      {display.weighBatch && canWeigh && meal && dateKey && (
         <label className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-slate-600">
           <span>Weigh your batch (cooked):</span>
           <input
@@ -338,7 +348,7 @@ export function RecipeDetailsBody({
         ))}
       </ol>
 
-      {tips.length > 0 && (
+      {display.prepTips && tips.length > 0 && (
         <ul className="mt-3 space-y-1.5">
           {tips.map((tip) => (
             <li key={tip.id} className="rounded-lg border border-slate-200 bg-white text-sm">
@@ -359,7 +369,7 @@ export function RecipeDetailsBody({
         </ul>
       )}
 
-      {recipe.mealPrepNotes && variationIsMealPrep(recipe, selectedId) && (
+      {display.mealPrepNotes && recipe.mealPrepNotes && variationIsMealPrep(recipe, selectedId) && (
         <p className="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-xs leading-relaxed text-violet-900">
           <span className="font-semibold">Meal prep:</span> {recipe.mealPrepNotes}
         </p>

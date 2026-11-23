@@ -23,6 +23,8 @@ import {
 } from "@/utils/household";
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
+import { DisplaySettings } from "@/components/DisplaySettings";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 import { MealTimingPreferenceSection } from "@/components/MealTimingPreferenceSection";
 import { CuisinePreferenceSection } from "@/components/CuisinePreferenceSection";
 import {
@@ -49,6 +51,7 @@ import {
 } from "@/utils/proteinMinimum";
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
+  const display = useDisplayPrefs();
   const userProfile = useAppStore((s) => s.userProfile);
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const setTargets = useAppStore((s) => s.setTargets);
@@ -281,6 +284,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <PlanningPrefsSection value={planningPrefs} onChange={setPlanningPrefs} />
         </section>
 
+        {display.macroSplitSetting && (
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">
             Preferred macro split
@@ -309,6 +313,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </section>
+        )}
 
         <section className="space-y-4 border-b border-slate-100 pb-5">
           <MealTimingPreferenceSection
@@ -321,6 +326,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         <section className="space-y-4 border-b border-slate-100 pb-5">
           <CuisinePreferenceSection selected={preferredCuisines} onChange={setPreferredCuisines} />
         </section>
+
+        <DisplaySettings />
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">Check-in</h3>

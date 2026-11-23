@@ -205,11 +205,16 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       ? computeDailyTargets(buildProfile(goal))
       : null;
 
+  const setStartingDisplay = useAppStore((st) => st.setStartingDisplay);
+
   function persistAndFinish(openSettings: boolean) {
     if (!canFinish || !goal) return;
     const profile = buildProfile(goal);
     setUserProfile(profile);
     setTargets(applyProfileToTargets(profile));
+    // Starting display: detailed if any refine card was changed, basic if they went straight through.
+    const refined = JSON.stringify(refine) !== JSON.stringify(defaultRefineValues());
+    setStartingDisplay(refined ? "detailed" : "basic");
     finishOnboarding();
     if (openSettings) requestOpenSettings();
   }

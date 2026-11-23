@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 import type { DailyTargets } from "@/types";
 
 function fiberTarget(targets: DailyTargets): number {
@@ -60,6 +61,7 @@ export function TodayProgressCard({
   const proteinLeft = Math.max(0, Math.round(targets.protein - eaten.protein));
   const kcalPct = kcalTarget > 0 ? Math.min(100, (kcalEaten / kcalTarget) * 100) : 0;
   const fiberGoal = fiberTarget(targets);
+  const display = useDisplayPrefs();
 
   return (
     <>
@@ -97,6 +99,8 @@ export function TodayProgressCard({
             target={targets.protein}
             barClass="bg-sky-500"
           />
+          {display.progressMacros && (
+          <>
           <ThinBar
             label="Carbs"
             eaten={eaten.carbs}
@@ -115,6 +119,8 @@ export function TodayProgressCard({
             target={fiberGoal}
             barClass="bg-emerald-500"
           />
+          </>
+          )}
         </div>
       </section>
     </>

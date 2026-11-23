@@ -23,6 +23,9 @@ import {
 } from "@/utils/household";
 import { mealsForDateKey, sumTrackedMacros, trackingLabel } from "@/utils/mealTracking";
 import { remainingToday } from "@/utils/snackItems";
+import { QuestionCard } from "@/components/QuestionCard";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
+import { canAskOnOpen, MAX_ON_OPEN, nextQuestions, type Question } from "@/utils/questionQueue";
 
 const fallbackOrder: MealSlotId[] = ["breakfast", "lunch", "dinner", "snack", "snack_2", "snack_3"];
 
@@ -50,6 +53,12 @@ export function TodayScreen() {
     null,
   );
   const [snackOpen, setSnackOpen] = useState(false);
+  const [question, setQuestion] = useState<Question | null>(null);
+  const display = useDisplayPrefs();
+  const recordUsage = useAppStore((s) => s.recordUsage);
+  const refreshQuestions = useAppStore((s) => s.refreshQuestions);
+  const answerQuestion = useAppStore((s) => s.answerQuestion);
+  const restoreCheckpoint = useAppStore((s) => s.restoreCheckpoint);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [expandedSlot, setExpandedSlot] = useState<MealSlotId | "init" | null>("init");
@@ -105,6 +114,25 @@ export function TodayScreen() {
     expandedSlot === "init" ? nextUnlogged : expandedSlot;
   const checkInRecent = isRecentCheckIn(userProfile?.lastCheckInAt);
   const checkInDue = !checkInRecent;
+
+  // App open: count the meal cards shown, then maybe ask one question (3-day spacing).
+  useEffect(() => {
+    recordUsage("cards", mealsForViewDate.length);
+    refreshQuestions();
+    const s = useAppStore.getState();
+    if (!canAskOnOpen(s.lastQuestionAskedAt, new Date())) return;
+    setQuestion(nextQuestions(s.questionQueue, s.questionLog, new Date(), MAX_ON_OPEN)[0] ?? null);
+    // Once per visit to Today.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleAnswer(q: Question, answer: Parameters<typeof answerQuestion>[1]) {
+    setQuestion(null);
+    const cp = answerQuestion(q.id, answer);
+    if (cp) {
+      showUndo({ message: `${cp.what}.`, undo: () => restoreCheckpoint(cp.id) }, 10000);
+    }
+  }
 
   useEffect(() => {
     if (!openSettingsOnStart) return;
@@ -186,7 +214,13 @@ export function TodayScreen() {
         </div>
       )}
 
-      {checkInRecent && (
+      {question && (
+        <div className="section-gap">
+          <QuestionCard question={question} onAnswer={(a) => handleAnswer(question, a)} />
+        </div>
+      )}
+
+      {display.insightBanners && checkInRecent && (
         <div className="section-gap flex justify-center">
           <SmartAdjustmentBadge variant="success">
             Adjusted based on your recent check-in
@@ -194,7 +228,7 @@ export function TodayScreen() {
         </div>
       )}
 
-      {personalizationInsight && (
+      {display.insightBanners && personalizationInsight && (
         <PersonalizationInsightBanner
           message={personalizationInsight.message}
           onDismiss={dismissPersonalizationInsight}
@@ -341,7 +375,12 @@ export function TodayScreen() {
         />
       )}
       {snackOpen && (
-        <AddSnackSheet dateKey={todayDateKey} onClose={() => setSnackOpen(false)} onLogged={handleSnackLogged} />
+        <AddSnackSheet
+          dateKey={todayDateKey}
+          remaining={remainingToday(targets, eaten)}
+          onClose={() => setSnackOpen(false)}
+          onLogged={handleSnackLogged}
+        />
       )}
       {undo && (
         <UndoToast
