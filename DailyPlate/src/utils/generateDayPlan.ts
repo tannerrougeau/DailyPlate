@@ -22,6 +22,15 @@ import {
 import { getProteinSource } from "@/utils/recipeProteinSource";
 import { createPlannedMeal } from "@/utils/recipeDisplay";
 import { pickPreferredVariationId } from "@/utils/variationPrefs";
+import {
+  budgetWeight,
+  cheapestCost,
+  median,
+  MIN_OPTIONS_PER_SLOT,
+  passesEffortLimits,
+  passesEquipmentLimits,
+} from "@/utils/recipeFit";
+import type { BudgetPreference, CookingLimit } from "@/types/profile";
 import { isBeverageRecipe, mealMacrosWithBeverage } from "@/utils/beverages";
 
 export { isBeverageRecipe } from "@/utils/beverages";
@@ -135,6 +144,7 @@ function isRecipeAllowed(
   if (recipeExcludedByDislikeChips(recipe, dislikedChips, dislikedCustom)) return false;
   if (options && recipeAvoidedByProteinSources(recipe, options.avoidedProteinSources)) return false;
   if (options && !recipeMatchesEquipment(recipe, options.kitchenEquipment)) return false;
+  if (options && !passesEquipmentLimits(recipe, options.cookingLimits)) return false;
   if (
     options &&
     slot &&
@@ -180,6 +190,10 @@ export interface GenerateOptions {
   };
   /** Per-slot meal targets; picks that can be portioned to fit are preferred. */
   slotTargets?: Partial<Record<MealSlotId, DailyTargets>>;
+  /** "Anything that limits cooking?" Equipment limits are hard; time and chopping can soften. */
+  cookingLimits?: CookingLimit[];
+  /** Tight and Moderate rank by estimated cost per serving (cheapest variation). */
+  budget?: BudgetPreference;
 }
 
 /** Goal portions are applied when the day is saved (see applyGoalPortions), so picks start at scale 1. */
@@ -221,6 +235,7 @@ export function generateDayPlan(
         live.dislikedChips,
         live.dislikedCustom,
         live.snackStyle,
+        live.budget,
       ),
     });
   }
@@ -261,6 +276,10 @@ function pickSlotRecipe(
       isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom, options, slot) &&
       !used.has(r.id),
   );
+  // Time and chopping limits filter when enough options remain; otherwise they strongly prefer.
+  const effortOk = pool.filter((r) => passesEffortLimits(r, options.cookingLimits));
+  const softEffort = effortOk.length < MIN_OPTIONS_PER_SLOT;
+  if (!softEffort) pool = effortOk;
   const fresh = pool.filter((r) => underRepeatLimit(r, options));
   if (fresh.length > 0) pool = fresh;
   if (pool.length === 0) {
@@ -271,9 +290,24 @@ function pickSlotRecipe(
     );
   }
   if (pool.length === 0) {
-    pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
+    // Last resort still respects equipment limits (never an oven recipe for "No oven").
+    pool = recipes.filter(
+      (r) =>
+        !dislike.has(r.id) &&
+        !used.has(r.id) &&
+        !isBeverageRecipe(r) &&
+        passesEquipmentLimits(r, options.cookingLimits),
+    );
   }
-  return weightedPick(pool, (r) => recipeWeight(r, slot, options));
+  const costs = new Map(options.budget && options.budget !== "flexible" ? pool.map((r) => [r.id, cheapestCost(r)]) : []);
+  const mid = median([...costs.values()]);
+  return weightedPick(pool, (r) => {
+    let w = recipeWeight(r, slot, options);
+    if (softEffort && !passesEffortLimits(r, options.cookingLimits)) w *= 0.15;
+    const c = costs.get(r.id);
+    if (c != null) w *= budgetWeight(c, mid, options.budget);
+    return w;
+  });
 }
 
 /**
@@ -308,6 +342,7 @@ export function generateSlotsPlan(
         live.dislikedChips,
         live.dislikedCustom,
         live.snackStyle,
+        live.budget,
       ),
     });
   }

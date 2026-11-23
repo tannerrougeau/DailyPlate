@@ -53,6 +53,13 @@ export type SnackStyle = "whole_food" | "packaged" | "both";
 
 export type { KitchenEquipmentId };
 
+/** How a meal is usually gotten ("fit your life" question 1). */
+export type MealSource = "cook" | "prep" | "buy";
+export type MealSourceSlot = "breakfast" | "lunch" | "dinner";
+export type CookingAmount = "little" | "some" | "most";
+export type BudgetPreference = "tight" | "moderate" | "flexible";
+export type CookingLimit = "microwave_only" | "no_oven" | "short_time" | "little_chopping";
+
 export interface UserProfile {
   age: number;
   sex: BiologicalSex;
@@ -126,4 +133,9 @@ export interface UserProfile {
   lowComplexityEnabled?: boolean;
   /** Preferred cuisines for recipe weighting (e.g. mediterranean, asian). */
   preferredCuisines?: string[];
+  /** "Fit your life" answers. Each is optional; unset keeps the default behavior. */
+  mealSources?: Partial<Record<MealSourceSlot, MealSource>>;
+  cookingAmount?: CookingAmount;
+  budget?: BudgetPreference;
+  cookingLimits?: CookingLimit[];
 }

@@ -34,13 +34,12 @@ export const snackRecipes: RecipeSource[] = [
     cookMinutes: 12,
     servingWeightGrams: 200,
     cookStyle: "assembled",
-    equipment: ["stovetop"],
     ingredients: [
       { name: "Eggs", quantity: 2, unit: "large", category: "Protein" },
       { name: "Mixed berries", quantity: 0.75, unit: "cup", category: "Produce" },
     ],
     instructions: [
-      "Simmer eggs 10–12 minutes, cool, and peel.",
+      "Use store-bought hard-boiled eggs, or simmer eggs 10–12 minutes, cool, and peel.",
       "Serve with a handful of berries.",
     ],
   },

@@ -746,7 +746,8 @@ const baseRecipeLibrary: RecipeSource[] = [
       "Whisk eggs with a pinch of pepper.",
       "Heat oil in a pan; wilt spinach and halved tomatoes briefly.",
       "Pour in eggs and scramble until softly set.",
-      "Fold in cottage cheese off heat and serve in a bowl."
+      "Fold in cottage cheese off heat and serve in a bowl.",
+      "Microwave option: whisk eggs in a microwave-safe bowl and microwave 60–90 seconds, stirring twice, until just set. Wilt spinach and tomatoes in the microwave 30 seconds, then fold everything together with the cottage cheese."
     ],
   },
   {
@@ -1181,7 +1182,7 @@ const baseRecipeLibrary: RecipeSource[] = [
     imageUrl: "/recipes/chicken-burrito-bowl.png",
     cuisine: "mexican",
     tags: ["whole_food", "high_protein", "meal_prep", "quick"],
-    mealSlots: ["lunch"],
+    mealSlots: ["lunch", "dinner"],
     prepMinutes: 10,
     cookMinutes: 8,
     ingredients: [
@@ -1504,7 +1505,7 @@ const baseRecipeLibrary: RecipeSource[] = [
     imageUrl: "/recipes/turkey-veggie-hummus-wrap.png",
     cuisine: "american",
     tags: ["whole_food", "high_protein", "quick", "meal_prep"],
-    mealSlots: ["lunch"],
+    mealSlots: ["lunch", "dinner"],
     prepMinutes: 10,
     cookMinutes: 0,
     servingWeightGrams: 385,

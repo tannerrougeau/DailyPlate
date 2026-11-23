@@ -428,6 +428,8 @@ function buildGenerateOptions(
     preferredProteinSources: s.userProfile.preferredProteinSources ?? [],
     avoidedProteinSources: s.userProfile.avoidedProteinSources ?? [],
     kitchenEquipment: s.userProfile.kitchenEquipment,
+    cookingLimits: s.userProfile.cookingLimits,
+    budget: s.userProfile.budget,
     ingredientVariety: s.userProfile.ingredientVariety ?? "minimal",
     personalization: {
       profile: s.userProfile,

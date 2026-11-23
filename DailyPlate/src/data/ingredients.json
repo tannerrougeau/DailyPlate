@@ -23,6 +23,7 @@
       "Lean ground turkey"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -57,6 +58,7 @@
       "Lean ground beef (93%)"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -93,6 +95,7 @@
       "Chicken breast (cubed)"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -127,6 +130,7 @@
       "Ground chicken"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -166,6 +170,7 @@
       "Sliced turkey breast"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -202,6 +207,7 @@
       "Chicken thighs (bone-in, skin-on)"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -237,6 +243,7 @@
       "Lean beef strips"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -271,6 +278,7 @@
       "Salmon fillet"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.8,
@@ -305,6 +313,7 @@
       "Cooked salmon or tuna"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -337,6 +346,7 @@
       "Canned tuna in water"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -369,6 +379,7 @@
       "Eggs"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -401,6 +412,7 @@
       "Extra liquid egg whites"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -436,6 +448,7 @@
       "Cooked bacon, chopped"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -470,6 +483,7 @@
       "Turkey bacon"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null
   },
@@ -500,6 +514,7 @@
       "Diced ham"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -534,6 +549,7 @@
       "Diced turkey breast or deli turkey"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -566,6 +582,7 @@
       "Turkey burger patty"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -601,6 +618,7 @@
       "Chicken sausage, diced"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "cooked",
     "yield": null
   },
@@ -628,6 +646,7 @@
       "Beef jerky"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -661,6 +680,7 @@
       "Beef or turkey meat stick"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null
   },
@@ -691,6 +711,7 @@
       "Microwave rice (cooked)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "cooked",
     "yield": {
       "cookedPerRaw": 2.6,
@@ -726,6 +747,7 @@
       "Rolled oats"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "dry",
     "yield": {
       "cookedPerRaw": 1,
@@ -760,6 +782,7 @@
       "Orzo (dry)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "dry",
     "yield": {
       "cookedPerRaw": 2.5,
@@ -795,6 +818,7 @@
       "Protein pasta (dry)"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "dry",
     "yield": {
       "cookedPerRaw": 2.5,
@@ -828,6 +852,7 @@
       "Sliced bread (toasted)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -860,6 +885,7 @@
       "Plain bagel (halved, toasted)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -892,6 +918,7 @@
       "Croissant"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -924,6 +951,7 @@
       "Breakfast biscuit"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -958,6 +986,7 @@
       "6-inch flour tortillas"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -992,6 +1021,7 @@
       "6-inch whole wheat tortillas"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1024,6 +1054,7 @@
       "6-inch corn tortillas"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1056,6 +1087,7 @@
       "Teriyaki sauce"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1089,6 +1121,7 @@
       "Soy sauce or teriyaki"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1123,6 +1156,7 @@
       "Broccoli, cooked"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -1156,6 +1190,7 @@
       "Green vegetable mix"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -1188,6 +1223,7 @@
       "Sesame seeds (optional)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1222,6 +1258,7 @@
       "Avocado oil"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1254,6 +1291,7 @@
       "Butter or oil"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1285,6 +1323,7 @@
       "Chia seeds"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1322,6 +1361,7 @@
       "Strawberry protein powder (or vanilla)"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "as-sold",
     "yield": null
   },
@@ -1352,6 +1392,7 @@
       "Greek yogurt (optional)"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1383,6 +1424,7 @@
       "Plain Greek yogurt cup (5.3 oz)"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1416,6 +1458,7 @@
       "Low-fat cottage cheese"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1447,6 +1490,7 @@
       "Cottage cheese cup (4 oz)"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1480,6 +1524,7 @@
       "Unsweetened almond milk (or milk of choice)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1512,6 +1557,7 @@
       "Milk (2%)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1544,6 +1590,7 @@
       "Fat-free milk"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1577,6 +1624,7 @@
       "Ice"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1610,6 +1658,7 @@
       "Pinch of salt"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1642,6 +1691,7 @@
       "Mild chili seasoning"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1673,6 +1723,7 @@
       "Cinnamon"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1704,6 +1755,7 @@
       "Cumin"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1735,6 +1787,7 @@
       "Garlic powder"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1767,6 +1820,7 @@
       "Italian herbs"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1798,6 +1852,7 @@
       "Dried oregano"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1829,6 +1884,7 @@
       "Smoked paprika"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1860,6 +1916,7 @@
       "Ranch seasoning mix"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1891,6 +1948,7 @@
       "Ginger (fresh)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -1922,6 +1980,7 @@
       "Almond butter"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1953,6 +2012,7 @@
       "Peanut butter"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -1984,6 +2044,7 @@
       "Almonds"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2015,6 +2076,7 @@
       "Peanuts"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2046,6 +2108,7 @@
       "Cashews"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2077,6 +2140,7 @@
       "Chopped pecans"
     ],
     "role": "fat",
+    "cost": "high",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2109,6 +2173,7 @@
       "Mixed nuts"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2142,6 +2207,7 @@
       "Diced apple"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2176,6 +2242,7 @@
       "Sliced banana"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2209,6 +2276,7 @@
       "Asparagus"
     ],
     "role": "vegetable",
+    "cost": "medium",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2241,6 +2309,7 @@
       "Avocado (sliced)"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2274,6 +2343,7 @@
       "Potato (cubed)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2305,6 +2375,7 @@
       "Shredded hash browns (cooked)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2339,6 +2410,7 @@
       "Sweet potato (diced)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2372,6 +2444,7 @@
       "Mixed greens or spinach"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.3,
@@ -2409,6 +2482,7 @@
       "Shredded lettuce"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2446,6 +2520,7 @@
       "Diced bell pepper"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.85,
@@ -2480,6 +2555,7 @@
       "Roasted red peppers, diced"
     ],
     "role": "vegetable",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2517,6 +2593,7 @@
       "Frozen cherries or mixed berries"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2549,6 +2626,7 @@
       "Frozen strawberries"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2581,6 +2659,7 @@
       "Black beans (canned, drained)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2612,6 +2691,7 @@
       "Canned chickpeas (drained)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2643,6 +2723,7 @@
       "Shelled edamame"
     ],
     "role": "protein",
+    "cost": "low",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -2675,6 +2756,7 @@
       "Sweetener (to taste)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2707,6 +2789,7 @@
       "Brussels sprouts (halved)"
     ],
     "role": "vegetable",
+    "cost": "medium",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2743,6 +2826,7 @@
       "Shredded carrots"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2776,6 +2860,7 @@
       "Celery stalks"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2814,6 +2899,7 @@
       "Tomato (sliced)"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2845,6 +2931,7 @@
       "Sun-dried tomatoes, chopped"
     ],
     "role": "flavor",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2877,6 +2964,7 @@
       "Diced tomatoes (canned)"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -2911,6 +2999,7 @@
       "Cucumber (sliced)"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -2952,6 +3041,7 @@
       "Yellow onion (wedges)"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.75,
@@ -2988,6 +3078,7 @@
       "Garlic"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -3019,6 +3110,7 @@
       "Corn kernels"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -3052,6 +3144,7 @@
       "Roasted vegetables"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "cooked",
     "yield": null,
     "usda": {
@@ -3087,6 +3180,7 @@
       "Zucchini or yellow squash (diced)"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.8,
@@ -3122,6 +3216,7 @@
       "Sliced mushrooms"
     ],
     "role": "vegetable",
+    "cost": "medium",
     "state": "raw",
     "yield": {
       "cookedPerRaw": 0.6,
@@ -3157,6 +3252,7 @@
       "Frozen pineapple (optional)"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -3188,6 +3284,7 @@
       "Frozen mango chunks"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -3219,6 +3316,7 @@
       "Riced cauliflower"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -3253,6 +3351,7 @@
       "Broccoli florets"
     ],
     "role": "vegetable",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -3285,6 +3384,7 @@
       "Beef broth or chicken broth"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3324,6 +3424,7 @@
       "Sliced cheddar or American cheese"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3356,6 +3457,7 @@
       "Pepper Jack cheese, shredded"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3387,6 +3489,7 @@
       "Gruyère cheese, shredded"
     ],
     "role": "fat",
+    "cost": "high",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3419,6 +3522,7 @@
       "Swiss cheese, shredded"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3453,6 +3557,7 @@
       "Shredded mozzarella or Gruyère"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3485,6 +3590,7 @@
       "Mini Babybel cheese"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3519,6 +3625,7 @@
       "Feta cheese, crumbled"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3550,6 +3657,7 @@
       "Parmesan"
     ],
     "role": "fat",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3581,6 +3689,7 @@
       "Light cream cheese"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3612,6 +3721,7 @@
       "Sour cream (optional)"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3645,6 +3755,7 @@
       "Spicy mayo or yogurt sauce"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3677,6 +3788,7 @@
       "Light Caesar dressing"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null
   },
@@ -3704,6 +3816,7 @@
       "Mustard (optional)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3736,6 +3849,7 @@
       "Salsa verde (optional)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3767,6 +3881,7 @@
       "Hummus"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3798,6 +3913,7 @@
       "Tzatziki"
     ],
     "role": "flavor",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3829,6 +3945,7 @@
       "Honey"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3860,6 +3977,7 @@
       "Maple syrup"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3892,6 +4010,7 @@
       "Orange marmalade"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3923,6 +4042,7 @@
       "Unsweetened cocoa powder"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3955,6 +4075,7 @@
       "Mini chocolate chips"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -3986,6 +4107,7 @@
       "Unsweetened shredded coconut"
     ],
     "role": "fat",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4018,6 +4140,7 @@
       "High-protein granola (low sugar)"
     ],
     "role": "carb",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4049,6 +4172,7 @@
       "Cornstarch"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4080,6 +4204,7 @@
       "Rice vinegar"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4115,6 +4240,7 @@
       "Lime juice"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4146,6 +4272,7 @@
       "Lemon zest"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4185,6 +4312,7 @@
       "Parsley"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -4216,6 +4344,7 @@
       "Fresh chives, chopped"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4247,6 +4376,7 @@
       "Capers (optional)"
     ],
     "role": "flavor",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4279,6 +4409,7 @@
       "Kalamata olives (pitted)"
     ],
     "role": "flavor",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4310,6 +4441,7 @@
       "Jalapeño slices (optional)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "raw",
     "yield": null,
     "usda": {
@@ -4341,6 +4473,7 @@
       "Hot sauce (optional)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4372,6 +4505,7 @@
       "Croutons"
     ],
     "role": "carb",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4403,6 +4537,7 @@
       "Simple stir-fry sauce"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4434,6 +4569,7 @@
       "Smoked salmon, chopped"
     ],
     "role": "protein",
+    "cost": "high",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4468,6 +4604,7 @@
       "RXBAR or similar nut-and-egg-white bar"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null
   },
@@ -4497,6 +4634,7 @@
       "Protein chips (1 bag)"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null
   },
@@ -4527,6 +4665,7 @@
       "RTD protein shake (11.5 fl oz)"
     ],
     "role": "protein",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null
   },
@@ -4555,6 +4694,7 @@
       "Seaweed snacks"
     ],
     "role": "flavor",
+    "cost": "medium",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4588,6 +4728,7 @@
       "Diet beverage (zero-calorie soda, sparkling water, or similar)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null
   },
@@ -4616,6 +4757,7 @@
       "Sweetened drink (soda, juice, or similar)"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
@@ -4647,6 +4789,7 @@
       "Black pepper"
     ],
     "role": "flavor",
+    "cost": "low",
     "state": "as-sold",
     "yield": null,
     "usda": {
