@@ -234,6 +234,20 @@ function rememberIngredients(options: GenerateOptions, recipe: Recipe) {
   options.pickedIngredientNames = names;
 }
 
+/**
+ * Recent-repeat limit: a recipe planned on this many days (7 back to 7 ahead) is left out when
+ * other options exist. Favorites get one more; a "meals felt repetitive" check-in lowers it to 1.
+ */
+export function repeatLimitFor(recipeId: string, options: GenerateOptions): number {
+  const base = options.personalization?.signals.wantsMoreVariety ? 1 : 2;
+  return options.favoriteIds.includes(recipeId) ? base + 1 : base;
+}
+
+function underRepeatLimit(recipe: Recipe, options: GenerateOptions): boolean {
+  const count = options.personalization?.signals.recentCounts?.get(recipe.id) ?? 0;
+  return count < repeatLimitFor(recipe.id, options);
+}
+
 function pickSlotRecipe(
   recipes: Recipe[],
   slot: MealSlotId,
@@ -247,6 +261,8 @@ function pickSlotRecipe(
       isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom, options, slot) &&
       !used.has(r.id),
   );
+  const fresh = pool.filter((r) => underRepeatLimit(r, options));
+  if (fresh.length > 0) pool = fresh;
   if (pool.length === 0) {
     pool = recipes.filter(
       (r) =>

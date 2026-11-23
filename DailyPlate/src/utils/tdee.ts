@@ -79,3 +79,34 @@ export function computeDailyTargets(profile: UserProfile): ComputedTargets {
     fiber: fiberG,
   };
 }
+
+/** Profile fields that feed calorie and macro targets. */
+const TARGET_INPUTS = [
+  "age",
+  "sex",
+  "heightCm",
+  "weightKg",
+  "goal",
+  "activityLevel",
+  "knownTdeeKcal",
+  "proteinPreference",
+  "minimumProteinGrams",
+  "macroSplitPreference",
+] as const satisfies readonly (keyof UserProfile)[];
+
+export function targetInputsChanged(prev: UserProfile | null | undefined, next: UserProfile): boolean {
+  if (!prev) return true;
+  return TARGET_INPUTS.some((key) => (prev[key] ?? null) !== (next[key] ?? null));
+}
+
+/**
+ * Targets after a profile save: recalculated only when a target input changed (weight, goal,
+ * activity, protein…). Otherwise the current targets stay, including an applied recommendation.
+ */
+export function targetsAfterProfileChange(
+  prev: UserProfile | null | undefined,
+  next: UserProfile,
+  current: import("@/types").DailyTargets,
+): import("@/types").DailyTargets {
+  return targetInputsChanged(prev, next) ? computeDailyTargets(next) : current;
+}

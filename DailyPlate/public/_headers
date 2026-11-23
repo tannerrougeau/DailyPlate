@@ -1,0 +1,7 @@
+# Always revalidate the service worker, app shell and manifest so a new deploy is picked up promptly.
+/sw.js
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Cache-Control: no-cache

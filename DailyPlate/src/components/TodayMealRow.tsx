@@ -37,6 +37,7 @@ import {
 } from "@/utils/recipeDisplay";
 import { useAppStore } from "@/store/useAppStore";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 
 export function TodayMealRow({
   meal,
@@ -95,6 +96,8 @@ export function TodayMealRow({
   const setMealFatVariation = useAppStore((s) => s.setMealFatVariation);
   const setMealBeverage = useAppStore((s) => s.setMealBeverage);
   const keepMeal = useAppStore((s) => s.keepMeal);
+  const display = useDisplayPrefs();
+  const recordUsage = useAppStore((s) => s.recordUsage);
   const addMealSides = useAppStore((s) => s.addMealSides);
   const replaceMealSlot = useAppStore((s) => s.replaceMealSlot);
   const dayMeals = useAppStore((s) => s.dailyPlans[dateKey]);
@@ -205,19 +208,25 @@ export function TodayMealRow({
             <span>
               Protein <span className="font-semibold text-slate-800">{protein}g</span>
             </span>
-            <span>
-              Carbs <span className="font-semibold text-slate-800">{Math.round(macros.carbs)}g</span>
-            </span>
-            <span>
-              Fat <span className="font-semibold text-slate-800">{Math.round(macros.fat)}g</span>
-            </span>
+            {display.cardMacros && (
+              <>
+                <span>
+                  Carbs <span className="font-semibold text-slate-800">{Math.round(macros.carbs)}g</span>
+                </span>
+                <span>
+                  Fat <span className="font-semibold text-slate-800">{Math.round(macros.fat)}g</span>
+                </span>
+              </>
+            )}
+            {display.cardFiber && (
             <span>
               Fiber{" "}
               <span className="font-semibold text-slate-800">{Math.round(macros.fiber ?? 0)}g</span>
             </span>
+            )}
           </div>
           <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            {serving && (
+            {serving && display.servingLine && (
               <button
                 type="button"
                 onClick={() => setDetailsOpen(true)}
@@ -270,6 +279,7 @@ export function TodayMealRow({
               </button>
             </div>
           )}
+          {display.drinkPicker && (
           <label className="mt-2 flex min-w-0 items-center gap-1 text-[11px] text-slate-600">
             <span className="shrink-0 font-medium text-slate-500">Drink:</span>
             <select
@@ -287,6 +297,7 @@ export function TodayMealRow({
               ))}
             </select>
           </label>
+          )}
           <div className="mt-2 flex gap-1">
             <button
               type="button"
@@ -326,7 +337,10 @@ export function TodayMealRow({
           <button
             type="button"
             aria-expanded={detailsOpen}
-            onClick={() => setDetailsOpen((open) => !open)}
+            onClick={() => {
+              if (!detailsOpen) recordUsage("details");
+              setDetailsOpen((open) => !open);
+            }}
             className="mt-2 flex min-h-[40px] w-full items-center justify-between rounded-lg px-1 text-sm font-semibold text-primary"
           >
             <span>Recipe/Prep details</span>

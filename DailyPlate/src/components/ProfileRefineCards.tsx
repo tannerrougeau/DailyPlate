@@ -389,7 +389,7 @@ export function refineValuesFromProfile(profile: UserProfile): RefineCardValues 
     },
     knownTdeeInput: profile.knownTdeeKcal != null ? String(profile.knownTdeeKcal) : "",
     macroSplitPreference: profile.macroSplitPreference ?? "balanced",
-    minProteinGrams: isCustomProteinOverride(profile.minimumProteinGrams, input)
+    minProteinGrams: (profile.minimumProteinCustom ?? isCustomProteinOverride(profile.minimumProteinGrams, input))
       ? String(profile.minimumProteinGrams)
       : "",
   };
@@ -431,6 +431,7 @@ export function profilePatchFromRefine(
     knownTdeeKcal: parseKnownTdee(value.knownTdeeInput),
     macroSplitPreference: value.macroSplitPreference,
     prioritizeMinProtein: true,
+    minimumProteinCustom: hasCustomProtein,
     minimumProteinGrams: hasCustomProtein
       ? Math.round(parsedProtein)
       : goalLinkedProteinGrams({

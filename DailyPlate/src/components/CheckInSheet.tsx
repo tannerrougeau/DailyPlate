@@ -1,4 +1,14 @@
 import { useState } from "react";
+import { QuestionCard } from "@/components/QuestionCard";
+import { resolveDisplayPrefs, type Checkpoint } from "@/utils/displayPrefs";
+import {
+  checkInPlanQuestions,
+  checkInQuestions,
+  MAX_IN_CHECK_IN,
+  nextQuestions,
+  usesLongBatches,
+  type Question,
+} from "@/utils/questionQueue";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { ChevronDown, X } from "lucide-react";
 import { CHECK_IN_DISCLAIMER } from "@/checkIn/questionnaire";
@@ -43,6 +53,11 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
   const authSession = useAppStore((s) => s.authSession);
 
   const [phase, setPhase] = useState<Phase>("form");
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [applied, setApplied] = useState<Checkpoint[]>([]);
+  const refreshQuestions = useAppStore((s) => s.refreshQuestions);
+  const answerQuestion = useAppStore((s) => s.answerQuestion);
+  const restoreCheckpoint = useAppStore((s) => s.restoreCheckpoint);
   const [screen, setScreen] = useState<Screen>(1);
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -136,6 +151,29 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
       buildProfileUpdates(),
     );
     setResult(checkInResult);
+    // Checkpoint: up to two questions from this check-in and the queue.
+    const now = new Date();
+    const st = useAppStore.getState();
+    // Plans with batches longer than 2 days, from settings or from batches already planned ahead.
+    const plannedLongBatch = Object.entries(st.dailyPlans).some(
+      ([key, meals]) => key >= st.todayDateKey && meals.some((m) => (m.mealPrep?.portionsCooked ?? 1) > 2),
+    );
+    refreshQuestions([
+      // Plan changes from low (1–2) answers are asked, never applied automatically.
+      ...checkInPlanQuestions(checkInResult.entry, st.userProfile, now),
+      ...checkInQuestions(
+        checkInResult.entry,
+        resolveDisplayPrefs(st.displayPrefs),
+        st.userProfile,
+        now,
+        usesLongBatches(st.userProfile) || plannedLongBatch,
+      ),
+    ]);
+    const after = useAppStore.getState();
+    // Two at most; plan changes first, the rest stay queued.
+    setQuestions(
+      nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN, { planFirst: true }),
+    );
     setPhase("results");
   }
 
@@ -458,6 +496,36 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
+          {phase === "results" && (questions.length > 0 || applied.length > 0) && (
+            <div className="mb-4 space-y-2">
+              {applied.map((cp) => (
+                <p key={cp.id} className="flex items-center justify-between gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  <span>{cp.what}.</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      restoreCheckpoint(cp.id);
+                      setApplied((list) => list.filter((x) => x.id !== cp.id));
+                    }}
+                    className="font-semibold"
+                  >
+                    Undo
+                  </button>
+                </p>
+              ))}
+              {questions.map((q) => (
+                <QuestionCard
+                  key={q.id}
+                  question={q}
+                  onAnswer={(answer) => {
+                    const cp = answerQuestion(q.id, answer);
+                    setQuestions((list) => list.filter((x) => x.id !== q.id));
+                    if (cp) setApplied((list) => [...list, cp]);
+                  }}
+                />
+              ))}
+            </div>
+          )}
           {phase === "results" && result && (
             <ResultsView
               result={result}

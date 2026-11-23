@@ -22,6 +22,10 @@ export function snapshotAppState(
     | "lastBeverageBySlot"
     | "snackLogs"
     | "savedSnacks"
+    | "swapLog"
+    | "displayPrefs"
+    | "checkpoints"
+    | "myFoods"
     | "dismissedUsageNotes"
     | "favoriteIds"
     | "dislikedIds"
@@ -51,6 +55,10 @@ export function snapshotAppState(
     lastBeverageBySlot: s.lastBeverageBySlot,
     snackLogs: s.snackLogs,
     savedSnacks: s.savedSnacks,
+    swapLog: s.swapLog,
+    displayPrefs: s.displayPrefs,
+    checkpoints: s.checkpoints,
+    myFoods: s.myFoods,
     dismissedUsageNotes: s.dismissedUsageNotes,
     favoriteIds: s.favoriteIds,
     dislikedIds: s.dislikedIds,
@@ -82,6 +90,10 @@ export function savedStateToPatch(state: SavedAccountState): Partial<AppState> {
     lastBeverageBySlot: state.lastBeverageBySlot ?? {},
     snackLogs: state.snackLogs ?? {},
     savedSnacks: state.savedSnacks ?? [],
+    swapLog: state.swapLog ?? [],
+    displayPrefs: state.displayPrefs ?? null,
+    checkpoints: state.checkpoints ?? [],
+    myFoods: state.myFoods ?? [],
     dismissedUsageNotes: state.dismissedUsageNotes,
     favoriteIds: state.favoriteIds,
     dislikedIds: state.dislikedIds,

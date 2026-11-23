@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { AdjustServingsSheet } from "@/components/AdjustServingsSheet";
+import { FoodPickConfirm } from "@/components/FoodPickConfirm";
+import { FoodSearchPanel } from "@/components/FoodSearchPanel";
+import type { FoodItem } from "@/utils/foodTypes";
+import { foodToSnackItem } from "@/utils/foodSearch";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { allRecipes } from "@/recipes/recipePool";
 import { useAppStore } from "@/store/useAppStore";
@@ -18,10 +22,13 @@ import {
 /** Log a snack as it's eaten: Recent, Saved, Common items, Snack recipes, or a custom entry. */
 export function AddSnackSheet({
   dateKey,
+  remaining,
   onClose,
   onLogged,
 }: {
   dateKey: string;
+  /** Calories and protein left today, for the fit line after picking a found food. */
+  remaining?: { calories: number; protein: number };
   onClose: () => void;
   onLogged: (entry: MealTrackingEntry) => void;
 }) {
@@ -30,6 +37,8 @@ export function AddSnackSheet({
   const savedSnacks = useAppStore((s) => s.savedSnacks);
   const userRecipes = useAppStore((s) => s.userRecipes);
   const saveSnack = useAppStore((s) => s.saveSnack);
+  const saveMyFood = useAppStore((s) => s.saveMyFood);
+  const [picked, setPicked] = useState<FoodItem | null>(null);
   const [adjusting, setAdjusting] = useState<SnackItem | null>(null);
   const [name, setName] = useState("");
   const [kcal, setKcal] = useState("");
@@ -104,6 +113,22 @@ export function AddSnackSheet({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <div className="mt-3">
+            {picked ? (
+              <FoodPickConfirm
+                food={picked}
+                target={remaining ?? null}
+                forLabel="for what's left today"
+                onBack={() => setPicked(null)}
+                onLog={(servings, sized) => {
+                  saveMyFood(sized);
+                  log(foodToSnackItem(sized), servings);
+                }}
+              />
+            ) : (
+              <FoodSearchPanel onPick={setPicked} />
+            )}
+          </div>
           {sections
             .filter(([, items]) => items.length > 0)
             .map(([title, items]) => (

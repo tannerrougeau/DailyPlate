@@ -27,6 +27,10 @@ export interface SavedAccountState {
   lastBeverageBySlot?: Partial<Record<"breakfast" | "lunch" | "dinner" | "snack", import("@/types").BeverageId>>;
   snackLogs?: Record<string, import("@/types").MealTrackingEntry[]>;
   savedSnacks?: import("@/utils/snackItems").SavedSnack[];
+  swapLog?: import("@/utils/personalizationEngine").SwapLogEntry[];
+  displayPrefs?: Partial<import("@/utils/displayPrefs").DisplayPrefs> | null;
+  checkpoints?: import("@/utils/displayPrefs").Checkpoint[];
+  myFoods?: import("@/utils/foodTypes").FoodItem[];
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
   favoriteIds: string[];
   dislikedIds: string[];

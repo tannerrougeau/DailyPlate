@@ -114,6 +114,8 @@ export interface UserProfile {
   prioritizeMinProtein?: boolean;
   /** Daily protein floor (g) when prioritizeMinProtein is enabled. */
   minimumProteinGrams?: number | null;
+  /** True when the user typed a protein minimum; otherwise it follows goal, weight and preference. */
+  minimumProteinCustom?: boolean;
   /** ISO timestamp of most recent check-in submission. */
   lastCheckInAt?: string | null;
   /** Latest free-text experience note from check-in. */

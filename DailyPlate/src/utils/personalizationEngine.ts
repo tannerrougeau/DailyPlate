@@ -13,10 +13,22 @@ export const CUISINE_OPTIONS = [
   { id: "japanese", label: "Japanese" },
 ] as const;
 
+/** A recipe the user swapped away from (Replace or "New meal"). */
+export type SwapLogEntry = { recipeId: string; dateKey: string; at: string };
+
 export type PersonalizationSignals = {
   skippedRecipeIds: Set<string>;
   enjoyedRecipeIds: Set<string>;
   recentRecipeIds: Set<string>;
+  /** Swapped away within the last 30 days. */
+  swappedRecipeIds: Set<string>;
+  /**
+   * Cook events per recipe from 7 days back to 7 days ahead. A batch (meal prep, planned
+   * leftovers, Low Complexity) counts once, however many days it's eaten.
+   */
+  recentCounts: Map<string, number>;
+  /** Latest check-in said meals felt repetitive (variety 1–2 of 5). */
+  wantsMoreVariety: boolean;
   skippedLongPrepCount: number;
   enjoyedBatchCount: number;
   loggedMealCount: number;
@@ -48,6 +60,8 @@ export function analyzePersonalizationSignals(input: {
   plannedMeals: PlannedMeal[];
   todayDateKey: string;
   lookbackDays?: number;
+  swapLog?: SwapLogEntry[];
+  latestCheckIn?: CheckInEntry | null;
 }): PersonalizationSignals {
   const lookback = input.lookbackDays ?? 14;
   const anchor = fromDateKey(input.todayDateKey);
@@ -89,10 +103,35 @@ export function analyzePersonalizationSignals(input: {
     }
   }
 
+  const swapCutoff = toDateKey(addDays(anchor, -29));
+  const swappedRecipeIds = new Set(
+    (input.swapLog ?? []).filter((s) => s.dateKey >= swapCutoff).map((s) => s.recipeId),
+  );
+
+  // Repeats: cook events per recipe from 7 days back to 7 days ahead. Every day of one batch
+  // shares the batch id, so a 4-day batch is one event, not four repeats.
+  const cookEvents = new Map<string, Set<string>>();
+  for (let offset = -6; offset <= 7; offset++) {
+    const key = toDateKey(addDays(anchor, offset));
+    for (const meal of mealsForDateKey(key, input.dailyPlans, input.plannedMeals, input.todayDateKey)) {
+      const event = meal.mealPrep?.batchId ? `batch:${meal.mealPrep.batchId}` : `day:${key}`;
+      const events = cookEvents.get(meal.recipe.id) ?? new Set<string>();
+      events.add(event);
+      cookEvents.set(meal.recipe.id, events);
+    }
+  }
+  const recentCounts = new Map([...cookEvents].map(([id, events]) => [id, events.size] as const));
+
+  const wantsMoreVariety =
+    input.latestCheckIn != null && checkInScale(input.latestCheckIn, "mealVarietySatisfaction") <= 2;
+
   return {
     skippedRecipeIds,
     enjoyedRecipeIds,
     recentRecipeIds,
+    swappedRecipeIds,
+    recentCounts,
+    wantsMoreVariety,
     skippedLongPrepCount,
     enjoyedBatchCount,
     loggedMealCount: logged,
@@ -127,8 +166,9 @@ export function recipePersonalizationBoost(
   }
 
   if (signals.skippedRecipeIds.has(recipe.id)) boost -= 45;
+  if (signals.swappedRecipeIds?.has(recipe.id)) boost -= 30;
   if (signals.enjoyedRecipeIds.has(recipe.id)) boost += 16;
-  if (signals.recentRecipeIds.has(recipe.id)) boost -= 12;
+  if (signals.recentRecipeIds.has(recipe.id)) boost -= signals.wantsMoreVariety ? 24 : 12;
 
   if (favoriteIds.includes(recipe.id) && signals.enjoyedRecipeIds.has(recipe.id)) {
     boost += 10;
@@ -144,51 +184,23 @@ export function recipePersonalizationBoost(
   return boost;
 }
 
-export function deriveAdaptiveProfileUpdates(
+/**
+ * Meal-log patterns that suggest a plan setting. Nothing is changed here: the question queue asks
+ * (see logPlanQuestions), and only a Yes applies it.
+ */
+export function logPlanPatterns(
   profile: UserProfile,
   signals: PersonalizationSignals,
-  entry?: CheckInEntry,
-): Partial<UserProfile> {
-  const updates: Partial<UserProfile> = {};
-
-  if (
-    !profile.prioritizeMinimalPrep &&
-    signals.loggedMealCount >= 4 &&
-    signals.skippedLongPrepCount >= 2 &&
-    signals.skipRate >= 0.35
-  ) {
-    updates.prioritizeMinimalPrep = true;
-  }
-
-  if (
-    !profile.weeklyMealPrepEnabled &&
-    signals.loggedMealCount >= 5 &&
-    signals.enjoyedBatchCount >= 3
-  ) {
-    updates.weeklyMealPrepEnabled = true;
-    updates.weeklyMealPrepSlot = updates.weeklyMealPrepSlot ?? profile.weeklyMealPrepSlot ?? "dinner";
-    updates.weeklyMealPrepRepeatCount =
-      updates.weeklyMealPrepRepeatCount ?? profile.weeklyMealPrepRepeatCount ?? 3;
-  }
-
-  if (entry) {
-    const protein = checkInScale(entry, "proteinAdherence");
-    const ease = checkInScale(entry, "planEaseOfUse");
-    const enjoyment = checkInScale(entry, "recipeEnjoyment");
-    if (isMidLowScore(protein) && !profile.prioritizeMinProtein) {
-      updates.prioritizeMinProtein = true;
-    }
-    if (isMidLowScore(ease) && !profile.weeklyMealPrepEnabled) {
-      updates.weeklyMealPrepEnabled = true;
-      updates.weeklyMealPrepSlot = profile.weeklyMealPrepSlot ?? "dinner";
-      updates.weeklyMealPrepRepeatCount = profile.weeklyMealPrepRepeatCount ?? 3;
-    }
-    if (isMidLowScore(enjoyment) && !profile.prioritizeMinimalPrep && isMidLowScore(ease)) {
-      updates.prioritizeMinimalPrep = true;
-    }
-  }
-
-  return updates;
+): { skipsLongPrep: boolean; eatsBatchMeals: boolean } {
+  return {
+    skipsLongPrep:
+      !profile.prioritizeMinimalPrep &&
+      signals.loggedMealCount >= 4 &&
+      signals.skippedLongPrepCount >= 2 &&
+      signals.skipRate >= 0.35,
+    eatsBatchMeals:
+      !profile.weeklyMealPrepEnabled && signals.loggedMealCount >= 5 && signals.enjoyedBatchCount >= 3,
+  };
 }
 
 function macroSplitLabel(pref: UserProfile["macroSplitPreference"]): string {
@@ -211,24 +223,8 @@ export function buildPersonalizationInsights(input: {
 }): PersonalizationInsight[] {
   const { profile, signals, checkInEntry: entry, favoriteIds, source } = input;
   const messages: string[] = [];
-  const adaptive = deriveAdaptiveProfileUpdates(profile, signals, entry);
-  const nextProfile = { ...profile, ...adaptive };
-
-  if (adaptive.prioritizeMinimalPrep && !profile.prioritizeMinimalPrep) {
-    messages.push(
-      "Based on your recent logs, we enabled quick & minimal-prep meal priority — future plans will favor faster recipes.",
-    );
-  }
-  if (adaptive.prioritizeMinProtein && !profile.prioritizeMinProtein) {
-    messages.push(
-      "Based on your check-in and logs, we adjusted protein upward and will prioritize high-protein meals in your plans.",
-    );
-  }
-  if (adaptive.weeklyMealPrepEnabled && !profile.weeklyMealPrepEnabled) {
-    messages.push(
-      "You’ve been eating batch-friendly meals — we enabled weekly meal prep to reduce cooking days.",
-    );
-  }
+  // Plan settings only change through a Yes in the question queue, so no "we enabled…" messages here.
+  const nextProfile = profile;
 
   if (entry && source === "check_in") {
     if (isMidLowScore(checkInScale(entry, "mealVarietySatisfaction"))) {

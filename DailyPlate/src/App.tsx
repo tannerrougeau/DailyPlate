@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { BottomNav } from "@/components/BottomNav";
 import { SideNav } from "@/components/SideNav";
 import { GroceryScreen } from "@/screens/GroceryScreen";
@@ -50,6 +51,7 @@ export default function App() {
 
   return (
     <div className="min-h-dvh bg-cream">
+      <UpdateBanner />
       <AddToHomeScreenBanner />
       <a
         href="#main"

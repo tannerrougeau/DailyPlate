@@ -6,7 +6,8 @@ import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { HouseholdPicker } from "@/components/HouseholdPicker";
 import { HouseholdDetailsSection } from "@/components/HouseholdDetailsSection";
-import { applyProfileToTargets, useAppStore } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
+import { targetsAfterProfileChange } from "@/utils/tdee";
 import { MealPatternSection } from "@/components/MealPatternSection";
 import { ProteinPreferenceSection } from "@/components/ProteinPreferenceSection";
 import { PlanningPrefsSection, type PlanningPrefsValue } from "@/components/PlanningPrefsSection";
@@ -23,6 +24,10 @@ import {
 } from "@/utils/household";
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
+import { DisplaySettings } from "@/components/DisplaySettings";
+import { DevPanel } from "@/components/DevPanel";
+import { BUILD_INFO } from "@/utils/buildInfo";
+import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 import { MealTimingPreferenceSection } from "@/components/MealTimingPreferenceSection";
 import { CuisinePreferenceSection } from "@/components/CuisinePreferenceSection";
 import {
@@ -49,9 +54,14 @@ import {
 } from "@/utils/proteinMinimum";
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
+  const display = useDisplayPrefs();
+  // Hidden Dev panel: tap the version 5 times.
+  const [versionTaps, setVersionTaps] = useState(0);
+  const [devOpen, setDevOpen] = useState(false);
   const userProfile = useAppStore((s) => s.userProfile);
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const setTargets = useAppStore((s) => s.setTargets);
+  const targets = useAppStore((s) => s.targets);
   const authSession = useAppStore((s) => s.authSession);
   const logout = useAppStore((s) => s.logout);
   const syncAccountSnapshot = useAppStore((s) => s.syncAccountSnapshot);
@@ -98,12 +108,13 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
     setHouseholdAvoidCustom(userProfile.householdFoodAvoidCustom ?? "");
     const preference = migrateProteinPreference(userProfile.proteinPreference);
     setMinProteinGrams(
-      isCustomProteinOverride(userProfile.minimumProteinGrams, {
-        goal: userProfile.goal,
-        preference,
-        weightKg: userProfile.weightKg,
-        heightCm: userProfile.heightCm,
-      })
+      (userProfile.minimumProteinCustom ??
+        isCustomProteinOverride(userProfile.minimumProteinGrams, {
+          goal: userProfile.goal,
+          preference,
+          weightKg: userProfile.weightKg,
+          heightCm: userProfile.heightCm,
+        }))
         ? String(userProfile.minimumProteinGrams)
         : "",
     );
@@ -170,6 +181,9 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         .filter(Boolean)
         .filter((v, i, arr) => arr.indexOf(v) === i)
         .join(", "),
+      // Typed value = set by hand (kept as-is); empty = follows goal, weight and preference.
+      minimumProteinCustom:
+        minProteinGrams.trim() !== "" && Number.isFinite(parsedProtein) && parsedProtein > 0,
       minimumProteinGrams:
         minProteinGrams.trim() !== "" && Number.isFinite(parsedProtein) && parsedProtein > 0
           ? Math.round(parsedProtein)
@@ -181,7 +195,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             }),
     };
     setUserProfile(next);
-    setTargets(applyProfileToTargets(next));
+    // Keep current targets (e.g. an applied recommendation) unless a target input changed.
+    setTargets(targetsAfterProfileChange(userProfile, useAppStore.getState().userProfile ?? next, targets));
     void syncAccountSnapshot();
     onClose();
   };
@@ -281,6 +296,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <PlanningPrefsSection value={planningPrefs} onChange={setPlanningPrefs} />
         </section>
 
+        {display.macroSplitSetting && (
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">
             Preferred macro split
@@ -309,6 +325,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </section>
+        )}
 
         <section className="space-y-4 border-b border-slate-100 pb-5">
           <MealTimingPreferenceSection
@@ -321,6 +338,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         <section className="space-y-4 border-b border-slate-100 pb-5">
           <CuisinePreferenceSection selected={preferredCuisines} onChange={setPreferredCuisines} />
         </section>
+
+        <DisplaySettings />
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">Check-in</h3>
@@ -386,9 +405,25 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             Save
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            const next = versionTaps + 1;
+            if (next >= 5) {
+              setVersionTaps(0);
+              setDevOpen(true);
+            } else {
+              setVersionTaps(next);
+            }
+          }}
+          className="mt-6 block w-full text-center text-xs text-slate-400"
+        >
+          Version {BUILD_INFO.version} ({BUILD_INFO.commit})
+        </button>
       </div>
     </div>
     {feedbackOpen && <CheckInSheet onClose={() => setFeedbackOpen(false)} />}
+    {devOpen && <DevPanel onClose={() => setDevOpen(false)} />}
     </>
   );
 }

@@ -150,7 +150,7 @@ function questionnaireCalorieNudge(
   }
 
   if (isMidLowScore(proteinAdherence)) {
-    reasons.push("Protein adherence was moderate — hitting protein supports muscle and satiety.");
+    reasons.push("Protein adherence was low — hitting protein supports muscle and satiety.");
   } else if (isHighScore(proteinAdherence)) {
     reasons.push("Strong protein adherence — great for preserving lean mass.");
   }
