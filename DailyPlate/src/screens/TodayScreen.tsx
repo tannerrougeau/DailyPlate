@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
+import { AddSnackSheet } from "@/components/AddSnackSheet";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import type { MealSlotId, MealTrackingEntry, Recipe } from "@/types";
 import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
@@ -21,6 +22,7 @@ import {
   resolveHouseholdCounts,
 } from "@/utils/household";
 import { mealsForDateKey, sumTrackedMacros, trackingLabel } from "@/utils/mealTracking";
+import { remainingToday } from "@/utils/snackItems";
 
 const fallbackOrder: MealSlotId[] = ["breakfast", "lunch", "dinner", "snack", "snack_2", "snack_3"];
 
@@ -32,10 +34,12 @@ function isRecentCheckIn(iso?: string | null, days = 14): boolean {
 }
 
 type UndoState = {
-  slot: MealSlotId;
-  previous: MealTrackingEntry | null;
   message: string;
+  undo: () => void;
 };
+
+const REGENERATE_CONFIRM =
+  "Replace today's meals? This also updates today on your plan, calendar and grocery list. Meals you kept or marked eaten won't change.";
 
 export function TodayScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -45,7 +49,7 @@ export function TodayScreen() {
   const [mealPrep, setMealPrep] = useState<{ recipe: Recipe; variationId?: string } | null>(
     null,
   );
-  const [generateNotice, setGenerateNotice] = useState<string | null>(null);
+  const [snackOpen, setSnackOpen] = useState(false);
   const [householdSheetOpen, setHouseholdSheetOpen] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [expandedSlot, setExpandedSlot] = useState<MealSlotId | "init" | null>("init");
@@ -60,8 +64,12 @@ export function TodayScreen() {
   const userProfile = useAppStore((s) => s.userProfile);
   const todayHouseholdOverride = useAppStore((s) => s.todayHouseholdOverride);
   const setTodayHouseholdOverride = useAppStore((s) => s.setTodayHouseholdOverride);
-  const generateDay = useAppStore((s) => s.generateDay);
+  const regenerateToday = useAppStore((s) => s.regenerateToday);
+  const restoreDay = useAppStore((s) => s.restoreDay);
   const setMealTracking = useAppStore((s) => s.setMealTracking);
+  const snackLogs = useAppStore((s) => s.snackLogs);
+  const addSnackLog = useAppStore((s) => s.addSnackLog);
+  const removeSnackLog = useAppStore((s) => s.removeSnackLog);
   const todayNoteDismissed = useAppStore((s) => s.dismissedUsageNotes.today);
   const dismissUsageNote = useAppStore((s) => s.dismissUsageNote);
   const personalizationInsight = useAppStore((s) => s.personalizationInsight);
@@ -83,9 +91,11 @@ export function TodayScreen() {
     todayDateKey,
   );
   const dayTracking = mealTracking[todayDateKey];
+  const todaySnacks = snackLogs[todayDateKey] ?? [];
   const { eaten, loggedCount } = sumTrackedMacros(
     mealsForViewDate,
     dayTracking,
+    todaySnacks,
   );
   const sortedMeals = [...mealsForViewDate].sort(
     (a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot),
@@ -95,12 +105,6 @@ export function TodayScreen() {
     expandedSlot === "init" ? nextUnlogged : expandedSlot;
   const checkInRecent = isRecentCheckIn(userProfile?.lastCheckInAt);
   const checkInDue = !checkInRecent;
-
-  useEffect(() => {
-    if (!generateNotice) return;
-    const timer = window.setTimeout(() => setGenerateNotice(null), 7000);
-    return () => window.clearTimeout(timer);
-  }, [generateNotice]);
 
   useEffect(() => {
     if (!openSettingsOnStart) return;
@@ -115,18 +119,23 @@ export function TodayScreen() {
   }, []);
 
   function handleRegenerateToday() {
-    const result = generateDay(todayDateKey, {
-      lowComplexity: userProfile?.lowComplexityEnabled === true,
-    });
+    const result = regenerateToday();
     if (!result.ok) return;
-    setGenerateNotice("Today’s plan has been replaced. Grocery list updated.");
+    const { previous } = result;
     setExpandedSlot("init");
+    showUndo(
+      {
+        message: "Today's meals were replaced.",
+        undo: () => restoreDay(previous.dateKey, previous.meals, previous.tracking),
+      },
+      10000,
+    );
   }
 
-  function showUndo(next: UndoState) {
+  function showUndo(next: UndoState, ms = 5000) {
     if (undoTimer.current != null) window.clearTimeout(undoTimer.current);
     setUndo(next);
-    undoTimer.current = window.setTimeout(() => setUndo(null), 5000);
+    undoTimer.current = window.setTimeout(() => setUndo(null), ms);
   }
 
   function handleLog(slot: MealSlotId, entry: MealTrackingEntry | null, fromCircle: boolean) {
@@ -139,14 +148,27 @@ export function TodayScreen() {
     const remaining = sortedMeals.find((meal) => meal.slot !== slot && !dayTracking?.[meal.slot]);
     setExpandedSlot(remaining?.slot ?? null);
     showUndo({
-      slot,
-      previous,
       message: fromCircle && entry.status === "all" ? "Marked eaten" : trackingLabel(entry),
+      undo: () => setMealTracking(todayDateKey, slot, previous),
+    });
+  }
+
+  function handleSnackLogged(entry: MealTrackingEntry) {
+    addSnackLog(todayDateKey, entry);
+    // Remaining meals are not re-sized; show what's left instead.
+    const after = remainingToday(targets, {
+      ...eaten,
+      calories: eaten.calories + (entry.calories ?? 0),
+      protein: eaten.protein + (entry.protein ?? 0),
+    });
+    showUndo({
+      message: `Logged ${entry.note ?? "snack"} · ${after.calories.toLocaleString()} kcal and ${after.protein} g protein left today`,
+      undo: () => removeSnackLog(todayDateKey, entry.loggedAt),
     });
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-32 pt-3">
+    <div className="mx-auto max-w-lg px-4 pb-32 pt-3 lg:max-w-5xl lg:pb-12">
       <TodayHeader
         viewDate={viewDate}
         householdChip={householdChip}
@@ -158,7 +180,7 @@ export function TodayScreen() {
       {!todayNoteDismissed && (
         <div className="section-gap">
           <UsageNote
-            text="Tap the circle to mark a meal eaten. Open a row for details, or use ⋯ to log half, 1.5×, skip, or something else."
+            text="Tap the circle to mark a meal eaten. Open a row for details, or use ⋯ to adjust servings, skip, or log something else."
             onDismiss={() => dismissUsageNote("today")}
           />
         </div>
@@ -179,17 +201,9 @@ export function TodayScreen() {
         />
       )}
 
-      <div className="section-gap">
-        <TodayProgressCard targets={targets} eaten={eaten} />
-      </div>
-
-      <div className="section-gap flex justify-center">
-        <FeedbackCheckInButton due={checkInDue} onOpen={() => setFeedbackOpen(true)} />
-      </div>
-
       {confirmRegenerate && (
         <div className="section-gap rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <p className="text-sm font-medium text-slate-800">Replace today’s meals?</p>
+          <p className="text-sm font-medium leading-relaxed text-slate-800">{REGENERATE_CONFIRM}</p>
           <div className="mt-3 flex justify-end gap-2">
             <button
               type="button"
@@ -206,28 +220,33 @@ export function TodayScreen() {
               }}
               className="min-h-[36px] rounded-xl bg-[#2563EB] px-3 text-sm font-semibold text-white"
             >
-              Confirm
+              Regenerate
             </button>
           </div>
         </div>
       )}
-      {generateNotice && (
-        <div
-          className="section-gap flex gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3"
-          role="status"
-        >
-          <p className="flex-1 text-sm leading-relaxed text-emerald-900">{generateNotice}</p>
+
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
+      <aside className="lg:sticky lg:top-4 lg:order-2">
+        <div className="section-gap">
+          <TodayProgressCard targets={targets} eaten={eaten} />
+        </div>
+        <div className="section-gap">
           <button
             type="button"
-            onClick={() => setGenerateNotice(null)}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-emerald-700 hover:bg-emerald-100/80"
-            aria-label="Dismiss notice"
+            onClick={() => setSnackOpen(true)}
+            className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-[#2563EB] shadow-sm"
           >
-            <X className="h-4 w-4" />
+            <Plus className="h-4 w-4" aria-hidden />
+            Add snack
           </button>
         </div>
-      )}
+        <div className="section-gap flex justify-center">
+          <FeedbackCheckInButton due={checkInDue} onOpen={() => setFeedbackOpen(true)} />
+        </div>
+      </aside>
 
+      <div className="lg:order-1">
       <section aria-label="Today's meals" className="section-gap space-y-3">
         <div className="flex items-baseline justify-between gap-2 px-1">
           <h2 className="text-lg font-bold text-slate-900">Meals</h2>
@@ -244,7 +263,7 @@ export function TodayScreen() {
           <div className="card-surface px-6 py-14 text-center">
             <p className="text-base leading-relaxed text-slate-500">
               No meals yet — open{" "}
-              <span className="font-semibold text-primary">⋯</span> and tap Regenerate Today.
+              <span className="font-semibold text-primary">⋯</span> and tap Regenerate today.
             </p>
           </div>
         ) : (
@@ -272,6 +291,34 @@ export function TodayScreen() {
         )}
       </section>
 
+      {todaySnacks.length > 0 && (
+        <section aria-label="Snacks logged today" className="section-gap">
+          <h2 className="px-1 text-lg font-bold text-slate-900">Snacks</h2>
+          <ul className="mt-2 divide-y divide-slate-100 rounded-2xl border border-slate-200/80 bg-white">
+            {todaySnacks.map((entry) => (
+              <li key={entry.loggedAt} className="flex items-center gap-2 px-3 py-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-slate-900">{entry.note}</span>
+                  <span className="block text-xs tabular-nums text-slate-500">
+                    {entry.calories ?? 0} kcal · {entry.protein ?? 0}g protein
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeSnackLog(todayDateKey, entry.loggedAt)}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-slate-50"
+                  aria-label={`Remove ${entry.note ?? "snack"}`}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      </div>
+      </div>
+
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {feedbackOpen && <CheckInSheet onClose={() => setFeedbackOpen(false)} />}
       {householdSheetOpen && (
@@ -293,11 +340,14 @@ export function TodayScreen() {
           onClose={() => setMealPrep(null)}
         />
       )}
+      {snackOpen && (
+        <AddSnackSheet dateKey={todayDateKey} onClose={() => setSnackOpen(false)} onLogged={handleSnackLogged} />
+      )}
       {undo && (
         <UndoToast
           message={undo.message}
           onUndo={() => {
-            setMealTracking(todayDateKey, undo.slot, undo.previous);
+            undo.undo();
             setUndo(null);
             if (undoTimer.current != null) window.clearTimeout(undoTimer.current);
           }}

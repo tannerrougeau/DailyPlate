@@ -432,26 +432,37 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
 }
 
 function WelcomeStep({ onNext, onLogin }: { onNext: () => void; onLogin?: () => void }) {
+  // Fits one phone screen (375×667) without scrolling.
   return (
-    <div className="space-y-8 text-center">
-      <div className="rounded-3xl border border-slate-200/80 bg-white px-6 py-12 shadow-sm">
-        <h1 className="text-3xl font-bold text-slate-900">Welcome to DailyPlate</h1>
-        <p className="mt-4 text-lg leading-relaxed text-slate-600">
-          Five quick questions — household, stats, goal, and meals — then a summary you can refine.
-        </p>
+    <div className="space-y-4">
+      <div className="rounded-3xl border border-slate-200/80 bg-white px-5 py-6 shadow-sm">
+        <h1 className="text-2xl font-bold text-slate-900">Welcome to DailyPlate</h1>
+        <div className="mt-3 space-y-3 text-[15px] leading-snug text-slate-600">
+          <p>
+            DailyPlate builds a meal plan around your goals and sizes each meal to fit your targets.
+          </p>
+          <p>
+            It's flexible. Swap any meal you don't want, and the more you rate and use your meals,
+            the more personal your plan gets.
+          </p>
+          <p>
+            There's no perfect diet. The best plan is one you can keep doing, so give it a few
+            weeks. Consistency is what makes results show.
+          </p>
+        </div>
       </div>
       <button
         type="button"
         onClick={onNext}
-        className="min-h-[56px] w-full rounded-2xl bg-[#2563EB] py-4 text-lg font-semibold text-white shadow-md"
+        className="min-h-[52px] w-full rounded-2xl bg-[#2563EB] py-3 text-lg font-semibold text-white shadow-md"
       >
-        Let’s begin
+        Get started
       </button>
       {onLogin && (
         <button
           type="button"
           onClick={onLogin}
-          className="min-h-[52px] w-full rounded-2xl border-2 border-slate-200 bg-white py-3 text-base font-semibold text-slate-700"
+          className="min-h-[44px] w-full rounded-2xl py-2 text-sm font-semibold text-slate-600"
         >
           I already have an account — log in
         </button>

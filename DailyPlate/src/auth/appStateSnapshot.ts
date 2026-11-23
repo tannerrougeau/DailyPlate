@@ -20,6 +20,8 @@ export function snapshotAppState(
     | "userRecipes"
     | "todayHouseholdOverride"
     | "lastBeverageBySlot"
+    | "snackLogs"
+    | "savedSnacks"
     | "dismissedUsageNotes"
     | "favoriteIds"
     | "dislikedIds"
@@ -47,6 +49,8 @@ export function snapshotAppState(
     userRecipes: s.userRecipes,
     todayHouseholdOverride: s.todayHouseholdOverride,
     lastBeverageBySlot: s.lastBeverageBySlot,
+    snackLogs: s.snackLogs,
+    savedSnacks: s.savedSnacks,
     dismissedUsageNotes: s.dismissedUsageNotes,
     favoriteIds: s.favoriteIds,
     dislikedIds: s.dislikedIds,
@@ -76,6 +80,8 @@ export function savedStateToPatch(state: SavedAccountState): Partial<AppState> {
     userRecipes: state.userRecipes ?? [],
     todayHouseholdOverride: state.todayHouseholdOverride ?? null,
     lastBeverageBySlot: state.lastBeverageBySlot ?? {},
+    snackLogs: state.snackLogs ?? {},
+    savedSnacks: state.savedSnacks ?? [],
     dismissedUsageNotes: state.dismissedUsageNotes,
     favoriteIds: state.favoriteIds,
     dislikedIds: state.dislikedIds,

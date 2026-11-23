@@ -84,7 +84,7 @@ export function RecipesScreen() {
   }
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
+    <div className="mx-auto max-w-lg px-4 pb-32 pt-4 lg:max-w-6xl lg:pb-12">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Recipes</h1>
         <div className="flex shrink-0 items-center gap-2">
@@ -216,7 +216,7 @@ export function RecipesScreen() {
         {filtered.length > 0 && " · sorted A–Z"}
       </p>
 
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
         {filtered.length === 0 && (
           <li className="col-span-2 card-surface px-4 py-10 text-center">
             <p className="text-sm font-medium text-slate-600">No recipes found</p>
@@ -310,7 +310,7 @@ function RecipeDetail({
   const canMealPrep = isMealPrepFriendly(recipe, variationId);
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
+    <div className="mx-auto max-w-lg px-4 pb-32 pt-4 lg:max-w-3xl lg:pb-12">
       <button type="button" onClick={onBack} className="mb-4 text-sm font-medium text-slate-500">
         ← Back to Recipes
       </button>

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useAppStore, type NavTab } from "@/store/useAppStore";
 
-const tabs: { id: NavTab; label: string; icon: typeof Home }[] = [
+export const NAV_TABS: { id: NavTab; label: string; icon: typeof Home }[] = [
   { id: "today", label: "Today", icon: Home },
   { id: "plan", label: "Plan", icon: CalendarDays },
   { id: "recipes", label: "Recipes", icon: BookOpen },
@@ -21,11 +21,11 @@ export function BottomNav() {
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200/80 bg-white/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200/80 bg-white/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-md lg:hidden"
       aria-label="Main"
     >
       <div className="mx-auto flex max-w-lg items-stretch justify-around px-1">
-        {tabs.map(({ id, label, icon: Icon }) => {
+        {NAV_TABS.map(({ id, label, icon: Icon }) => {
           const active = nav === id;
           return (
             <button

@@ -23,6 +23,7 @@ import {
 } from "@/utils/household";
 import { mealsForDateKey } from "@/utils/mealTracking";
 import { PantrySheet } from "@/components/PantrySheet";
+import { useIsWide } from "@/hooks/useIsWide";
 import type { GroceryItem, IngredientCategory } from "@/types";
 
 const CATEGORY_ORDER: IngredientCategory[] = [
@@ -69,6 +70,7 @@ export function GroceryScreen() {
   const pantryCheckedKeys = useAppStore((s) => s.pantryCheckedKeys);
   const togglePantryChecked = useAppStore((s) => s.togglePantryItemChecked);
   const [pantrySheetOpen, setPantrySheetOpen] = useState(false);
+  const isWide = useIsWide();
   const [pantrySectionOpen, setPantrySectionOpen] = useState(true);
   const [extraFutureWeeks, setExtraFutureWeeks] = useState(0);
   const initialWeekDefaultApplied = useRef(false);
@@ -191,7 +193,7 @@ export function GroceryScreen() {
   const selectedRangeLabel = formatSelectedDateRange(selectedDateKeys);
 
   return (
-    <div className="mx-auto max-w-lg px-4 pb-32 pt-4">
+    <div className="mx-auto max-w-lg px-4 pb-32 pt-4 lg:max-w-6xl lg:pb-12">
       <h1 className="mb-2 text-2xl font-bold tracking-tight text-slate-900">Grocery List</h1>
       {!groceryNoteDismissed && (
         <UsageNote
@@ -208,6 +210,8 @@ export function GroceryScreen() {
         </p>
       )}
 
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:items-start lg:gap-6">
+      <div className="min-w-0">
       <div className="mb-4 flex flex-wrap gap-2">
         <button
           type="button"
@@ -219,7 +223,7 @@ export function GroceryScreen() {
         <button
           type="button"
           onClick={() => setPantrySheetOpen(true)}
-          className="min-h-[44px] rounded-full border-2 border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900"
+          className="min-h-[44px] rounded-full border-2 border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-900 lg:hidden"
         >
           View Pantry
         </button>
@@ -359,7 +363,23 @@ export function GroceryScreen() {
         </div>
       )}
 
-      {pantrySheetOpen && (
+      </div>
+      {isWide && (
+        <aside className="lg:sticky lg:top-4">
+          <PantrySheet
+            inline
+            items={items}
+            ownedKeys={ownedKeys}
+            checkedKeys={pantryCheckedKeys}
+            onToggleChecked={togglePantryChecked}
+            onRemoveFromPantry={toggleOwned}
+            onClose={() => undefined}
+          />
+        </aside>
+      )}
+      </div>
+
+      {pantrySheetOpen && !isWide && (
         <PantrySheet
           items={items}
           ownedKeys={ownedKeys}
