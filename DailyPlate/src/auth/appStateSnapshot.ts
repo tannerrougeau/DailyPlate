@@ -23,6 +23,7 @@ export function snapshotAppState(
     | "snackLogs"
     | "savedSnacks"
     | "swapLog"
+    | "slotSourceOverrides"
     | "displayPrefs"
     | "checkpoints"
     | "myFoods"
@@ -56,6 +57,7 @@ export function snapshotAppState(
     snackLogs: s.snackLogs,
     savedSnacks: s.savedSnacks,
     swapLog: s.swapLog,
+    slotSourceOverrides: s.slotSourceOverrides,
     displayPrefs: s.displayPrefs,
     checkpoints: s.checkpoints,
     myFoods: s.myFoods,
@@ -91,6 +93,7 @@ export function savedStateToPatch(state: SavedAccountState): Partial<AppState> {
     snackLogs: state.snackLogs ?? {},
     savedSnacks: state.savedSnacks ?? [],
     swapLog: state.swapLog ?? [],
+    slotSourceOverrides: state.slotSourceOverrides ?? {},
     displayPrefs: state.displayPrefs ?? null,
     checkpoints: state.checkpoints ?? [],
     myFoods: state.myFoods ?? [],

@@ -9,6 +9,9 @@ import { ingredientRole } from "@/utils/ingredientNutrition";
 import { shortIngredientName } from "@/utils/recipeDisplay";
 
 export const ASK_SPACING_DAYS = 3;
+/** After this many skips or "Not now" answers in a row, questions are spaced further apart. */
+export const BACKOFF_AFTER_SKIPS = 3;
+export const BACKOFF_SPACING_DAYS = 7;
 export const NO_SNOOZE_DAYS = 30;
 export const MAX_ON_OPEN = 1;
 export const MAX_IN_CHECK_IN = 2;
@@ -43,9 +46,54 @@ export type UsageEvent = { kind: "details" | "adjust" | "cards"; at: string; n?:
 
 const daysBetween = (a: string, b: Date) => (b.getTime() - new Date(a).getTime()) / DAY_MS;
 
-/** On app open: only if no question was asked in the last 3 days. */
-export function canAskOnOpen(lastAskedAt: string | null | undefined, now: Date): boolean {
-  return !lastAskedAt || daysBetween(lastAskedAt, now) >= ASK_SPACING_DAYS;
+/** Days between questions: 3, or 7 after 3 skips in a row (any answer goes back to 3). */
+export function spacingDays(skipStreak = 0): number {
+  return skipStreak >= BACKOFF_AFTER_SKIPS ? BACKOFF_SPACING_DAYS : ASK_SPACING_DAYS;
+}
+
+/** On app open: only if no question was asked within the current spacing. */
+export function canAskOnOpen(lastAskedAt: string | null | undefined, now: Date, skipStreak = 0): boolean {
+  return !lastAskedAt || daysBetween(lastAskedAt, now) >= spacingDays(skipStreak);
+}
+
+/** Skip streak after an answer: "Not now" counts as a skip; Yes or No resets it. */
+export function nextSkipStreak(streak: number, answer: QuestionAnswer): number {
+  return answer === "not_now" ? streak + 1 : 0;
+}
+
+// ---------- Basic mode and pausing ----------
+
+/** "until I resume" is stored as this value instead of a date. */
+export const PAUSED_INDEFINITELY = "indefinite";
+export type PauseChoice = "week" | "month" | "indefinite";
+
+export type QuestionGate = { basicMode?: boolean; questionsPausedUntil?: string | null };
+
+export function pauseUntil(choice: PauseChoice, now: Date): string {
+  if (choice === "indefinite") return PAUSED_INDEFINITELY;
+  const d = new Date(now);
+  if (choice === "week") d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString();
+}
+
+export function isPaused(pausedUntil: string | null | undefined, now: Date): boolean {
+  if (!pausedUntil) return false;
+  if (pausedUntil === PAUSED_INDEFINITELY) return true;
+  return new Date(pausedUntil).getTime() > now.getTime();
+}
+
+/** Questions and suggestions are off in Basic mode and while paused. */
+export function questionsAllowed(gate: QuestionGate, now: Date): boolean {
+  return !gate.basicMode && !isPaused(gate.questionsPausedUntil, now);
+}
+
+/** "Paused until Dec 1 · Resume" / "Paused · Resume". */
+export function pauseLabel(pausedUntil: string | null | undefined): string {
+  if (!pausedUntil) return "";
+  if (pausedUntil === PAUSED_INDEFINITELY) return "Paused";
+  const d = new Date(pausedUntil);
+  return `Paused until ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
 function blocked(log: QuestionLog, id: string, now: Date): boolean {

@@ -35,6 +35,8 @@ import {
   planningDefaultsForNewProfile,
 } from "@/utils/planningPrefs";
 import { goalLinkedProteinGrams } from "@/utils/proteinMinimum";
+import { applyFitAnswers, type FitAnswers } from "@/utils/fitYourLife";
+import { FitYourLifeSteps } from "@/onboarding/FitYourLifeSteps";
 import {
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
@@ -46,15 +48,18 @@ import {
   type WeightUnit,
 } from "@/utils/bodyMeasurements";
 
-type Step = "welcome" | "household" | "stats" | "goal" | "meals" | "summary";
+type Step = "welcome" | "household" | "stats" | "goal" | "meals" | "fit" | "summary";
 
 const BASIC_STEPS: Exclude<Step, "welcome">[] = [
   "household",
   "stats",
   "goal",
   "meals",
+  "fit",
   "summary",
 ];
+
+export const QUESTIONS_OPTIONAL_LINE = "Questions are always optional. Skip or pause them anytime.";
 
 const GOAL_OPTIONS: { id: MainGoal; label: string }[] = [
   { id: "lose", label: "Lose weight" },
@@ -113,6 +118,9 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
   const [refine, setRefine] = useState<RefineCardValues>(() => defaultRefineValues());
   const [householdAvoidChips, setHouseholdAvoidChips] = useState<string[]>([]);
   const [householdAvoidCustom, setHouseholdAvoidCustom] = useState("");
+  // "Fit your life": optional answers and "Keep it simple" (Basic mode).
+  const [fitAnswers, setFitAnswers] = useState<FitAnswers>({});
+  const [basicMode, setBasicMode] = useState(false);
 
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const setTargets = useAppStore((s) => s.setTargets);
@@ -195,7 +203,13 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       ),
       householdFoodAvoidChips: householdAvoidChips,
       householdFoodAvoidCustom: householdAvoidCustom,
+      basicMode,
     };
+  }
+
+  /** The built profile with the "fit your life" answers applied (cooking fields, meal-prep slot). */
+  function buildFinalProfile(goalId: MainGoal): UserProfile {
+    return applyFitAnswers(buildProfile(goalId), fitAnswers);
   }
 
   const canFinish = Boolean(goal && eatenMeals.length >= 1 && householdAdults >= 1 && canContinueStats);
@@ -209,7 +223,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
 
   function persistAndFinish(openSettings: boolean) {
     if (!canFinish || !goal) return;
-    const profile = buildProfile(goal);
+    const profile = buildFinalProfile(goal);
     setUserProfile(profile);
     setTargets(applyProfileToTargets(profile));
     // Starting display: detailed if any refine card was changed, basic if they went straight through.
@@ -361,10 +375,23 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
             />
             <StickyNav
               onBack={() => setStep("goal")}
-              onNext={() => setStep("summary")}
+              onNext={() => setStep("fit")}
               nextDisabled={eatenMeals.length === 0}
             />
           </div>
+        )}
+
+        {step === "fit" && (
+          <FitYourLifeSteps
+            value={fitAnswers}
+            onChange={setFitAnswers}
+            onDone={() => setStep("summary")}
+            onKeepSimple={() => {
+              setBasicMode(true);
+              setStep("summary");
+            }}
+            onBack={() => setStep("meals")}
+          />
         )}
 
         {step === "summary" && previewTargets && goal && bodyStats && (
@@ -428,7 +455,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
               }}
             />
 
-            <StickyNav onBack={() => setStep("meals")} />
+            <StickyNav onBack={() => setStep("fit")} />
           </div>
         )}
       </div>
@@ -437,7 +464,7 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
 }
 
 function WelcomeStep({ onNext, onLogin }: { onNext: () => void; onLogin?: () => void }) {
-  // Fits one phone screen (375×667) without scrolling.
+  // Fits one phone screen (375×667) without scrolling, including the optional-questions line.
   return (
     <div className="space-y-4">
       <div className="rounded-3xl border border-slate-200/80 bg-white px-5 py-6 shadow-sm">
@@ -454,6 +481,7 @@ function WelcomeStep({ onNext, onLogin }: { onNext: () => void; onLogin?: () => 
             There's no perfect diet. The best plan is one you can keep doing, so give it a few
             weeks. Consistency is what makes results show.
           </p>
+          <p className="text-sm font-medium text-slate-700">{QUESTIONS_OPTIONAL_LINE}</p>
         </div>
       </div>
       <button

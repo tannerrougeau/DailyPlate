@@ -170,9 +170,11 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
       ),
     ]);
     const after = useAppStore.getState();
-    // Two at most; plan changes first, the rest stay queued.
+    // Two at most; plan changes first, the rest stay queued. None in Basic mode or while paused.
     setQuestions(
-      nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN, { planFirst: true }),
+      after.questionsAllowedNow()
+        ? nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN, { planFirst: true })
+        : [],
     );
     setPhase("results");
   }
@@ -522,6 +524,7 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
                     setQuestions((list) => list.filter((x) => x.id !== q.id));
                     if (cp) setApplied((list) => [...list, cp]);
                   }}
+                  onPaused={() => setQuestions([])}
                 />
               ))}
             </div>

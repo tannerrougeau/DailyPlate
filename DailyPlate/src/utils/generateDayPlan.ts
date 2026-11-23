@@ -66,6 +66,7 @@ function recipeWeight(
 ): number {
   let w = 12;
   if (options.favoriteIds.includes(recipe.id)) w += 38;
+  if (preppedBreakfast(recipe, slot, options)) w += 40;
   w += recipeFavoriteBoost(recipe, options.favoriteChips, options.favoriteCustom);
   w += timingBoost(recipe, slot, options.mealTiming);
   if (options.prioritizeMinProtein) {
@@ -258,9 +259,19 @@ export function repeatLimitFor(recipeId: string, options: GenerateOptions): numb
   return options.favoriteIds.includes(recipeId) ? base + 1 : base;
 }
 
-function underRepeatLimit(recipe: Recipe, options: GenerateOptions): boolean {
+/** Breakfast set to "Meal prep": batch-friendly breakfasts are preferred and repeat across days. */
+function preppedBreakfast(recipe: Recipe, slot: MealSlotId, options: GenerateOptions): boolean {
+  return (
+    slot === "breakfast" &&
+    options.personalization?.profile.mealSources?.breakfast === "prep" &&
+    recipe.tags.includes("batch_friendly")
+  );
+}
+
+function underRepeatLimit(recipe: Recipe, options: GenerateOptions, slot?: MealSlotId): boolean {
   const count = options.personalization?.signals.recentCounts?.get(recipe.id) ?? 0;
-  return count < repeatLimitFor(recipe.id, options);
+  const extra = slot && preppedBreakfast(recipe, slot, options) ? 3 : 0;
+  return count < repeatLimitFor(recipe.id, options) + extra;
 }
 
 function pickSlotRecipe(
@@ -280,7 +291,7 @@ function pickSlotRecipe(
   const effortOk = pool.filter((r) => passesEffortLimits(r, options.cookingLimits));
   const softEffort = effortOk.length < MIN_OPTIONS_PER_SLOT;
   if (!softEffort) pool = effortOk;
-  const fresh = pool.filter((r) => underRepeatLimit(r, options));
+  const fresh = pool.filter((r) => underRepeatLimit(r, options, slot));
   if (fresh.length > 0) pool = fresh;
   if (pool.length === 0) {
     pool = recipes.filter(

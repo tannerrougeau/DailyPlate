@@ -138,4 +138,10 @@ export interface UserProfile {
   cookingAmount?: CookingAmount;
   budget?: BudgetPreference;
   cookingLimits?: CookingLimit[];
+  /** Basic mode: no questions or suggestions; likes, dislikes and swaps still count. */
+  basicMode?: boolean;
+  /** Questions paused until this ISO date, or "indefinite" (until I resume). */
+  questionsPausedUntil?: string | null;
+  /** Fixed add-ons per meal from a "next best step" Yes (e.g. a Greek yogurt at breakfast). */
+  slotAddOns?: Partial<Record<RecipeMealSlotId, import("@/types").RecipeIngredient[]>>;
 }

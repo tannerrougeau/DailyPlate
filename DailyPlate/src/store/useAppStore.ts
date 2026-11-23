@@ -97,8 +97,16 @@ import {
   type QuestionAnswer,
   type QuestionLog,
   type UsageEvent,
+  isPaused,
+  nextSkipStreak,
+  pauseUntil,
+  questionsAllowed,
+  type PauseChoice,
 } from "@/utils/questionQueue";
+import { withSlotSourceOverride, type SlotSourceOverrides } from "@/utils/boughtMeals";
+import { applyFitAnswers, type FitAnswers } from "@/utils/fitYourLife";
 import type { FoodItem } from "@/utils/foodTypes";
+import type { MealSourceSlot } from "@/types/profile";
 
 export type NavTab = "today" | "plan" | "recipes" | "grocery" | "guide";
 export type UsageNoteKey = "today" | "plan" | "recipes" | "grocery";
@@ -512,6 +520,12 @@ export interface AppState {
   questionQueue: Question[];
   questionLog: QuestionLog;
   lastQuestionAskedAt: string | null;
+  /** Skips / "Not now" in a row; 3 or more spaces questions to every 7 days. */
+  questionSkipStreak: number;
+  /** When the last "next best step" suggestion was queued (at most one a week). */
+  lastNextStepAt: string | null;
+  /** One-day changes: "Buy today" / "Cook this instead", by date and meal. */
+  slotSourceOverrides: SlotSourceOverrides;
   /** Every applied display or plan change, restorable from Settings. */
   checkpoints: Checkpoint[];
   /** Foods found by name or typed from a label, saved for reuse and offline. */
@@ -587,6 +601,15 @@ export interface AppState {
   markQuestionsAsked: () => void;
   /** Yes applies the change and returns its checkpoint; Not now / No change nothing. */
   answerQuestion: (id: string, answer: QuestionAnswer) => Checkpoint | null;
+  setBasicMode: (on: boolean) => void;
+  /** Save "fit your life" answers (from onboarding or Settings → How I eat); returns the new profile. */
+  setFitAnswers: (answers: FitAnswers) => UserProfile | null;
+  pauseQuestions: (choice: PauseChoice) => void;
+  resumeQuestions: () => void;
+  /** True when questions and suggestions may be shown (not Basic mode, not paused). */
+  questionsAllowedNow: () => boolean;
+  /** "Buy today" / "Cook this instead" for one date; null clears it. */
+  setSlotSourceOverride: (dateKey: string, slot: MealSourceSlot, source: "buy" | "cook" | null) => void;
   setDisplayPref: (element: DisplayElement, on: boolean) => void;
   applySimplestView: () => Checkpoint;
   /** Restore how things were before a checkpoint (saved as a new checkpoint). */
@@ -698,6 +721,9 @@ export const useAppStore = create<AppState>()(
       questionQueue: [],
       questionLog: {},
       lastQuestionAskedAt: null,
+      questionSkipStreak: 0,
+      lastNextStepAt: null,
+      slotSourceOverrides: {},
       checkpoints: [],
       myFoods: [],
       devForcedQuestionId: null,
@@ -810,6 +836,9 @@ export const useAppStore = create<AppState>()(
           questionQueue: [],
           questionLog: {},
           lastQuestionAskedAt: null,
+          questionSkipStreak: 0,
+          lastNextStepAt: null,
+          slotSourceOverrides: {},
           checkpoints: [],
           myFoods: [],
           favoriteIds: [],
@@ -1427,6 +1456,12 @@ export const useAppStore = create<AppState>()(
         const s = get();
         if (!s.userProfile) return;
         const now = new Date();
+        // An expired pause is cleared; nothing is queued in Basic mode or while paused.
+        if (s.userProfile.questionsPausedUntil && !isPaused(s.userProfile.questionsPausedUntil, now)) {
+          set({ userProfile: { ...s.userProfile, questionsPausedUntil: null } });
+          return get().refreshQuestions(extra);
+        }
+        if (!questionsAllowed(s.userProfile, now)) return;
         const prefs = resolveDisplayPrefs(s.displayPrefs);
         const library = recipesFor(s);
         const byId = new Map(library.map((r) => [r.id, r] as const));
@@ -1469,7 +1504,12 @@ export const useAppStore = create<AppState>()(
         const question = s.questionQueue.find((q) => q.id === id);
         const now = new Date();
         const next = recordAnswer(s.questionQueue, s.questionLog, id, answer, now);
-        set({ questionQueue: next.queue, questionLog: next.log, lastQuestionAskedAt: now.toISOString() });
+        set({
+          questionQueue: next.queue,
+          questionLog: next.log,
+          lastQuestionAskedAt: now.toISOString(),
+          questionSkipStreak: nextSkipStreak(s.questionSkipStreak, answer),
+        });
         if (answer !== "yes" || !question || !s.userProfile) return null;
         const change = applyChange(
           {
@@ -1492,6 +1532,46 @@ export const useAppStore = create<AppState>()(
           question.change,
         );
         return commitCheckpoint(set, get, change.what, question.why, change.before, change.after);
+      },
+
+      setFitAnswers: (answers) => {
+        const p = get().userProfile;
+        if (!p) return null;
+        const next = withPlanningDefaults(applyFitAnswers(p, answers));
+        set({ userProfile: next });
+        void get().syncAccountSnapshot();
+        return next;
+      },
+
+      setBasicMode: (on) => {
+        const p = get().userProfile;
+        if (!p) return;
+        set({ userProfile: { ...p, basicMode: on } });
+        void get().syncAccountSnapshot();
+      },
+
+      pauseQuestions: (choice) => {
+        const p = get().userProfile;
+        if (!p) return;
+        set({ userProfile: { ...p, questionsPausedUntil: pauseUntil(choice, new Date()) } });
+        void get().syncAccountSnapshot();
+      },
+
+      resumeQuestions: () => {
+        const p = get().userProfile;
+        if (!p) return;
+        set({ userProfile: { ...p, questionsPausedUntil: null } });
+        void get().syncAccountSnapshot();
+      },
+
+      questionsAllowedNow: () => {
+        const p = get().userProfile;
+        return Boolean(p) && questionsAllowed(p!, new Date());
+      },
+
+      setSlotSourceOverride: (dateKey, slot, source) => {
+        set((s) => ({ slotSourceOverrides: withSlotSourceOverride(s.slotSourceOverrides, dateKey, slot, source, s.todayDateKey) }));
+        void get().syncAccountSnapshot();
       },
 
       setDisplayPref: (element, on) => {
@@ -2086,6 +2166,9 @@ export const useAppStore = create<AppState>()(
         questionQueue: s.questionQueue,
         questionLog: s.questionLog,
         lastQuestionAskedAt: s.lastQuestionAskedAt,
+        questionSkipStreak: s.questionSkipStreak,
+        lastNextStepAt: s.lastNextStepAt,
+        slotSourceOverrides: s.slotSourceOverrides,
         checkpoints: s.checkpoints,
         myFoods: s.myFoods,
         dismissedUsageNotes: s.dismissedUsageNotes,
