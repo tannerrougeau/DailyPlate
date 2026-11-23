@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AddToHomeScreenBanner } from "@/components/AddToHomeScreenBanner";
 import { BottomNav } from "@/components/BottomNav";
+import { SideNav } from "@/components/SideNav";
 import { GroceryScreen } from "@/screens/GroceryScreen";
 import { PlanScreen } from "@/screens/PlanScreen";
 import { OnboardingFlow } from "@/onboarding/OnboardingFlow";
@@ -56,7 +57,8 @@ export default function App() {
       >
         Skip to content
       </a>
-      <main id="main">
+      <SideNav />
+      <main id="main" className="lg:pl-56">
         {nav === "today" && <TodayScreen />}
         {nav === "plan" && <PlanScreen />}
         {nav === "recipes" && <RecipesScreen />}

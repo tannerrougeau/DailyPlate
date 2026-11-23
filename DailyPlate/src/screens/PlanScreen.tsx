@@ -17,6 +17,7 @@ import { formatHouseholdPlanningLine } from "@/utils/household";
 import { mealsForDateKey } from "@/utils/mealTracking";
 import { sumPlannedMacros } from "@/utils/generateDayPlan";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
+import { useIsWide } from "@/hooks/useIsWide";
 
 function formatDayHeading(key: string): string {
   return fromDateKey(key).toLocaleDateString("en-US", {
@@ -39,7 +40,8 @@ export function PlanScreen() {
 
   const userProfile = useAppStore((s) => s.userProfile);
   const targets = useAppStore((s) => s.targets);
-  const selectedDateKey = useAppStore((s) => s.selectedPlanDateKey);
+  const storedSelectedDateKey = useAppStore((s) => s.selectedPlanDateKey);
+  const isWide = useIsWide();
   const setSelectedPlanDateKey = useAppStore((s) => s.setSelectedPlanDateKey);
   const generateForDateKeys = useAppStore((s) => s.generateForDateKeys);
   const generateDay = useAppStore((s) => s.generateDay);
@@ -58,6 +60,7 @@ export function PlanScreen() {
   );
   const mealsOn = (key: string) =>
     mealsForDateKey(key, dailyPlans, plannedMeals, todayKey);
+  const selectedDateKey = storedSelectedDateKey ?? (isWide ? todayKey : null);
   const selectedMeals = selectedDateKey ? mealsOn(selectedDateKey) : [];
 
   function exitSelectMode() {
@@ -124,7 +127,7 @@ export function PlanScreen() {
   }
 
   return (
-    <div className={`mx-auto max-w-lg px-4 pt-3 ${selectMode ? "pb-44" : "pb-32"}`}>
+    <div className={`mx-auto max-w-lg px-4 pt-3 lg:max-w-6xl lg:pb-12 ${selectMode ? "pb-44" : "pb-32"}`}>
       <header className="mb-4">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">Meal Plan</h1>
         {userProfile && (
@@ -158,6 +161,8 @@ export function PlanScreen() {
         )}
       </div>
 
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start lg:gap-6">
+      <div className="min-w-0">
       <RollingWeekCalendar
         todayDateKey={todayKey}
         selectedDateKeys={selectedDateSet}
@@ -168,9 +173,10 @@ export function PlanScreen() {
         extraFutureWeeks={extraFutureWeeks}
         onLoadMoreDates={() => setExtraFutureWeeks((n) => n + 4)}
       />
+      </div>
 
       {selectMode && (
-        <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4">
+        <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 px-4 lg:bottom-6 lg:pl-60">
           <div className="mx-auto flex max-w-lg items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2.5 shadow-lg">
             <p className="min-w-0 flex-1 text-sm font-semibold text-slate-800">
               {selectedKeys.length} {selectedKeys.length === 1 ? "day" : "days"} selected
@@ -198,7 +204,9 @@ export function PlanScreen() {
       )}
 
       {selectedDateKey && (
+        <div className="lg:sticky lg:top-4">
         <DayDetailSheet
+          inline={isWide}
           dateKey={selectedDateKey}
           meals={selectedMeals}
           locked={lockedDays.includes(selectedDateKey)}
@@ -225,7 +233,9 @@ export function PlanScreen() {
           }}
           onMealPrep={(recipe, variationId) => setMealPrep({ recipe, variationId })}
         />
+        </div>
       )}
+      </div>
 
       {mealPrep && selectedDateKey && (
         <MealPrepSheet
@@ -240,6 +250,7 @@ export function PlanScreen() {
 }
 
 function DayDetailSheet({
+  inline = false,
   dateKey,
   meals,
   locked,
@@ -269,8 +280,10 @@ function DayDetailSheet({
   onRegenerate: () => void;
   onClearDay: () => void;
   onMealPrep: (recipe: Recipe, variationId?: string) => void;
+  /** Wide screens: render beside the calendar instead of as an overlay. */
+  inline?: boolean;
 }) {
-  useOverlayBack(true, onClose);
+  useOverlayBack(!inline, onClose);
   const startX = useRef(0);
   const startY = useRef(0);
 
@@ -298,15 +311,21 @@ function DayDetailSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
-      <button
-        type="button"
-        aria-label="Close day details"
-        className="absolute inset-0 bg-slate-900/40"
-        onClick={onClose}
-      />
+    <div className={inline ? "" : "fixed inset-0 z-[80] flex items-end justify-center sm:items-center"}>
+      {!inline && (
+        <button
+          type="button"
+          aria-label="Close day details"
+          className="absolute inset-0 bg-slate-900/40"
+          onClick={onClose}
+        />
+      )}
       <section
-        className="relative z-[81] max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200 bg-[#f5f5f4] p-4 shadow-2xl sm:rounded-3xl"
+        className={
+          inline
+            ? "rounded-3xl border border-slate-200 bg-white/60 p-4"
+            : "relative z-[81] max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-slate-200 bg-[#f5f5f4] p-4 shadow-2xl sm:rounded-3xl"
+        }
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
       >

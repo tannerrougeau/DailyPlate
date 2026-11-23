@@ -66,7 +66,7 @@ function FaqItem({ question, answer }: { question: string; answer: string }) {
 
 export function GuideScreen() {
   return (
-    <div className="mx-auto max-w-lg px-4 pb-28 pt-2">
+    <div className="mx-auto max-w-lg px-4 pb-28 pt-2 lg:max-w-3xl lg:pb-12">
       <header className="mb-4">
         <h1 className="text-2xl font-bold text-slate-900">Guide</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">

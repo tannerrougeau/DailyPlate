@@ -65,7 +65,7 @@ export function TodayProgressCard({
     <>
       <div ref={sentinelRef} className="h-px" aria-hidden />
       {stuck && (
-        <div className="fixed inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-cream/95 px-4 py-2 backdrop-blur-sm">
+        <div className="fixed inset-x-0 top-0 z-30 border-b border-slate-200/80 bg-cream/95 px-4 py-2 backdrop-blur-sm lg:hidden">
           <p className="mx-auto max-w-lg text-center text-sm font-semibold tabular-nums text-slate-900">
             {kcalLeft.toLocaleString()} kcal left
             <span className="mx-1.5 font-normal text-slate-300">·</span>

@@ -15,6 +15,7 @@ export function PantrySheet({
   onToggleChecked,
   onRemoveFromPantry,
   onClose,
+  inline = false,
 }: {
   items: GroceryItem[];
   ownedKeys: string[];
@@ -22,8 +23,10 @@ export function PantrySheet({
   onToggleChecked: (key: string) => void;
   onRemoveFromPantry: (key: string) => void;
   onClose: () => void;
+  /** Wide screens: render beside the grocery list instead of as an overlay. */
+  inline?: boolean;
 }) {
-  useOverlayBack(true, onClose);
+  useOverlayBack(!inline, onClose);
   const byKey = new Map(items.map((item) => [item.key, item]));
   const rows = ownedKeys.map((key) => {
     const item = byKey.get(key);
@@ -39,17 +42,23 @@ export function PantrySheet({
   });
 
   return (
-    <div className="fixed inset-0 z-[86] flex items-end justify-center sm:items-center">
-      <button
-        type="button"
-        aria-label="Close pantry"
-        className="absolute inset-0 bg-slate-900/40"
-        onClick={onClose}
-      />
+    <div className={inline ? "" : "fixed inset-0 z-[86] flex items-end justify-center sm:items-center"}>
+      {!inline && (
+        <button
+          type="button"
+          aria-label="Close pantry"
+          className="absolute inset-0 bg-slate-900/40"
+          onClick={onClose}
+        />
+      )}
       <section
-        role="dialog"
+        role={inline ? "region" : "dialog"}
         aria-labelledby="pantry-title"
-        className="relative z-[87] flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:rounded-3xl"
+        className={
+          inline
+            ? "flex flex-col rounded-3xl border border-slate-200 bg-white p-5"
+            : "relative z-[87] flex max-h-[88dvh] w-full max-w-lg flex-col overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-2xl sm:rounded-3xl"
+        }
       >
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -60,14 +69,16 @@ export function PantrySheet({
               Pantry
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {!inline && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"
+              aria-label="Close"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <p className="mb-4 text-sm text-slate-500">
           Items you already have at home. Checking one keeps it visible. Inventory stays after you
