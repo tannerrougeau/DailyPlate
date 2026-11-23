@@ -130,5 +130,17 @@ export function passesCookingLimits(recipe: Pick<Recipe, "id" | "effort">, limit
   return passesEquipmentLimits(recipe, limits) && passesEffortLimits(recipe, limits);
 }
 
+/**
+ * "Quicker, no-cook" version of a meal: no-cook or microwave, 15 active minutes or less.
+ * True no-cook recipes are preferred when picking.
+ */
+export function isEasyMealRecipe(recipe: Pick<Recipe, "id" | "effort">): boolean {
+  return passesCookingLimits(recipe, ["microwave_only", "short_time"]);
+}
+
+export function isNoCookRecipe(recipe: Pick<Recipe, "id" | "effort">): boolean {
+  return recipeEffort(recipe).methods.some((way) => way.every((m) => m === "no_cook"));
+}
+
 /** Below this many options in a slot, time and chopping limits become a preference. */
 export const MIN_OPTIONS_PER_SLOT = 5;

@@ -202,4 +202,103 @@ describe("next best step", () => {
   });
 });
 
+describe("next best step: often-skipped meal", () => {
+  const byId = (id: string) => recipeLibrary.find((r) => r.id === id)!;
+  const lunch = createPlannedMeal("lunch", byId("chicken-burrito-bowl-11"), { scale: 1 });
+  const dayKey = (i: number) => new Date(Date.UTC(2026, 10, 22 - i)).toISOString().slice(0, 10);
+  const eaten: MealTrackingEntry = { status: "all", loggedAt: NOW.toISOString() };
+  const skipped: MealTrackingEntry = { status: "skipped", loggedAt: NOW.toISOString() };
+  const week = (breakfastId: string): DayLog[] =>
+    Array.from({ length: 7 }, (_, i) => ({
+      dateKey: dayKey(i),
+      meals: [createPlannedMeal("breakfast", byId(breakfastId), { scale: 1 }), lunch],
+      tracking: { breakfast: skipped, lunch: eaten },
+    }));
+  // Targets match what was eaten (lunch), so only the skipping stands out.
+  const targets = { calories: macrosForMeal(lunch).calories, protein: macrosForMeal(lunch).protein };
+  const base = { todayKey: "2026-11-23", targets, profile };
+
+  it("first offers an easier, no-cook version", () => {
+    const step = pickNextStep({ ...base, days: week("omelette-ham-tomato-56") })!;
+    expect(step.kind).toBe("easierMeal");
+    expect(step.text).toBe("You've skipped breakfast most days. Want quicker, no-cook breakfasts?");
+    const q = nextStepQuestion(step, profile, NOW);
+    expect(q.change).toMatchObject({ kind: "profile", set: { easyMeals: ["breakfast"] } });
+  });
+
+  it("offers dropping the meal only after a No to the easier version", () => {
+    const step = pickNextStep({ ...base, days: week("omelette-ham-tomato-56"), declinedEasier: (s) => s === "breakfast" })!;
+    expect(step.kind).toBe("dropMeal");
+    expect(step.text).toBe("You've skipped breakfast on most days lately. Want plans without breakfast?");
+  });
+
+  it("offers dropping right away when the skipped meals were already no-cook", () => {
+    expect(pickNextStep({ ...base, days: week("high-protein-overnight-oats-54") })?.kind).toBe("dropMeal");
+    const easy = { ...profile, easyMeals: ["breakfast" as const] };
+    expect(pickNextStep({ ...base, profile: easy, days: week("omelette-ham-tomato-56") })?.kind).toBe("dropMeal");
+  });
+});
+
+describe("easier meals in plans", () => {
+  it("an easy breakfast picks only quick no-cook or microwave recipes", async () => {
+    const { generateDayPlan } = await import("@/utils/generateDayPlan");
+    const { isEasyMealRecipe } = await import("@/utils/recipeFit");
+    const easy = { ...profile, easyMeals: ["breakfast" as const] };
+    for (let i = 0; i < 40; i++) {
+      const r = generateDayPlan(recipeLibrary, {
+        dislikedIds: [],
+        dislikedChips: [],
+        dislikedCustom: "",
+        favoriteIds: [],
+        favoriteChips: [],
+        favoriteCustom: "",
+        slots: ["breakfast"],
+        mealTiming: null,
+        prioritizeMinProtein: false,
+        minimumProteinGrams: null,
+        personalization: {
+          profile: easy,
+          signals: {
+            skippedRecipeIds: new Set(),
+            enjoyedRecipeIds: new Set(),
+            recentRecipeIds: new Set(),
+            swappedRecipeIds: new Set(),
+            recentCounts: new Map(),
+            wantsMoreVariety: false,
+            skippedLongPrepCount: 0,
+            enjoyedBatchCount: 0,
+            loggedMealCount: 0,
+            skipRate: 0,
+          },
+        },
+      })[0]!.recipe;
+      expect(isEasyMealRecipe(r), r.name).toBe(true);
+    }
+  });
+});
+
+describe("dropping a meal moves its calories and protein to the rest", () => {
+  it("the daily target stays; the remaining meals share all of it", async () => {
+    const { splitMealTargets } = await import("@/utils/mealTargets");
+    const { computeDailyTargets, targetInputsChanged } = await import("@/utils/tdee");
+    const daily = computeDailyTargets(profile);
+    const split = (slots: ("breakfast" | "lunch" | "dinner")[]) =>
+      splitMealTargets({ daily, slots: slots.map((slot) => ({ slot, kind: "cooked" as const })) });
+    const before = split(["breakfast", "lunch", "dinner"]);
+    const after = split(["lunch", "dinner"]);
+    const sum = (t: typeof before, k: "calories" | "protein") => Object.values(t).reduce((a, x) => a + (x?.[k] ?? 0), 0);
+    for (const k of ["calories", "protein"] as const) {
+      expect(sum(after, k)).toBe(sum(before, k));
+      expect(sum(after, k)).toBe(Math.round(daily[k]));
+      expect(after.lunch![k]).toBeGreaterThan(before.lunch![k]);
+      expect(after.dinner![k]).toBeGreaterThan(before.dinner![k]);
+    }
+    // Removing breakfast isn't a target input, so the daily targets don't change.
+    const step = nextStepQuestion({ kind: "dropMeal", slot: "breakfast", text: "" }, profile, NOW);
+    const set = step.change.kind === "profile" ? step.change.set : {};
+    expect(set.eatenMeals).toEqual(["lunch", "dinner"]);
+    expect(targetInputsChanged(profile, { ...profile, ...set })).toBe(false);
+  });
+});
+
 export type { PlannedMeal };

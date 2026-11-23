@@ -3,6 +3,7 @@ import type { MealSourceSlot, UserProfile } from "@/types/profile";
 import { recipeExcludedByDislikeChips } from "@/utils/chipMatching";
 import { macrosForMeal, trackingMultiplier } from "@/utils/mealTracking";
 import { ADD_ON_OPTIONS, type AddOnOption } from "@/utils/slotAddOns";
+import { isNoCookRecipe } from "@/utils/recipeFit";
 
 export { ADD_ON_NAMES, ADD_ON_OPTIONS, withSlotAddOns, type AddOnOption } from "@/utils/slotAddOns";
 
@@ -22,6 +23,7 @@ export type DayLog = {
 
 export type NextStep =
   | { kind: "slotAddOn"; slot: MealSourceSlot; gap: number; option: AddOnOption; text: string }
+  | { kind: "easierMeal"; slot: MealSourceSlot; text: string }
   | { kind: "dropMeal"; slot: MealSourceSlot; text: string }
   | { kind: "addSnack"; kcal: number; text: string }
   | { kind: "openCheckIn"; kcal: number; text: string }
@@ -73,6 +75,8 @@ export function pickNextStep(input: {
   profile: UserProfile;
   /** Lunch was bought on that date (usual setting or "Buy today"). */
   boughtLunch?: (dateKey: string) => boolean;
+  /** The user said No to the easier version of this meal. */
+  declinedEasier?: (slot: MealSourceSlot) => boolean;
 }): NextStep | null {
   const { profile, targets } = input;
   const logged = loggedDays(input.days, input.todayKey);
@@ -108,14 +112,30 @@ export function pickNextStep(input: {
       }
     }
 
-    // Often skipped (keep at least one main meal).
-    const skipped = days.filter((x) => x.meal && x.entry?.status === "skipped").length;
-    if (skipped >= 4 && eatenMeals.includes(slot) && eatenMeals.length > 1) {
-      options.push({
-        step: { kind: "dropMeal", slot, text: `You've skipped ${slot} on most days lately. Want plans without ${slot}?` },
-        benefit: skipped / 7,
-        effort: 1,
-      });
+    // Often skipped: first offer an easier version; dropping the meal only after a No to that, or
+    // when the skipped meals were already no-cook (keep at least one main meal).
+    const skippedDays = days.filter((x) => x.meal && x.entry?.status === "skipped");
+    const skipped = skippedDays.length;
+    if (skipped >= 4 && eatenMeals.includes(slot)) {
+      const alreadyNoCook =
+        profile.easyMeals?.includes(slot) || skippedDays.every((x) => isNoCookRecipe(x.meal!.recipe));
+      if (!alreadyNoCook && !input.declinedEasier?.(slot)) {
+        options.push({
+          step: {
+            kind: "easierMeal",
+            slot,
+            text: `You've skipped ${slot} most days. Want quicker, no-cook ${PLURAL[slot]}?`,
+          },
+          benefit: skipped / 7,
+          effort: 1,
+        });
+      } else if (eatenMeals.length > 1) {
+        options.push({
+          step: { kind: "dropMeal", slot, text: `You've skipped ${slot} on most days lately. Want plans without ${slot}?` },
+          benefit: skipped / 7,
+          effort: 1,
+        });
+      }
     }
   }
 

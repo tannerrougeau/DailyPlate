@@ -611,6 +611,10 @@ function conflict(recipeName: string, label: string, which: { chip?: string; tok
 
 const STEP_PLURAL = { breakfast: "breakfasts", lunch: "lunches", dinner: "dinners" } as const;
 
+export function easierMealQuestionId(slot: "breakfast" | "lunch" | "dinner"): string {
+  return `next:easy:${slot}`;
+}
+
 /** The "next best step" as a queued question: one sentence, one concrete action on Yes. */
 export function nextStepQuestion(step: NextStep, profile: UserProfile, now: Date): Question {
   const base = { text: step.text, why: "From your last 7 logged days", source: "next-step" as const, addedAt: now.toISOString() };
@@ -625,6 +629,16 @@ export function nextStepQuestion(step: NextStep, profile: UserProfile, now: Date
           kind: "profile",
           set: { slotAddOns: { ...(profile.slotAddOns ?? {}), [step.slot]: [step.option.item] } },
           what: `Added ${step.option.label} to your ${STEP_PLURAL[step.slot]}`,
+        },
+      };
+    case "easierMeal":
+      return {
+        ...base,
+        id: easierMealQuestionId(step.slot),
+        change: {
+          kind: "profile",
+          set: { easyMeals: [...new Set([...(profile.easyMeals ?? []), step.slot])] },
+          what: `Quicker, no-cook ${STEP_PLURAL[step.slot]}`,
         },
       };
     case "dropMeal": {

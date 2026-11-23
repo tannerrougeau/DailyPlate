@@ -142,6 +142,8 @@ export interface UserProfile {
   basicMode?: boolean;
   /** Questions paused until this ISO date, or "indefinite" (until I resume). */
   questionsPausedUntil?: string | null;
+  /** Meals switched to quicker, no-cook versions by a "next best step" Yes. */
+  easyMeals?: MealSourceSlot[];
   /** Fixed add-ons per meal from a "next best step" Yes (e.g. a Greek yogurt at breakfast). */
   slotAddOns?: Partial<Record<RecipeMealSlotId, import("@/types").RecipeIngredient[]>>;
 }

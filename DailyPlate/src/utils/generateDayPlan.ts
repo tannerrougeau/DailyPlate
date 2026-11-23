@@ -25,6 +25,8 @@ import { pickPreferredVariationId } from "@/utils/variationPrefs";
 import {
   budgetWeight,
   cheapestCost,
+  isEasyMealRecipe,
+  isNoCookRecipe,
   median,
   MIN_OPTIONS_PER_SLOT,
   passesEffortLimits,
@@ -259,6 +261,11 @@ export function repeatLimitFor(recipeId: string, options: GenerateOptions): numb
   return options.favoriteIds.includes(recipeId) ? base + 1 : base;
 }
 
+function easyMeal(slot: MealSlotId, options: GenerateOptions): boolean {
+  const easy = options.personalization?.profile.easyMeals ?? [];
+  return (easy as string[]).includes(slot);
+}
+
 /** Breakfast set to "Meal prep": batch-friendly breakfasts are preferred and repeat across days. */
 function preppedBreakfast(recipe: Recipe, slot: MealSlotId, options: GenerateOptions): boolean {
   return (
@@ -287,6 +294,12 @@ function pickSlotRecipe(
       isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom, options, slot) &&
       !used.has(r.id),
   );
+  // A meal switched to its easier version: quick no-cook / microwave picks only (when any fit).
+  const easy = easyMeal(slot, options);
+  if (easy) {
+    const quick = pool.filter((r) => isEasyMealRecipe(r));
+    if (quick.length > 0) pool = quick;
+  }
   // Time and chopping limits filter when enough options remain; otherwise they strongly prefer.
   const effortOk = pool.filter((r) => passesEffortLimits(r, options.cookingLimits));
   const softEffort = effortOk.length < MIN_OPTIONS_PER_SLOT;
@@ -315,6 +328,7 @@ function pickSlotRecipe(
   return weightedPick(pool, (r) => {
     let w = recipeWeight(r, slot, options);
     if (softEffort && !passesEffortLimits(r, options.cookingLimits)) w *= 0.15;
+    if (easy && isNoCookRecipe(r)) w *= 3;
     const c = costs.get(r.id);
     if (c != null) w *= budgetWeight(c, mid, options.budget);
     return w;

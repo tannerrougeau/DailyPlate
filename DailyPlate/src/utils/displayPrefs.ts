@@ -93,7 +93,14 @@ export type CheckpointState = {
 export type NextStepProfileFields = Partial<
   Pick<
     import("@/types/profile").UserProfile,
-    "slotAddOns" | "eatenMeals" | "snacksPerDay" | "mealsPerDay" | "mealSources" | "weeklyMealPrepEnabled" | "weeklyMealPrepSlot"
+    | "slotAddOns"
+    | "easyMeals"
+    | "eatenMeals"
+    | "snacksPerDay"
+    | "mealsPerDay"
+    | "mealSources"
+    | "weeklyMealPrepEnabled"
+    | "weeklyMealPrepSlot"
   >
 >;
 

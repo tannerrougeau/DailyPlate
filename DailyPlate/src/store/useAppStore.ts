@@ -102,6 +102,7 @@ import {
   pauseUntil,
   questionsAllowed,
   nextStepQuestion,
+  easierMealQuestionId,
   type PauseChoice,
 } from "@/utils/questionQueue";
 import { isBoughtMeal, withSlotSourceOverride, type SlotSourceOverrides } from "@/utils/boughtMeals";
@@ -1511,6 +1512,7 @@ export const useAppStore = create<AppState>()(
             targets: s.targets,
             profile: s.userProfile,
             boughtLunch: (dateKey) => isBoughtMeal(s.userProfile, s.slotSourceOverrides, dateKey, "lunch"),
+            declinedEasier: (slot) => s.questionLog[easierMealQuestionId(slot)]?.answer === "no",
           });
           if (step) {
             const q = nextStepQuestion(step, s.userProfile, now);

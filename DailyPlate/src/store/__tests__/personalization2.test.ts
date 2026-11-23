@@ -172,6 +172,29 @@ describe("next best step (store)", () => {
   });
 });
 
+describe("dropping a meal (store)", () => {
+  it("Yes keeps the daily targets, moves breakfast's share to the other meals, and Undo brings it back", async () => {
+    const { nextStepQuestion } = await import("@/utils/questionQueue");
+    const { splitMealTargets } = await import("@/utils/mealTargets");
+    const { slotsForMealsPerDay } = await import("@/utils/generateDayPlan");
+    const s0 = useAppStore.getState();
+    const targetsBefore = s0.targets;
+    const q = nextStepQuestion({ kind: "dropMeal", slot: "breakfast", text: "Plans without breakfast?" }, s0.userProfile!, new Date());
+    useAppStore.setState({ questionQueue: [q] });
+    const cp = useAppStore.getState().answerQuestion(q.id, "yes")!;
+    const p = useAppStore.getState().userProfile!;
+    expect(p.eatenMeals).toEqual(["lunch", "dinner"]);
+    expect(useAppStore.getState().targets).toEqual(targetsBefore);
+    const slots = slotsForMealsPerDay(p).filter((x) => x === "lunch" || x === "dinner" || x === "breakfast");
+    expect(slots).not.toContain("breakfast");
+    const split = splitMealTargets({ daily: targetsBefore, slots: slotsForMealsPerDay(p).map((slot) => ({ slot, kind: "cooked" as const })) });
+    const total = Object.values(split).reduce((a, t) => a + (t?.calories ?? 0), 0);
+    expect(total).toBe(Math.round(targetsBefore.calories));
+    useAppStore.getState().restoreCheckpoint(cp.id);
+    expect(useAppStore.getState().userProfile!.eatenMeals).toEqual(["breakfast", "lunch", "dinner"]);
+  });
+});
+
 describe("Buy today (store)", () => {
   it("a one-day override, cleared again by Cook this instead", () => {
     useAppStore.getState().setSlotSourceOverride("2026-11-24", "dinner", "buy");
