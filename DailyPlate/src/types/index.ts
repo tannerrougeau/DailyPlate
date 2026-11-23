@@ -50,6 +50,8 @@ export interface RecipeVariationDetail {
   fiber?: number;
   /** When true, this variation replaces recipe.ingredients/instructions instead of adding to them. */
   replaceBase?: boolean;
+  /** Change base ingredient amounts for this build, by ingredient name (e.g. half the vanilla whey). */
+  baseQuantities?: Record<string, number>;
   /** Slot tags for this build. Omitted = inherit the recipe's mealSlots. */
   mealSlots?: RecipeMealSlotId[];
   /** When set, overrides recipe-level meal-prep eligibility for this build. */

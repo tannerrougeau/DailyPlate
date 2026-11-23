@@ -43,3 +43,54 @@ describe("ingredient entries", () => {
     expect(matchIngredient("Shredded hash browns (cooked)")!.per100g.fat).toBeLessThan(1);
   });
 });
+
+describe("amount state matches its values", () => {
+  it.each([
+    ["Broccoli florets", "broccoli-raw", "raw"],
+    ["Broccoli", "broccoli-raw", "raw"],
+    ["Steamed broccoli", "broccoli-cooked", "cooked"],
+    ["Turkey bacon", "turkey-bacon", "as-sold"],
+    ["Turkey burger patty", "turkey-patty-raw", "raw"],
+    ["Cooked salmon or tuna", "salmon-cooked", "cooked"],
+    ["Sliced turkey breast", "turkey-deli", "as-sold"],
+    ["Roasted red peppers, diced", "peppers-roasted-jarred", "as-sold"],
+    ["Dried oregano", "oregano", "as-sold"],
+  ])("%s uses %s (%s)", (name, id, state) => {
+    const food = matchIngredient(name)!;
+    expect(food.id).toBe(id);
+    expect(food.state).toBe(state);
+  });
+
+  it("raw broccoli weighs about 91 g per cup", () => {
+    expect(matchIngredient("Broccoli florets")!.grams.cup).toBe(91);
+  });
+
+  it("turkey bacon uses as-packaged values", () => {
+    expect(matchIngredient("Turkey bacon")!.per100g.calories).toBe(218);
+  });
+});
+
+describe("recipe fixes", () => {
+  const scoops = (recipeName: string, variationId: string) =>
+    resolveRecipeIngredients(recipeLibrary.find((r) => r.name === recipeName)!, variationId)
+      .filter((i) => /protein powder/i.test(i.name))
+      .reduce((sum, i) => sum + i.quantity, 0);
+
+  it("flavored overnight oats keep 1 scoop of protein powder in total", () => {
+    expect(scoops("High Protein Overnight Oats", "chocolate-banana-nut")).toBeCloseTo(1, 6);
+    expect(scoops("High Protein Overnight Oats", "strawberry")).toBeCloseTo(1, 6);
+  });
+
+  it("Breakfast Taco and Breakfast Sandwich are meals, not snacks", () => {
+    for (const name of ["Breakfast Taco", "Breakfast Sandwich"]) {
+      expect(recipeLibrary.find((r) => r.name === name)!.mealSlots).toEqual(["breakfast"]);
+    }
+  });
+
+  it("flour Breakfast Tacos use two small tortillas", () => {
+    const taco = recipeLibrary.find((r) => r.name === "Breakfast Taco")!;
+    const tortilla = resolveRecipeIngredients(taco, "pork-bacon-flour").find((i) => /tortilla/i.test(i.name))!;
+    expect(tortilla).toMatchObject({ quantity: 2, unit: "small" });
+    expect(matchIngredient(tortilla.name)!.grams.small).toBe(32);
+  });
+});

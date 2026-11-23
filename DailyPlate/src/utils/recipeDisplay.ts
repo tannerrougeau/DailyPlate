@@ -96,7 +96,12 @@ export function fatVariationLabels(
 /** One serving of ingredients: the recipe's list (plus variation) ÷ recipe.servings. */
 function rawRecipeIngredients(recipe: Recipe, variationId?: string): RecipeIngredient[] {
   const v = getVariationDetail(recipe, variationId);
-  const list = !v ? recipe.ingredients : v.replaceBase ? v.ingredients : [...recipe.ingredients, ...v.ingredients];
+  const baseList = v?.baseQuantities
+    ? recipe.ingredients.map((ing) =>
+        v.baseQuantities![ing.name] != null ? { ...ing, quantity: v.baseQuantities![ing.name]! } : ing,
+      )
+    : recipe.ingredients;
+  const list = !v ? baseList : v.replaceBase ? v.ingredients : [...baseList, ...v.ingredients];
   const servings = recipe.servings != null && recipe.servings > 1 ? recipe.servings : 1;
   if (servings === 1) return list;
   return list.map((ing) => ({ ...ing, quantity: ing.quantity / servings }));

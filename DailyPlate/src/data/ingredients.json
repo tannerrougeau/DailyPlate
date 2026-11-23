@@ -268,8 +268,7 @@
       "g": 1
     },
     "aliases": [
-      "Salmon fillet",
-      "Cooked salmon or tuna"
+      "Salmon fillet"
     ],
     "role": "protein",
     "state": "raw",
@@ -279,6 +278,37 @@
     },
     "usda": {
       "description": "Fish, salmon, Atlantic, farmed, raw",
+      "dataType": "SR Legacy"
+    }
+  },
+  {
+    "id": "salmon-cooked",
+    "name": "salmon, Atlantic, farmed, cooked",
+    "fdcId": 175168,
+    "query": "Fish, salmon, Atlantic, farmed, cooked, dry heat",
+    "per100g": {
+      "calories": 206,
+      "protein": 22.1,
+      "carbs": 0,
+      "fat": 12.35,
+      "fiber": 0
+    },
+    "grams": {
+      "cup": null,
+      "tbsp": null,
+      "tsp": null,
+      "oz": 28.3495,
+      "each": null,
+      "g": 1
+    },
+    "aliases": [
+      "Cooked salmon or tuna"
+    ],
+    "role": "protein",
+    "state": "cooked",
+    "yield": null,
+    "usda": {
+      "description": "Fish, salmon, Atlantic, farmed, cooked, dry heat",
       "dataType": "SR Legacy"
     }
   },
@@ -415,14 +445,15 @@
   },
   {
     "id": "turkey-bacon",
-    "name": "turkey bacon, cooked",
-    "fdcId": 171639,
+    "name": "turkey bacon, as packaged (precooked)",
+    "fdcId": null,
+    "skipUsda": "Slices are weighed as packaged; USDA's only match is microwaved turkey bacon (drier, 368 kcal per 100 g). Typed as-packaged label values.",
     "query": "Turkey bacon, cooked",
     "per100g": {
-      "calories": 368,
-      "protein": 29.5,
-      "carbs": 4.24,
-      "fat": 25.87,
+      "calories": 218,
+      "protein": 16.5,
+      "carbs": 1.5,
+      "fat": 16.8,
       "fiber": 0
     },
     "grams": {
@@ -439,12 +470,8 @@
       "Turkey bacon"
     ],
     "role": "protein",
-    "state": "cooked",
-    "yield": null,
-    "usda": {
-      "description": "Bacon, turkey, microwaved",
-      "dataType": "SR Legacy"
-    }
+    "state": "as-sold",
+    "yield": null
   },
   {
     "id": "ham-deli",
@@ -481,15 +508,49 @@
     }
   },
   {
-    "id": "turkey-patty-cooked",
-    "name": "ground turkey 93% lean, cooked",
-    "fdcId": 174492,
-    "query": "Turkey, ground, 93% lean, 7% fat, patties, broiled",
+    "id": "turkey-deli",
+    "name": "turkey breast, sliced, prepackaged (deli)",
+    "fdcId": 172941,
+    "query": "Turkey breast, sliced, prepackaged",
     "per100g": {
-      "calories": 207,
-      "protein": 25.86,
+      "calories": 106,
+      "protein": 14.81,
+      "carbs": 2.2,
+      "fat": 3.77,
+      "fiber": 0
+    },
+    "grams": {
+      "cup": null,
+      "tbsp": null,
+      "tsp": null,
+      "oz": 28.3495,
+      "each": 28,
+      "g": 1,
+      "slice": 28
+    },
+    "aliases": [
+      "Sliced turkey",
+      "Sliced turkey breast",
+      "Diced turkey breast or deli turkey"
+    ],
+    "role": "protein",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Turkey breast, sliced, prepackaged",
+      "dataType": "SR Legacy"
+    }
+  },
+  {
+    "id": "turkey-patty-raw",
+    "name": "turkey burger patty, 93% lean, raw",
+    "fdcId": 172850,
+    "query": "Turkey, ground, 93% lean, 7% fat, raw",
+    "per100g": {
+      "calories": 150,
+      "protein": 18.73,
       "carbs": 0,
-      "fat": 11.45,
+      "fat": 8.34,
       "fiber": 0
     },
     "grams": {
@@ -505,23 +566,27 @@
       "Turkey burger patty"
     ],
     "role": "protein",
-    "state": "cooked",
-    "yield": null,
+    "state": "raw",
+    "yield": {
+      "cookedPerRaw": 0.75,
+      "source": "Approximate; typical of USDA Table of Cooking Yields for Meat and Poultry (Release 2, 2014). Verify per cut."
+    },
     "usda": {
-      "description": "Turkey, ground, 93% lean, 7% fat, patties, broiled",
+      "description": "Turkey, ground, 93% lean, 7% fat, raw",
       "dataType": "SR Legacy"
     }
   },
   {
     "id": "chicken-sausage",
     "name": "chicken sausage, cooked",
-    "fdcId": 173880,
+    "fdcId": null,
+    "skipUsda": "USDA's closest entry (chicken or turkey Italian sausage, FDC 173880) has an atypical 14 g carbs per 100 g; typed label values.",
     "query": "Chicken sausage, cooked",
     "per100g": {
-      "calories": 183,
-      "protein": 21.43,
-      "carbs": 14.25,
-      "fat": 4.46,
+      "calories": 179,
+      "protein": 16.5,
+      "carbs": 2,
+      "fat": 11.5,
       "fiber": 0
     },
     "grams": {
@@ -537,11 +602,7 @@
     ],
     "role": "protein",
     "state": "cooked",
-    "yield": null,
-    "usda": {
-      "description": "Sausage, chicken or turkey, Italian style,  lower sodium",
-      "dataType": "SR Legacy"
-    }
+    "yield": null
   },
   {
     "id": "beef-jerky",
@@ -576,14 +637,15 @@
   },
   {
     "id": "meat-stick",
-    "name": "beef stick, smoked",
-    "fdcId": 168850,
+    "name": "meat stick, lean (packaged)",
+    "fdcId": null,
+    "skipUsda": "Packaged product; typed values for a lean meat stick (USDA's smoked beef stick is a fattier style).",
     "query": "Snacks, beef sticks, smoked",
     "per100g": {
-      "calories": 550,
-      "protein": 21.5,
-      "carbs": 5.4,
-      "fat": 49.6,
+      "calories": 290,
+      "protein": 30,
+      "carbs": 1,
+      "fat": 18,
       "fiber": 0
     },
     "grams": {
@@ -600,11 +662,7 @@
     ],
     "role": "protein",
     "state": "as-sold",
-    "yield": null,
-    "usda": {
-      "description": "Snacks, beef sticks, smoked",
-      "dataType": "SR Legacy"
-    }
+    "yield": null
   },
   {
     "id": "rice-white-cooked",
@@ -892,10 +950,12 @@
       "oz": 28.3495,
       "each": 72,
       "g": 1,
-      "large": 72
+      "large": 72,
+      "small": 32
     },
     "aliases": [
-      "10-inch flour tortilla"
+      "10-inch flour tortilla",
+      "6-inch flour tortillas"
     ],
     "role": "carb",
     "state": "as-sold",
@@ -924,10 +984,12 @@
       "oz": 28.3495,
       "each": 70,
       "g": 1,
-      "large": 70
+      "large": 70,
+      "small": 32
     },
     "aliases": [
-      "Whole wheat or spinach tortilla"
+      "Whole wheat or spinach tortilla",
+      "6-inch whole wheat tortillas"
     ],
     "role": "carb",
     "state": "as-sold",
@@ -1056,8 +1118,6 @@
       "cups": 156
     },
     "aliases": [
-      "Broccoli",
-      "Broccoli florets",
       "Steamed broccoli",
       "Steamed broccoli florets, chopped",
       "Broccoli, cooked"
@@ -1704,7 +1764,6 @@
     },
     "aliases": [
       "Dried Italian herbs",
-      "Dried oregano",
       "Italian herbs"
     ],
     "role": "flavor",
@@ -1712,6 +1771,37 @@
     "yield": null,
     "usda": {
       "description": "Spices, poultry seasoning",
+      "dataType": "SR Legacy"
+    }
+  },
+  {
+    "id": "oregano",
+    "name": "oregano, dried",
+    "fdcId": 171328,
+    "query": "Spices, oregano, dried",
+    "per100g": {
+      "calories": 265,
+      "protein": 9,
+      "carbs": 68.92,
+      "fat": 4.28,
+      "fiber": 42.5
+    },
+    "grams": {
+      "cup": null,
+      "tbsp": 3,
+      "tsp": 1,
+      "oz": 28.3495,
+      "each": null,
+      "g": 1
+    },
+    "aliases": [
+      "Dried oregano"
+    ],
+    "role": "flavor",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Spices, oregano, dried",
       "dataType": "SR Legacy"
     }
   },
@@ -2193,18 +2283,18 @@
   },
   {
     "id": "hash-brown",
-    "name": "hash brown potatoes, shredded, no added fat",
-    "fdcId": 170026,
-    "query": "Potatoes, flesh and skin, raw",
+    "name": "hash brown potatoes, frozen, plain, unprepared",
+    "fdcId": 170043,
+    "query": "Potatoes, hash brown, frozen, plain, unprepared",
     "per100g": {
-      "calories": 77,
-      "protein": 2.05,
-      "carbs": 17.49,
-      "fat": 0.09,
-      "fiber": 2.1
+      "calories": 82,
+      "protein": 2.06,
+      "carbs": 17.72,
+      "fat": 0.62,
+      "fiber": 1.4
     },
     "grams": {
-      "cup": 156,
+      "cup": 210,
       "tbsp": null,
       "tsp": null,
       "oz": 28.3495,
@@ -2215,10 +2305,10 @@
       "Shredded hash browns (cooked)"
     ],
     "role": "carb",
-    "state": "cooked",
+    "state": "as-sold",
     "yield": null,
     "usda": {
-      "description": "Potatoes, flesh and skin, raw",
+      "description": "Potatoes, hash brown, frozen, plain, unprepared",
       "dataType": "SR Legacy"
     }
   },
@@ -2353,8 +2443,7 @@
       "Bell pepper (chunks)",
       "Bell pepper strips",
       "Bell peppers (optional)",
-      "Diced bell pepper",
-      "Roasted red peppers, diced"
+      "Diced bell pepper"
     ],
     "role": "vegetable",
     "state": "raw",
@@ -2364,6 +2453,37 @@
     },
     "usda": {
       "description": "Peppers, sweet, red, raw",
+      "dataType": "SR Legacy"
+    }
+  },
+  {
+    "id": "peppers-roasted-jarred",
+    "name": "red peppers, roasted, jarred (canned)",
+    "fdcId": 168546,
+    "query": "Peppers, sweet, red, canned, solids and liquids",
+    "per100g": {
+      "calories": 18,
+      "protein": 0.8,
+      "carbs": 3.9,
+      "fat": 0.3,
+      "fiber": 1.2
+    },
+    "grams": {
+      "cup": 140,
+      "tbsp": null,
+      "tsp": null,
+      "oz": 28.3495,
+      "each": null,
+      "g": 1
+    },
+    "aliases": [
+      "Roasted red peppers, diced"
+    ],
+    "role": "vegetable",
+    "state": "as-sold",
+    "yield": null,
+    "usda": {
+      "description": "Peppers, sweet, red, canned, solids and liquids",
       "dataType": "SR Legacy"
     }
   },
@@ -3109,32 +3229,35 @@
   {
     "id": "broccoli-raw",
     "name": "broccoli, raw",
-    "fdcId": 747447,
+    "fdcId": 170379,
     "query": "Broccoli, raw",
     "per100g": {
-      "calories": 31,
-      "protein": 2.57,
-      "carbs": 6.27,
-      "fat": 0.34,
-      "fiber": 2.4
+      "calories": 34,
+      "protein": 2.82,
+      "carbs": 6.64,
+      "fat": 0.37,
+      "fiber": 2.6
     },
     "grams": {
-      "cup": 90,
+      "cup": 91,
       "tbsp": null,
       "tsp": null,
       "oz": 28.3495,
       "each": null,
-      "g": 1
+      "g": 1,
+      "cups": 91
     },
     "aliases": [
-      "Riced broccoli"
+      "Riced broccoli",
+      "Broccoli",
+      "Broccoli florets"
     ],
     "role": "vegetable",
     "state": "raw",
     "yield": null,
     "usda": {
       "description": "Broccoli, raw",
-      "dataType": "Foundation"
+      "dataType": "SR Legacy"
     }
   },
   {
@@ -3532,14 +3655,15 @@
   {
     "id": "caesar",
     "name": "caesar dressing, light",
-    "fdcId": 169877,
+    "fdcId": null,
+    "skipUsda": "USDA's 'low calorie' Caesar is close to fat-free; typed values from a typical light Caesar label.",
     "query": "Salad dressing, caesar, low calorie",
     "per100g": {
-      "calories": 110,
-      "protein": 0.3,
-      "carbs": 18.6,
-      "fat": 4.4,
-      "fiber": 0.1
+      "calories": 200,
+      "protein": 1,
+      "carbs": 9,
+      "fat": 18,
+      "fiber": 0
     },
     "grams": {
       "cup": 240,
@@ -3554,11 +3678,7 @@
     ],
     "role": "fat",
     "state": "as-sold",
-    "yield": null,
-    "usda": {
-      "description": "Salad dressing, caesar, low calorie",
-      "dataType": "SR Legacy"
-    }
+    "yield": null
   },
   {
     "id": "mustard",
@@ -4136,15 +4256,15 @@
   },
   {
     "id": "olives",
-    "name": "olives, ripe, canned",
-    "fdcId": 169095,
-    "query": "Olives, ripe, canned",
+    "name": "olives, ripe, canned (small-extra large)",
+    "fdcId": 169094,
+    "query": "Olives, ripe, canned (small-extra large)",
     "per100g": {
-      "calories": 81,
-      "protein": 0.97,
-      "carbs": 5.61,
-      "fat": 6.87,
-      "fiber": 2.5
+      "calories": 116,
+      "protein": 0.84,
+      "carbs": 6.04,
+      "fat": 10.9,
+      "fiber": 1.6
     },
     "grams": {
       "cup": 134,
@@ -4162,7 +4282,7 @@
     "state": "as-sold",
     "yield": null,
     "usda": {
-      "description": "Olives, ripe, canned (jumbo-super colossal)",
+      "description": "Olives, ripe, canned (small-extra large)",
       "dataType": "SR Legacy"
     }
   },
