@@ -2,7 +2,7 @@
  * What a scan result turns into, without the UI. The AI identifies; numbers always come from the
  * planned recipe, USDA / Open Food Facts, or the label the user confirmed.
  */
-import type { ScanItem, ScanLabel, ScanResult } from "@/server/scan/types";
+import type { ScanItem, ScanLabel, ScanResult, ScanWhole } from "@/server/scan/types";
 import type { FoodItem } from "@/utils/foodTypes";
 import { applyPortion, manualFood } from "@/utils/foodSearch";
 import { normalizeGtin } from "@/utils/gtin";
@@ -10,7 +10,7 @@ import { normalizeGtin } from "@/utils/gtin";
 // ---- Confidence thresholds (calibrate from the exported corrections) ----
 /** "Looks like your Teriyaki Turkey Rice Bowl" needs at least this match confidence. */
 export const PLANNED_MATCH_MIN_CONFIDENCE = 0.7;
-/** Every food item (and the scan overall) needs at least this to be shown as identified. */
+/** Food items at or above this are shown as identified; below it they're listed as "Not sure". */
 export const FOOD_ITEM_MIN_CONFIDENCE = 0.6;
 
 // ---- Messages ----
@@ -22,11 +22,20 @@ export const SCAN_TOO_LARGE_MESSAGE = "That photo is too large to scan. Try agai
 export const SCAN_PRIVACY_NOTE =
   "Photos are sent to our AI provider to identify your food. DailyPlate doesn't keep them unless you turn on 'Help improve scanning.'";
 export const STILL_WORKING_AFTER_MS = 8000;
+export const MULTIPLE_LABELS_MESSAGE =
+  "This photo shows more than one Nutrition Facts label. Take a photo of just one label so the right numbers are logged.";
+export const LABEL_MISMATCH_WARNING = "These numbers don't add up. Check them before logging.";
+/** How far printed calories may be from 4×protein + 4×carbs + 9×fat before the warning shows. */
+export const LABEL_MISMATCH_TOLERANCE = 0.2;
+/** Default "how many slices did you have?" for a whole or shared dish. */
+export const WHOLE_DEFAULT_SERVINGS = 2;
 
 export type ScanView =
   | { kind: "planned" }
-  | { kind: "foods"; items: ScanItem[] }
+  /** items: the confident ones, logged as usual. unsure: listed underneath as "Not sure: … Keep or remove?" */
+  | { kind: "foods"; items: ScanItem[]; unsure: ScanItem[] }
   | { kind: "label"; label: ScanLabel }
+  | { kind: "multipleLabels" }
   | { kind: "barcode"; code: string }
   | { kind: "uncertain"; suggestions: string[] };
 
@@ -47,25 +56,27 @@ export function suggestionsFor(result: ScanResult): string[] {
 
 /**
  * Which screen to show. With skipPlanned (the user tapped "Not it"), the planned match is ignored.
- * Anything unclear goes to suggestions: no guessing.
+ * Foods: the confident items are shown with the unsure ones listed underneath; suggestions only
+ * when the main (first) item is unsure or nothing is confident.
  */
 export function scanView(result: ScanResult, opts: { hasPlannedMeal: boolean; skipPlanned?: boolean }): ScanView {
   const pm = result.plannedMeal;
   if (opts.hasPlannedMeal && !opts.skipPlanned && pm?.matches && pm.confidence >= PLANNED_MATCH_MIN_CONFIDENCE) {
     return { kind: "planned" };
   }
+  if (result.multipleLabels) return { kind: "multipleLabels" };
   if (result.type === "label" && result.label) return { kind: "label", label: result.label };
   if (result.type === "barcode") {
     const code = result.barcode?.digits ? normalizeGtin(result.barcode.digits) : null;
     if (code) return { kind: "barcode", code };
   }
-  if (
-    result.type === "food" &&
-    result.items.length > 0 &&
-    result.confidence >= FOOD_ITEM_MIN_CONFIDENCE &&
-    result.items.every((i) => i.confidence >= FOOD_ITEM_MIN_CONFIDENCE)
-  ) {
-    return { kind: "foods", items: result.items };
+  const main = result.items[0];
+  if (result.type === "food" && main && main.confidence >= FOOD_ITEM_MIN_CONFIDENCE) {
+    return {
+      kind: "foods",
+      items: result.items.filter((i) => i.confidence >= FOOD_ITEM_MIN_CONFIDENCE),
+      unsure: result.items.filter((i) => i.confidence < FOOD_ITEM_MIN_CONFIDENCE),
+    };
   }
   return { kind: "uncertain", suggestions: suggestionsFor(result) };
 }
@@ -93,6 +104,29 @@ export function pickMatch(item: Pick<ScanItem, "brand">, results: FoodItem[]): F
 export function portionLabel(portion: ScanItem["portion"]): string {
   const amount = Math.round(portion.amount * 100) / 100;
   return `${amount} ${portion.unit}`.trim();
+}
+
+/** "slice" → "slices" for counts other than 1. */
+export function unitFor(unit: string, count: number): string {
+  if (count === 1 || /s$/i.test(unit)) return unit;
+  return /(ch|sh|x)$/i.test(unit) ? `${unit}es` : `${unit}s`;
+}
+
+/** "12-inch pizza, 8 slices, about 80 g per slice". */
+export function wholeSummary(whole: ScanWhole): string {
+  return `${whole.name}, ${whole.servings} ${unitFor(whole.unit, whole.servings)}, about ${Math.round(whole.gramsPerServing)} g per ${whole.unit}`;
+}
+
+/** "How many slices did you have?" */
+export function wholeQuestion(whole: ScanWhole): string {
+  return `How many ${unitFor(whole.unit, 2)} did you have?`;
+}
+
+/** The portion for a count of servings of a whole dish: 2 slices of 80 g = "2 slices", 160 g. */
+export function wholePortion(whole: ScanWhole, count: number): { label: string; grams: number } | null {
+  if (!(count > 0)) return null;
+  const n = Math.round(count * 100) / 100;
+  return { label: `${n} ${unitFor(whole.unit, n)}`, grams: Math.round(n * whole.gramsPerServing) };
 }
 
 /**
@@ -157,10 +191,22 @@ export type LabelForm = {
 
 const str = (v: number | null | undefined) => (v == null ? "" : String(v));
 
-/** The label as read, for the editable form. */
-export function labelForm(label: ScanLabel): LabelForm {
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "Scanned label (Nov 24)" for a label with no product name visible. */
+export function scannedLabelName(dateKey: string): string {
+  const [, m, d] = dateKey.split("-").map(Number);
+  const month = m && MONTHS[m - 1];
+  return month && d ? `Scanned label (${month} ${d})` : "Scanned label";
+}
+
+/**
+ * The label as read, for the editable form. The name is the product name from the label or the
+ * package front, otherwise "Scanned label (date)", so it can be logged in one tap.
+ */
+export function labelForm(label: ScanLabel, dateKey: string): LabelForm {
   return {
-    name: label.productName ?? "",
+    name: label.productName?.trim() || scannedLabelName(dateKey),
     serving: label.servingSize.text,
     servingGrams: str(label.servingSize.grams),
     calories: str(label.calories),
@@ -170,6 +216,19 @@ export function labelForm(label: ScanLabel): LabelForm {
     fiber: str(label.fiber),
     sodiumMg: str(label.sodiumMg),
   };
+}
+
+/**
+ * true when the printed calories are more than 20% away from 4×protein + 4×carbs + 9×fat. A warning
+ * only, never a block. Not checked until calories, protein, carbs and fat are all filled in.
+ */
+export function labelDoesntAddUp(form: Pick<LabelForm, "calories" | "protein" | "carbs" | "fat">): boolean {
+  const vals = [form.calories, form.protein, form.carbs, form.fat].map((s) => (s.trim() === "" ? NaN : Number(s)));
+  if (vals.some((v) => !Number.isFinite(v) || v < 0)) return false;
+  const [calories, protein, carbs, fat] = vals as [number, number, number, number];
+  const fromMacros = 4 * protein + 4 * carbs + 9 * fat;
+  if (fromMacros === 0) return calories > 0;
+  return Math.abs(calories - fromMacros) / fromMacros > LABEL_MISMATCH_TOLERANCE;
 }
 
 /** The edited label as a food for My foods (per serving), or null until name, calories and protein are set. */
@@ -197,7 +256,13 @@ export function labelFood(form: LabelForm): FoodItem | null {
 
 export type ScanFinal =
   | { kind: "planned"; recipeId: string; servings: number }
-  | { kind: "foods"; items: { aiName: string; matchId: string; matchName: string; grams: number | null }[]; servings: number }
+  | {
+      kind: "foods";
+      items: { aiName: string; matchId: string; matchName: string; grams: number | null }[];
+      servings: number;
+      /** What the user did with each "Not sure" item: kept (logged), removed, or left alone (not logged). */
+      unsure?: { aiName: string; choice: "kept" | "removed" | "unanswered" }[];
+    }
   | { kind: "label"; values: LabelForm; servings: number }
   | { kind: "barcode"; code: string; matchId: string | null }
   | { kind: "search"; query?: string; matchId?: string }

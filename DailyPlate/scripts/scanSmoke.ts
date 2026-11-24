@@ -65,7 +65,9 @@ function summarize(r: ScanResult): string {
     parts.push(
       `  - ${i.brand ? `${i.brand} ` : ""}${i.name}: ${i.portion.amount} ${i.portion.unit} ≈ ${Math.round(i.portion.grams)} g (${i.confidence.toFixed(2)})${i.notes.length ? ` [${i.notes.join(", ")}]` : ""}`,
     );
+    if (i.whole) parts.push(`    whole: ${i.whole.name}, ${i.whole.servings} × ${i.whole.unit}, about ${Math.round(i.whole.gramsPerServing)} g each`);
   }
+  if (r.multipleLabels) parts.push("  multiple Nutrition Facts labels: asks for a photo of one");
   if (r.label) {
     const l = r.label;
     parts.push(

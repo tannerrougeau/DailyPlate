@@ -3,7 +3,7 @@
  * validator, because the server checks every reply itself. Strict mode needs every key present
  * and additionalProperties false; numeric ranges aren't supported there, so they're checked here.
  */
-import type { ScanItem, ScanLabel, ScanResult } from "./types";
+import type { ScanItem, ScanLabel, ScanResult, ScanWhole } from "./types";
 
 const nullable = (schema: Record<string, unknown>) => ({ anyOf: [schema, { type: "null" }] });
 const num = { type: "number" };
@@ -13,7 +13,7 @@ const strOrNull = { type: ["string", "null"] };
 export const SCAN_RESULT_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "confidence", "plannedMeal", "items", "label", "barcode", "suggestions"],
+  required: ["type", "confidence", "plannedMeal", "items", "label", "multipleLabels", "barcode", "suggestions"],
   properties: {
     type: { type: "string", enum: ["food", "label", "barcode", "unknown"] },
     confidence: { ...num, description: "0 to 1, how sure you are overall." },
@@ -32,7 +32,7 @@ export const SCAN_RESULT_SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["name", "brand", "confidence", "portion", "notes"],
+        required: ["name", "brand", "confidence", "portion", "notes", "whole"],
         properties: {
           name: { type: "string", description: "Plain, searchable food name, e.g. 'turkey sandwich'." },
           brand: { ...strOrNull, description: "Brand if a package or wrapper shows one, else null." },
@@ -47,6 +47,20 @@ export const SCAN_RESULT_SCHEMA = {
             type: "array",
             items: { type: "string" },
             description: "Only things that change nutrition: fried, sauce, visible oil, cheese, etc.",
+          },
+          whole: {
+            ...nullable({
+              type: "object",
+              additionalProperties: false,
+              required: ["name", "servings", "unit", "gramsPerServing"],
+              properties: {
+                name: { type: "string", description: "The whole item, e.g. '12-inch pizza'." },
+                servings: { ...num, description: "Servings in the whole item, e.g. 8." },
+                unit: { type: "string", description: "Singular serving unit, e.g. 'slice'." },
+                gramsPerServing: num,
+              },
+            }),
+            description: "Whole or shared dishes only (pizza, cake, casserole); null otherwise.",
           },
         },
       },
@@ -85,6 +99,10 @@ export const SCAN_RESULT_SCHEMA = {
       }),
       description: "Nutrition Facts label only; per-serving column. null otherwise.",
     },
+    multipleLabels: {
+      type: "boolean",
+      description: "true when more than one Nutrition Facts panel is visible.",
+    },
     barcode: {
       ...nullable({
         type: "object",
@@ -108,7 +126,15 @@ const isNumOrNull = (v: unknown) => v === null || isNum(v);
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isUnit = (v: unknown) => isNum(v) && v >= 0 && v <= 1;
 
-function validItem(v: unknown): v is ScanItem {
+/** A usable whole-dish description, or null (it's optional detail, so a bad one is dropped, not fatal). */
+function wholeOf(v: unknown): ScanWhole | null {
+  if (!isObj(v) || !isStr(v.name) || !v.name.trim() || !isStr(v.unit) || !v.unit.trim()) return null;
+  if (!isNum(v.servings) || v.servings < 1 || v.servings > 100) return null;
+  if (!isNum(v.gramsPerServing) || v.gramsPerServing <= 0 || v.gramsPerServing > 5000) return null;
+  return { name: v.name.trim(), servings: v.servings, unit: v.unit.trim(), gramsPerServing: v.gramsPerServing };
+}
+
+function validItem(v: unknown): v is Omit<ScanItem, "whole"> & { whole?: unknown } {
   if (!isObj(v) || !isStr(v.name) || !v.name.trim() || !isUnit(v.confidence)) return false;
   if (!(v.brand === null || isStr(v.brand))) return false;
   const p = v.portion;
@@ -136,13 +162,17 @@ export function validateScanResult(v: unknown): ScanResult | null {
   const b = v.barcode;
   if (!(b === null || (isObj(b) && (b.digits === null || isStr(b.digits))))) return null;
   if (!Array.isArray(v.suggestions) || !v.suggestions.every(isStr)) return null;
-  if (v.type === "label" && v.label === null) return null;
+  if (!(v.multipleLabels === undefined || typeof v.multipleLabels === "boolean")) return null;
+  const multipleLabels = v.multipleLabels === true;
+  // Several labels: nothing is read from them, so a label scan needs values only when there's one.
+  if (v.type === "label" && v.label === null && !multipleLabels) return null;
   return {
     type: v.type as ScanResult["type"],
     confidence: v.confidence as number,
     plannedMeal: pm as ScanResult["plannedMeal"],
-    items: v.items as ScanItem[],
+    items: v.items.map((i: Record<string, unknown>) => ({ ...i, whole: wholeOf(i.whole) }) as ScanItem),
     label: v.label as ScanLabel | null,
+    multipleLabels,
     barcode: b as ScanResult["barcode"],
     suggestions: (v.suggestions as string[]).map((s) => s.trim()).filter(Boolean).slice(0, 3),
   };

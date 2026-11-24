@@ -15,8 +15,9 @@ const ai: ScanResult = {
   type: "food",
   confidence: 0.74,
   plannedMeal: { matches: false, confidence: 0.2 },
-  items: [{ name: "turkey sandwich", brand: null, confidence: 0.71, portion: { amount: 1, unit: "sandwich", grams: 230 }, notes: [] }],
+  items: [{ name: "turkey sandwich", brand: null, confidence: 0.71, portion: { amount: 1, unit: "sandwich", grams: 230 }, notes: [], whole: null }],
   label: null,
+  multipleLabels: false,
   barcode: null,
   suggestions: [],
 };

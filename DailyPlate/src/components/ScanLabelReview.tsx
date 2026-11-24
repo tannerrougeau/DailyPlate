@@ -4,7 +4,7 @@ import type { DailyTargets } from "@/types";
 import type { FoodItem } from "@/utils/foodTypes";
 import { fitLine } from "@/utils/foodSearch";
 import { formatServings, servingsFromGrams } from "@/utils/mealTracking";
-import { labelFood, labelForm, type LabelForm } from "@/utils/scan/scanFlow";
+import { LABEL_MISMATCH_WARNING, labelDoesntAddUp, labelFood, labelForm, type LabelForm } from "@/utils/scan/scanFlow";
 
 const OPTIONS = [0.5, 1, 1.5, 2];
 
@@ -19,20 +19,24 @@ const FIELDS: [keyof LabelForm, string][] = [
 
 /**
  * The label as read (per serving), editable before logging. Logged by servings; grams too when
- * the label prints the serving weight. Saved to My foods.
+ * the label prints the serving weight. Saved to My foods. Without a visible product name it's
+ * named "Scanned label (date)" so it logs in one tap.
  */
 export function ScanLabelReview({
   label,
+  dateKey,
   target,
   forLabel,
   onLog,
 }: {
   label: ScanLabel;
+  /** The day being logged, for the default name. */
+  dateKey: string;
   target: Pick<DailyTargets, "calories" | "protein"> | null;
   forLabel: string;
   onLog: (food: FoodItem, servings: number, values: LabelForm) => void;
 }) {
-  const [form, setForm] = useState<LabelForm>(() => labelForm(label));
+  const [form, setForm] = useState<LabelForm>(() => labelForm(label, dateKey));
   const [servings, setServings] = useState(1);
   const [grams, setGrams] = useState("");
   const food = labelFood(form);
@@ -70,6 +74,11 @@ export function ScanLabelReview({
           </label>
         ))}
       </div>
+      {labelDoesntAddUp(form) && (
+        <p role="status" className="mt-2 rounded-lg bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900">
+          {LABEL_MISMATCH_WARNING}
+        </p>
+      )}
 
       <p className="mt-3 text-xs font-semibold text-slate-500">How much did you have?</p>
       <div className="mt-1 grid grid-cols-4 gap-2">

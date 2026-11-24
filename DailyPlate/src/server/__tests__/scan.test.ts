@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import Anthropic from "@anthropic-ai/sdk";
 import { base64Bytes, DEVICE_HEADER, handleScanRequest, parseScanBody, type ScanDeps } from "@/server/scan/handler";
 import { checkAndCount, dayKey, memoryCounter } from "@/server/scan/limits";
-import { contextText, createClaudeProvider, SCAN_TOOL_NAME } from "@/server/scan/providers/claude";
+import { contextText, createClaudeProvider, SCAN_SYSTEM_PROMPT, SCAN_TOOL_NAME } from "@/server/scan/providers/claude";
 import { providerFromEnv } from "@/server/scan/providers/index";
 import { SCAN_RESULT_SCHEMA, validateScanResult } from "@/server/scan/schema";
 import type { ScanProvider, ScanResult } from "@/server/scan/types";
@@ -14,10 +14,11 @@ const foodResult: ScanResult = {
   confidence: 0.86,
   plannedMeal: null,
   items: [
-    { name: "turkey sandwich", brand: null, confidence: 0.84, portion: { amount: 1, unit: "sandwich", grams: 230 }, notes: [] },
-    { name: "potato chips", brand: "Lay's", confidence: 0.7, portion: { amount: 1, unit: "bag", grams: 28 }, notes: ["fried"] },
+    { name: "turkey sandwich", brand: null, confidence: 0.84, portion: { amount: 1, unit: "sandwich", grams: 230 }, notes: [], whole: null },
+    { name: "potato chips", brand: "Lay's", confidence: 0.7, portion: { amount: 1, unit: "bag", grams: 28 }, notes: ["fried"], whole: null },
   ],
   label: null,
+  multipleLabels: false,
   barcode: null,
   suggestions: [],
 };
@@ -38,6 +39,7 @@ const labelResult: ScanResult = {
     fiber: 2,
     sodiumMg: 140,
   },
+  multipleLabels: false,
   barcode: null,
   suggestions: [],
 };
@@ -48,6 +50,7 @@ const barcodeResult: ScanResult = {
   plannedMeal: null,
   items: [],
   label: null,
+  multipleLabels: false,
   barcode: { digits: "040000424314" },
   suggestions: [],
 };
@@ -58,6 +61,7 @@ const unknownResult: ScanResult = {
   plannedMeal: null,
   items: [],
   label: null,
+  multipleLabels: false,
   barcode: null,
   suggestions: ["granola", "trail mix"],
 };
@@ -339,6 +343,36 @@ describe("schema and parsing", () => {
     expect(validateScanResult({ ...unknownResult, suggestions: ["a", "b", "c", "d"] })?.suggestions).toEqual(["a", "b", "c"]);
     expect(validateScanResult({ ...labelResult, label: null })).toBeNull();
     expect(validateScanResult({ ...foodResult, items: [{ ...foodResult.items[0], portion: { amount: 1, unit: "x", grams: -5 } }] })).toBeNull();
+  });
+
+  it("whole dishes: a usable whole is kept, a bad or missing one becomes null without failing the scan", () => {
+    const pizza = { ...foodResult.items[0], name: "cheese pizza", whole: { name: " 12-inch pizza ", servings: 8, unit: "slice", gramsPerServing: 80 } };
+    expect(validateScanResult({ ...foodResult, items: [pizza] })?.items[0]?.whole).toEqual({
+      name: "12-inch pizza",
+      servings: 8,
+      unit: "slice",
+      gramsPerServing: 80,
+    });
+    for (const bad of [{ ...pizza.whole, servings: 0 }, { ...pizza.whole, gramsPerServing: -1 }, { ...pizza.whole, unit: "" }, "pizza"]) {
+      const r = validateScanResult({ ...foodResult, items: [{ ...pizza, whole: bad }] });
+      expect(r?.items[0]?.whole).toBeNull();
+    }
+    const { whole: _omit, ...noWhole } = pizza;
+    expect(validateScanResult({ ...foodResult, items: [noWhole] })?.items[0]?.whole).toBeNull();
+  });
+
+  it("multiple labels: reported without label values; missing means false; must be a boolean", () => {
+    expect(validateScanResult({ ...labelResult, label: null, multipleLabels: true })?.multipleLabels).toBe(true);
+    const { multipleLabels: _m, ...older } = labelResult;
+    expect(validateScanResult(older)?.multipleLabels).toBe(false);
+    expect(validateScanResult({ ...labelResult, multipleLabels: "yes" })).toBeNull();
+  });
+
+  it("the prompt covers several labels, package-front names, whole dishes and the main item first", () => {
+    expect(SCAN_SYSTEM_PROMPT).toMatch(/more than one Nutrition Facts panel.*multipleLabels to true/);
+    expect(SCAN_SYSTEM_PROMPT).toMatch(/front of the package/);
+    expect(SCAN_SYSTEM_PROMPT).toMatch(/12-inch pizza", servings 8, unit "slice", gramsPerServing 80/);
+    expect(SCAN_SYSTEM_PROMPT).toMatch(/List the main food first/);
   });
 
   it("parses the body and caps the planned-meal context", () => {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AdjustServingsSheet } from "@/components/AdjustServingsSheet";
 import { FoodPickConfirm } from "@/components/FoodPickConfirm";
 import { FoodSearchPanel } from "@/components/FoodSearchPanel";
+import { ScanButton } from "@/components/ScanButton";
 import { ScanFoodsReview } from "@/components/ScanFoodsReview";
 import { ScanLabelReview } from "@/components/ScanLabelReview";
 import type { ScanContext, ScanResult } from "@/server/scan/types";
@@ -17,6 +18,7 @@ import { newCorrection, saveCorrection } from "@/utils/scan/corrections";
 import { resizeForScan, type ScanPhoto } from "@/utils/scan/image";
 import { lookupBarcode, scanPhoto } from "@/utils/scan/scanClient";
 import {
+  MULTIPLE_LABELS_MESSAGE,
   SCAN_FAILED_MESSAGE,
   SCAN_OFFLINE_MESSAGE,
   SCAN_PAUSED_MESSAGE,
@@ -71,6 +73,8 @@ export function ScanPanel({
   const saveMyFood = useAppStore((s) => s.saveMyFood);
   const addPendingBarcode = useAppStore((s) => s.addPendingBarcode);
   const corrections = useAppStore((s) => s.scanCorrections);
+  // A retake (several labels in one photo) replaces the photo in place.
+  const [photoFile, setPhotoFile] = useState(file);
   const [screen, setScreen] = useState<Screen>({ kind: "working", step: "reading" });
   const [stillWorking, setStillWorking] = useState(false);
   const [adjustPlanned, setAdjustPlanned] = useState(false);
@@ -126,6 +130,15 @@ export function ScanPanel({
     onDone();
   }
 
+  function retake(next: File) {
+    record({ kind: "cancelled" });
+    aiRef.current = null;
+    pathRef.current = "ai";
+    finishedRef.current = false;
+    setScreen({ kind: "working", step: "reading" });
+    setPhotoFile(next);
+  }
+
   async function runBarcode(code: string) {
     setScreen({ kind: "working", step: "barcode" });
     const r = await lookupBarcode(code);
@@ -146,7 +159,7 @@ export function ScanPanel({
     void (async () => {
       let photo: ScanPhoto;
       try {
-        photo = await resizeForScan(file);
+        photo = await resizeForScan(photoFile);
       } catch {
         if (live) setScreen({ kind: "message", text: "Couldn't read that photo. Try another, or search instead." });
         return;
@@ -188,7 +201,7 @@ export function ScanPanel({
       controller.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [file]);
+  }, [photoFile]);
 
   // A barcode read offline: look it up when the connection is back, or keep it for later.
   useEffect(() => {
@@ -379,15 +392,17 @@ export function ScanPanel({
     body = (
       <ScanFoodsReview
         items={screen.view.items}
+        unsure={screen.view.unsure}
         target={target}
         forLabel={forLabel}
         onSearchInstead={() => setScreen({ kind: "search" })}
-        onLog={(combined, parts, servings) => {
+        onLog={(combined, parts, servings, unsureChoices) => {
           for (const p of parts) saveMyFood(p.food);
           logFood(combined, servings, {
             kind: "foods",
             servings,
             items: parts.map((p) => ({ aiName: p.aiName, matchId: p.food.id, matchName: p.food.name, grams: p.food.servingGrams ?? null })),
+            unsure: unsureChoices,
           });
         }}
       />
@@ -396,6 +411,7 @@ export function ScanPanel({
     body = (
       <ScanLabelReview
         label={screen.view.label}
+        dateKey={dateKey}
         target={target}
         forLabel={forLabel}
         onLog={(food, servings, values) => {
@@ -403,6 +419,22 @@ export function ScanPanel({
           logFood(food, servings, { kind: "label", values, servings });
         }}
       />
+    );
+  } else if (screen.view.kind === "multipleLabels") {
+    body = (
+      <div className="rounded-2xl border border-slate-200 p-3">
+        <p className="text-sm leading-relaxed text-slate-700">{MULTIPLE_LABELS_MESSAGE}</p>
+        <div className="mt-3">
+          <ScanButton onPhoto={retake} />
+        </div>
+        <button
+          type="button"
+          onClick={() => setScreen({ kind: "manual" })}
+          className="mt-2 min-h-[40px] text-sm font-semibold text-[#2563EB]"
+        >
+          Enter from a label
+        </button>
+      </div>
     );
   } else {
     const suggestions = screen.view.kind === "uncertain" ? screen.view.suggestions : [];

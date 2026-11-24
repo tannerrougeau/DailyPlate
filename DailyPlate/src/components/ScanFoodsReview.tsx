@@ -6,7 +6,17 @@ import type { DailyTargets } from "@/types";
 import type { FoodItem, FoodPortion } from "@/utils/foodTypes";
 import { applyPortion, fetchPortions, fitLine, proteinTopUp, SEARCH_FAILED_MESSAGE, searchFoods } from "@/utils/foodSearch";
 import { recentSnacks } from "@/utils/snackItems";
-import { combineFoods, itemQuery, pickMatch, portionLabel, sizeFood } from "@/utils/scan/scanFlow";
+import {
+  combineFoods,
+  itemQuery,
+  pickMatch,
+  portionLabel,
+  sizeFood,
+  WHOLE_DEFAULT_SERVINGS,
+  wholePortion,
+  wholeQuestion,
+  wholeSummary,
+} from "@/utils/scan/scanFlow";
 
 type Row = {
   key: string;
@@ -16,9 +26,11 @@ type Row = {
   failed: boolean;
   match: FoodItem | null;
   portions: FoodPortion[];
-  /** "ai" (the scan's estimate), a USDA portion index, or "grams". */
+  /** "ai" (the scan's estimate, or the count for a whole dish), a USDA portion index, or "grams". */
   choice: string;
   grams: string;
+  /** Whole or shared dish: how many slices (or pieces) were eaten. */
+  count: string;
   changing: boolean;
 };
 
@@ -29,6 +41,11 @@ const GRAMS = "grams";
 function sizedFor(row: Row): FoodItem | null {
   const m = row.match;
   if (!m) return null;
+  if (row.choice === AI && row.item.whole) {
+    // A whole pizza or cake is never logged whole: only the slices eaten.
+    const p = wholePortion(row.item.whole, Number(row.count));
+    return p ? sizeFood(m, p.grams, p.label) : null;
+  }
   if (row.choice === AI) return sizeFood(m, row.item.portion.grams, portionLabel(row.item.portion)) ?? (m.generic ? null : m);
   if (row.choice === GRAMS) {
     const g = Number(row.grams);
@@ -41,34 +58,33 @@ function sizedFor(row: Row): FoodItem | null {
 /**
  * Each identified food matched to USDA (or Open Food Facts) through the normal search, with the
  * scan's portion filled in. The user can change the match or portion; then one combined log.
+ * Unsure items are listed underneath ("Not sure: … Keep or remove?") and are logged only if kept.
  */
 export function ScanFoodsReview({
   items,
+  unsure = [],
   target,
   forLabel,
   onSearchInstead,
   onLog,
 }: {
   items: ScanItem[];
+  unsure?: ScanItem[];
   target: Pick<DailyTargets, "calories" | "protein"> | null;
   forLabel: string;
   onSearchInstead: () => void;
-  onLog: (combined: FoodItem, parts: { aiName: string; food: FoodItem }[], servings: number) => void;
+  onLog: (
+    combined: FoodItem,
+    parts: { aiName: string; food: FoodItem }[],
+    servings: number,
+    unsure: UnsureChoice[],
+  ) => void;
 }) {
   const myFoods = useAppStore((s) => s.myFoods);
   const snackLogs = useAppStore((s) => s.snackLogs);
-  const [rows, setRows] = useState<Row[]>(() =>
-    items.map((item, i) => ({
-      key: `${i}:${item.name}`,
-      item,
-      results: null,
-      failed: false,
-      match: null,
-      portions: [],
-      choice: AI,
-      grams: String(Math.round(item.portion.grams)),
-      changing: false,
-    })),
+  const [rows, setRows] = useState<Row[]>(() => items.map((item, i) => newRow(`${i}:${item.name}`, item)));
+  const [unsureChoices, setUnsureChoices] = useState<UnsureChoice[]>(() =>
+    unsure.map((item) => ({ aiName: item.name, choice: "unanswered" })),
   );
 
   const update = (key: string, patch: Partial<Row>) =>
@@ -87,6 +103,16 @@ export function ScanFoodsReview({
     update(key, { results, failed: Boolean(out.failed || out.offline) && results.length === 0 });
     const match = pickMatch(item, results);
     if (match) await choose(key, match);
+  }
+
+  function decide(index: number, choice: "kept" | "removed") {
+    setUnsureChoices((cs) => cs.map((c, i) => (i === index ? { ...c, choice } : c)));
+    if (choice === "kept") {
+      const item = unsure[index]!;
+      const row = newRow(`unsure${index}:${item.name}`, item);
+      setRows((rs) => [...rs, row]);
+      void search(row.key, itemQuery(item), item);
+    }
   }
 
   useEffect(() => {
@@ -120,6 +146,7 @@ export function ScanFoodsReview({
               ) : (
                 <p className="mt-1 text-sm text-amber-800">{r.failed ? SEARCH_FAILED_MESSAGE : "No match found."}</p>
               )}
+              {r.item.whole && <p className="mt-0.5 text-xs text-slate-500">{wholeSummary(r.item.whole)}</p>}
               {r.item.notes.length > 0 && <p className="mt-0.5 text-xs text-slate-500">Noted: {r.item.notes.join(", ")}</p>}
             </div>
             {rows.length > 1 && (
@@ -134,6 +161,14 @@ export function ScanFoodsReview({
             )}
           </div>
 
+          {r.match && r.item.whole && r.choice === AI && (
+            <WholeCount
+              question={wholeQuestion(r.item.whole)}
+              value={r.count}
+              max={r.item.whole.servings}
+              onChange={(count) => update(r.key, { count })}
+            />
+          )}
           {r.match && (
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
               <select
@@ -143,7 +178,9 @@ export function ScanFoodsReview({
                 aria-label={`Portion of ${r.match.name}`}
               >
                 <option value={AI}>
-                  {portionLabel(r.item.portion)}, about {Math.round(r.item.portion.grams)} g
+                  {r.item.whole
+                    ? `By ${r.item.whole.unit}`
+                    : `${portionLabel(r.item.portion)}, about ${Math.round(r.item.portion.grams)} g`}
                 </option>
                 {r.portions.map((p, i) => (
                   <option key={p.label} value={String(i)}>
@@ -193,19 +230,103 @@ export function ScanFoodsReview({
         </div>
       ))}
 
+      {unsure.map((item, i) =>
+        unsureChoices[i]?.choice === "unanswered" ? (
+          <div key={`unsure${i}`} className="flex flex-wrap items-center gap-2 rounded-2xl border border-dashed border-slate-300 p-3">
+            <p className="min-w-0 flex-1 text-sm text-slate-700">
+              Not sure: {item.brand ? `${item.brand} ` : ""}
+              {item.name}. Keep or remove?
+            </p>
+            <button
+              type="button"
+              onClick={() => decide(i, "kept")}
+              className="min-h-[40px] rounded-xl border border-slate-200 px-3 text-sm font-semibold text-[#2563EB]"
+            >
+              Keep
+            </button>
+            <button
+              type="button"
+              onClick={() => decide(i, "removed")}
+              className="min-h-[40px] rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-500"
+            >
+              Remove
+            </button>
+          </div>
+        ) : null,
+      )}
+
       {combined && target && <p className="text-sm leading-relaxed text-slate-700">{fitLine(combined, target, forLabel)}</p>}
       {topUp && <p className="text-sm leading-relaxed text-slate-700">{topUp}</p>}
       <div className="flex gap-2">
         <button
           type="button"
           disabled={!combined}
-          onClick={() => combined && onLog(combined, sized.map((s) => ({ aiName: s.row.item.name, food: s.food! })), 1)}
+          onClick={() =>
+            combined && onLog(combined, sized.map((s) => ({ aiName: s.row.item.name, food: s.food! })), 1, unsureChoices)
+          }
           className="min-h-[44px] flex-1 rounded-xl bg-[#2563EB] text-sm font-semibold text-white disabled:opacity-40"
         >
           Log it
         </button>
         <button type="button" onClick={onSearchInstead} className="min-h-[44px] px-2 text-sm font-semibold text-slate-500">
           Search instead
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export type UnsureChoice = { aiName: string; choice: "kept" | "removed" | "unanswered" };
+
+function newRow(key: string, item: ScanItem): Row {
+  return {
+    key,
+    item,
+    results: null,
+    failed: false,
+    match: null,
+    portions: [],
+    choice: AI,
+    grams: String(Math.round(item.portion.grams)),
+    count: String(item.whole ? Math.min(WHOLE_DEFAULT_SERVINGS, item.whole.servings) : 1),
+    changing: false,
+  };
+}
+
+/** "How many slices did you have?" with − / + (by one) and an editable number. */
+function WholeCount({
+  question,
+  value,
+  max,
+  onChange,
+}: {
+  question: string;
+  value: string;
+  max: number;
+  onChange: (value: string) => void;
+}) {
+  const n = Number(value);
+  const step = (d: number) => onChange(String(Math.min(max, Math.max(1, (Number.isFinite(n) ? Math.round(n) : 0) + d))));
+  const btn = "flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-lg font-semibold text-slate-700";
+  return (
+    <div className="mt-2">
+      <p className="text-sm font-semibold text-slate-900">{question}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <button type="button" onClick={() => step(-1)} className={btn} aria-label="One fewer">
+          −
+        </button>
+        <input
+          type="number"
+          min={0.5}
+          step={0.5}
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={question}
+          className="min-h-[40px] w-16 rounded-lg border border-slate-200 px-2 text-center text-sm"
+        />
+        <button type="button" onClick={() => step(1)} className={btn} aria-label="One more">
+          +
         </button>
       </div>
     </div>

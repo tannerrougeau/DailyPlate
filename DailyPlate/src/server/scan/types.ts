@@ -14,9 +14,25 @@ export type ScanItem = {
   portion: { amount: number; unit: string; grams: number };
   /** Things that change nutrition: "fried", "creamy sauce", "visible oil". */
   notes: string[];
+  /**
+   * A whole or shared dish (pizza, cake, casserole): the whole item and its serving unit, e.g.
+   * { name: "12-inch pizza", servings: 8, unit: "slice", gramsPerServing: 80 }. null otherwise.
+   */
+  whole: ScanWhole | null;
+};
+
+export type ScanWhole = {
+  /** The whole item as seen: "12-inch pizza". */
+  name: string;
+  /** How many servings the whole item makes: 8. */
+  servings: number;
+  /** Singular serving unit: "slice". */
+  unit: string;
+  gramsPerServing: number;
 };
 
 export type ScanLabel = {
+  /** From the label or, when visible, the front of the package. null when neither shows it. */
   productName: string | null;
   /** The per-serving column when the label has two. grams null when not printed. */
   servingSize: { text: string; grams: number | null };
@@ -39,6 +55,8 @@ export type ScanResult = {
   items: ScanItem[];
   /** Label only. */
   label: ScanLabel | null;
+  /** More than one Nutrition Facts panel is visible: the app asks for a photo of just one. */
+  multipleLabels: boolean;
   /** Barcode the phone couldn't read: digits if legible. */
   barcode: { digits: string | null } | null;
   /** Up to 3 likely names, for low confidence or unknown. */
