@@ -535,6 +535,12 @@ export interface AppState {
   checkpoints: Checkpoint[];
   /** Foods found by name or typed from a label, saved for reuse and offline. */
   myFoods: FoodItem[];
+  /** This device: the one-time "photos are sent to our AI provider" note was acknowledged. */
+  scanNoticeSeen: boolean;
+  /** This device: "Help improve scanning" (keep scan photos and corrections on the device). Off by default. */
+  scanCorrections: boolean;
+  /** Barcodes read offline, looked up once there's a connection. */
+  pendingBarcodes: string[];
   /** Dev panel: a question to show on Today right away (not persisted). */
   devForcedQuestionId: string | null;
   dismissedUsageNotes: Record<UsageNoteKey, boolean>;
@@ -622,6 +628,10 @@ export interface AppState {
   /** Starting display switches from onboarding. */
   setStartingDisplay: (kind: "basic" | "detailed") => void;
   saveMyFood: (food: FoodItem) => void;
+  acknowledgeScanNotice: () => void;
+  setScanCorrections: (on: boolean) => void;
+  addPendingBarcode: (code: string) => void;
+  setPendingBarcodes: (codes: string[]) => void;
   /** Dev panel: show the next queued question on Today now, ignoring spacing. */
   devShowNextQuestion: () => string | null;
   /** Dev panel: clear the 3-day spacing and every Not now / No snooze. */
@@ -731,6 +741,9 @@ export const useAppStore = create<AppState>()(
       slotSourceOverrides: {},
       checkpoints: [],
       myFoods: [],
+      scanNoticeSeen: false,
+      scanCorrections: false,
+      pendingBarcodes: [],
       devForcedQuestionId: null,
       dismissedUsageNotes: {
         today: false,
@@ -1681,6 +1694,15 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ myFoods: [food, ...s.myFoods.filter((f) => f.id !== food.id)].slice(0, 200) }));
       },
 
+      acknowledgeScanNotice: () => set({ scanNoticeSeen: true }),
+
+      setScanCorrections: (on) => set({ scanCorrections: on }),
+
+      addPendingBarcode: (code) =>
+        set((s) => ({ pendingBarcodes: s.pendingBarcodes.includes(code) ? s.pendingBarcodes : [...s.pendingBarcodes, code].slice(-20) })),
+
+      setPendingBarcodes: (codes) => set({ pendingBarcodes: codes }),
+
       addSnackLog: (dateKey, entry) => {
         set((s) => ({
           snackLogs: { ...s.snackLogs, [dateKey]: [...(s.snackLogs[dateKey] ?? []), entry] },
@@ -2213,6 +2235,9 @@ export const useAppStore = create<AppState>()(
         slotSourceOverrides: s.slotSourceOverrides,
         checkpoints: s.checkpoints,
         myFoods: s.myFoods,
+        scanNoticeSeen: s.scanNoticeSeen,
+        scanCorrections: s.scanCorrections,
+        pendingBarcodes: s.pendingBarcodes,
         dismissedUsageNotes: s.dismissedUsageNotes,
         favoriteIds: s.favoriteIds,
         dislikedIds: s.dislikedIds,

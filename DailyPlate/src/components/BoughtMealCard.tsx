@@ -67,7 +67,13 @@ export function BoughtMealCard({
         </>
       )}
       {searchOpen && (
-        <LogSomethingElseSheet dateKey={dateKey} meal={meal} onClose={() => setSearchOpen(false)} onSave={onLog} />
+        <LogSomethingElseSheet
+          dateKey={dateKey}
+          meal={meal}
+          bought
+          onClose={() => setSearchOpen(false)}
+          onSave={onLog}
+        />
       )}
     </article>
   );

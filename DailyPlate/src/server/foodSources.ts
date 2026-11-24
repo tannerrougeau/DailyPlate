@@ -4,6 +4,7 @@
  * User-Agent can be set (browsers don't allow it).
  */
 import type { FoodItem, FoodPortion } from "../utils/foodTypes";
+import { normalizeGtin, sameGtin } from "../utils/gtin";
 
 export const OFF_USER_AGENT = "DailyPlate/1.0 (tannerrougeau@gmail.com)";
 export const OFF_CREDIT = "Open Food Facts";
@@ -28,6 +29,7 @@ type UsdaFood = {
   servingSize?: number;
   servingSizeUnit?: string;
   householdServingFullText?: string;
+  gtinUpc?: string;
   foodNutrients?: UsdaNutrient[];
 };
 
@@ -306,6 +308,82 @@ export async function searchOff(query: string, fetchImpl: Fetch = fetch): Promis
   return (body.products ?? []).map(normalizeOff).filter((x): x is FoodItem => x != null);
 }
 
+// ---------- Barcode lookup ----------
+
+/** USDA Branded foods whose GTIN/UPC is this code (a search by the code, then an exact GTIN match). */
+export async function usdaByGtin(code: string, apiKey: string, fetchImpl: Fetch = fetch): Promise<FoodItem[]> {
+  const url = `https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${encodeURIComponent(apiKey)}`;
+  const queries = [...new Set([code, code.replace(/^0+/, "")])].filter(Boolean);
+  const found: FoodItem[] = [];
+  for (const query of queries) {
+    const res = await fetchImpl(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, dataType: ["Branded"], pageSize: 10 }),
+    });
+    if (!res.ok) throw new Error(`USDA barcode search failed (HTTP ${res.status})`);
+    const body = (await res.json()) as { foods?: UsdaFood[] };
+    for (const f of body.foods ?? []) {
+      if (!f.gtinUpc || !sameGtin(f.gtinUpc, code)) continue;
+      const item = normalizeUsda(f);
+      if (item && !found.some((x) => x.id === item.id)) found.push(item);
+    }
+    if (found.length > 0) break;
+  }
+  return found;
+}
+
+/** Open Food Facts product by barcode (a UPC-A is also tried as EAN-13); null when it isn't there. */
+export async function offByBarcode(code: string, fetchImpl: Fetch = fetch): Promise<FoodItem | null> {
+  const first = await offProductByCode(code, fetchImpl);
+  if (first || code.length !== 12) return first;
+  return offProductByCode(`0${code}`, fetchImpl);
+}
+
+async function offProductByCode(code: string, fetchImpl: Fetch): Promise<FoodItem | null> {
+  const url = new URL(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`);
+  url.searchParams.set("fields", "code,product_name,brands,serving_size,serving_quantity,nutriments");
+  let res = await fetchImpl(url.toString(), { headers: { "User-Agent": OFF_USER_AGENT } });
+  if (res.status === 503 || res.status === 429) {
+    await new Promise((r) => setTimeout(r, OFF_RETRY_MS));
+    res = await fetchImpl(url.toString(), { headers: { "User-Agent": OFF_USER_AGENT } });
+  }
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Open Food Facts product lookup failed (HTTP ${res.status})`);
+  const body = (await res.json()) as { status?: number; product?: OffProduct };
+  if (body.status !== 1 || !body.product) return null;
+  return normalizeOff({ ...body.product, code: body.product.code || code });
+}
+
+export type BarcodeLookup = { results: FoodItem[]; errors: string[]; failed: boolean };
+
+/** USDA Branded first, then Open Food Facts. failed = both sources errored (not the same as not found). */
+export async function lookupBarcode(
+  code: string,
+  apiKey: string | undefined,
+  fetchImpl: Fetch = fetch,
+): Promise<BarcodeLookup> {
+  const errors: string[] = [];
+  let usdaOk = false;
+  if (!apiKey) errors.push("USDA_API_KEY is not set");
+  else {
+    try {
+      const usda = await usdaByGtin(code, apiKey, fetchImpl);
+      usdaOk = true;
+      if (usda.length > 0) return { results: usda, errors, failed: false };
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : String(e));
+    }
+  }
+  try {
+    const off = await offByBarcode(code, fetchImpl);
+    return { results: off ? [off] : [], errors, failed: false };
+  } catch (e) {
+    errors.push(e instanceof Error ? e.message : String(e));
+    return { results: [], errors, failed: !usdaOk };
+  }
+}
+
 export type RemoteSearch = {
   results: FoodItem[];
   usdaCount: number;
@@ -367,6 +445,21 @@ export async function handleFoodSearchRequest(
   log: (msg: string) => void = (m) => console.error(m),
 ): Promise<Response> {
   const params = new URL(url).searchParams;
+  const upcRaw = params.get("upc");
+  if (upcRaw != null) {
+    const code = normalizeGtin(upcRaw);
+    if (!code) return Response.json({ error: "bad_request", results: [] }, { status: 400 });
+    const r = await lookupBarcode(code, apiKey, fetchImpl);
+    for (const err of r.errors) log(`food-search barcode ${code}: ${err}`);
+    if (r.failed) return Response.json({ error: "search_failed", upc: code, results: [] }, { status: 502 });
+    if (r.results.length === 0) {
+      return Response.json({ error: "not_found", upc: code, results: [] }, { status: 404, headers: { "Cache-Control": "no-store" } });
+    }
+    return Response.json(
+      { upc: code, results: r.results },
+      { headers: { "Cache-Control": r.errors.length ? "no-store" : "public, max-age=86400" } },
+    );
+  }
   const fdcId = (params.get("fdcId") ?? "").trim();
   if (fdcId) {
     if (!apiKey) {

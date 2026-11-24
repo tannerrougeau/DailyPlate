@@ -1,6 +1,7 @@
 /**
  * GET /.netlify/functions/food-search?q=chobani+vanilla   (search)
  * GET /.netlify/functions/food-search?fdcId=12345         (household portions for a generic food)
+ * GET /.netlify/functions/food-search?upc=012345678905    (barcode: USDA Branded, then Open Food Facts)
  * USDA FoodData Central (key from the USDA_API_KEY environment variable, server-side only), then
  * Open Food Facts. Errors are logged (Netlify → Logs → Functions → food-search).
  */

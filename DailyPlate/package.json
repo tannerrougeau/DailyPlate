@@ -10,13 +10,18 @@
     "usda:fetch": "tsx --tsconfig tsconfig.app.json scripts/fetchUsda.ts",
     "nutrition:check": "tsx --tsconfig tsconfig.app.json scripts/nutritionCheck.ts",
     "test": "vitest run",
-    "portions:report": "tsx --tsconfig tsconfig.app.json scripts/portionFitReport.ts"
+    "portions:report": "tsx --tsconfig tsconfig.app.json scripts/portionFitReport.ts",
+    "scan:smoke": "tsx --tsconfig tsconfig.app.json scripts/scanSmoke.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.13.0",
+    "@netlify/blobs": "^11.1.11",
+    "fflate": "^0.8.3",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "zustand": "^5.0.3"
+    "zustand": "^5.0.3",
+    "zxing-wasm": "^3.1.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
@@ -24,6 +29,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "fake-indexeddb": "^6.2.8",
     "tsx": "^4.23.15",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",

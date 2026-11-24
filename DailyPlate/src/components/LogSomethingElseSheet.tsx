@@ -3,6 +3,8 @@ import { Search, X } from "lucide-react";
 import { RecipeImage } from "@/components/RecipeImage";
 import { FoodPickConfirm } from "@/components/FoodPickConfirm";
 import { FoodSearchPanel } from "@/components/FoodSearchPanel";
+import { ScanButton } from "@/components/ScanButton";
+import { ScanPanel } from "@/components/ScanPanel";
 import type { FoodItem } from "@/utils/foodTypes";
 import { foodLogFromFood } from "@/utils/foodSearch";
 import { SLOT_LABELS } from "@/utils/planningPrefs";
@@ -19,15 +21,19 @@ export function LogSomethingElseSheet({
   meal,
   onClose,
   onSave,
+  bought,
 }: {
   dateKey: string;
   meal: PlannedMeal;
   onClose: () => void;
   onSave: (entry: MealTrackingEntry) => void;
+  /** A bought meal ("Log what you got"): no planned recipe to compare a scan with. */
+  bought?: boolean;
 }) {
   useOverlayBack(true, onClose);
   const [tab, setTab] = useState<"search" | "recipe" | "amounts">("search");
   const [picked, setPicked] = useState<FoodItem | null>(null);
+  const [scanFile, setScanFile] = useState<File | null>(null);
   const saveMyFood = useAppStore((s) => s.saveMyFood);
   const [query, setQuery] = useState("");
   const [kcal, setKcal] = useState("");
@@ -79,7 +85,7 @@ export function LogSomethingElseSheet({
             <h2 id="something-else-title" className="mt-0.5 text-lg font-bold text-slate-900">
               Log what you ate
             </h2>
-            <p className="mt-0.5 text-xs text-slate-400">Instead of {meal.recipe.name}</p>
+            {!bought && <p className="mt-0.5 text-xs text-slate-400">Instead of {meal.recipe.name}</p>}
           </div>
           <button
             type="button"
@@ -91,6 +97,28 @@ export function LogSomethingElseSheet({
           </button>
         </div>
 
+        {scanFile ? (
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">
+            <ScanPanel
+              file={scanFile}
+              dateKey={dateKey}
+              slot={meal.slot}
+              mode="meal"
+              plannedMeal={bought ? null : meal}
+              target={meal.portion?.target ?? null}
+              forLabel={`for ${SLOT_LABELS[meal.slot].toLowerCase()}`}
+              onLog={(entry) => {
+                onSave(entry);
+                onClose();
+              }}
+              onDone={() => setScanFile(null)}
+            />
+          </div>
+        ) : (
+          <>
+        <div className="px-4 pt-3">
+          <ScanButton onPhoto={setScanFile} />
+        </div>
         <div className="grid grid-cols-3 gap-1 px-4 pt-3">
           {(
             [
@@ -206,6 +234,8 @@ export function LogSomethingElseSheet({
               Save log
             </button>
           </div>
+        )}
+          </>
         )}
       </section>
     </div>

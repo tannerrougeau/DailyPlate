@@ -27,6 +27,7 @@ import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import { DisplaySettings } from "@/components/DisplaySettings";
 import { HowIEatSettings } from "@/components/HowIEatSettings";
 import { PersonalizationSettings } from "@/components/PersonalizationSettings";
+import { ScanSettings } from "@/components/ScanSettings";
 import { withMealSourcePlan } from "@/utils/fitYourLife";
 import { DevPanel } from "@/components/DevPanel";
 import { BUILD_INFO } from "@/utils/buildInfo";
@@ -361,6 +362,8 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         />
 
         <DisplaySettings />
+
+        <ScanSettings />
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">Check-in</h3>

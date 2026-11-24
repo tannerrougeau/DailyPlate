@@ -128,6 +128,9 @@ export function manualFood(input: {
   protein: number;
   carbs?: number;
   fat?: number;
+  fiber?: number;
+  sodiumMg?: number;
+  servingGrams?: number | null;
 }): FoodItem {
   const slug = `${norm(input.name).replace(/\s/g, "-")}-${norm(input.servingLabel).replace(/\s/g, "-") || "serving"}`;
   return {
@@ -138,6 +141,9 @@ export function manualFood(input: {
     protein: Math.round(input.protein),
     carbs: input.carbs,
     fat: input.fat,
+    fiber: input.fiber,
+    sodiumMg: input.sodiumMg,
+    servingGrams: input.servingGrams ?? undefined,
     source: "manual",
     sourceId: slug,
   };
@@ -153,7 +159,7 @@ export function foodToSnackItem(food: FoodItem): SnackItem {
       protein: food.protein,
       carbs: food.carbs ?? 0,
       fat: food.fat ?? 0,
-      fiber: 0,
+      fiber: food.fiber ?? 0,
     },
     servingGrams: food.servingGrams ?? null,
     source: "manual",
@@ -197,6 +203,7 @@ export function foodLogFromFood(
   slot: import("@/types").MealSlotId,
   food: FoodItem,
   servings: number,
+  source: "manual" | "scan" = "manual",
 ): import("@/types").MealTrackingEntry {
   const name = food.brand ? `${food.name} (${food.brand})` : food.name;
   return {
@@ -205,13 +212,13 @@ export function foodLogFromFood(
     loggedAt: new Date().toISOString(),
     date,
     slot,
-    source: "manual",
+    source,
     portionMultiplier: servings,
     calories: Math.round(food.calories * servings),
     protein: Math.round(food.protein * servings),
     carbs: Math.round((food.carbs ?? 0) * servings),
     fat: Math.round((food.fat ?? 0) * servings),
-    fiber: 0,
+    fiber: Math.round((food.fiber ?? 0) * servings),
   };
 }
 
@@ -266,5 +273,6 @@ export function applyPortion(food: FoodItem, portion: FoodPortion): FoodItem {
     protein: r1(food.protein)!,
     carbs: r1(food.carbs),
     fat: r1(food.fat),
+    fiber: r1(food.fiber),
   };
 }

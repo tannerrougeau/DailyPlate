@@ -207,7 +207,8 @@ export type MealTrackingStatus = "all" | "half" | "extra" | "skipped" | "custom"
  * also stored on the entry so a flat export stays readable.
  *
  * source: "recipe" (planned or chosen recipe), "manual" (typed kcal/protein),
- *         "scan" (reserved; this app does not write scans yet).
+ *         "scan" (logged from a photo, barcode or label scan; numbers still come from
+ *         the recipe, USDA/Open Food Facts or the label, never from the AI).
  * recipeId + variationId: set when source is "recipe".
  * portionMultiplier: 0 skipped, 0.5 half, 1 eaten, 1.5 extra. Manual and scan use 1.
  * calories/protein/carbs/fat/fiber: logged amounts, already multiplied.
