@@ -53,7 +53,20 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Netlify Functions are never served the app shell or cached: opening
         // /.netlify/functions/... shows the function's JSON, and fetch() goes to the network.
-        navigateFallbackDenylist: [/^\/\.netlify\//],
+        // The same for /api/ (food-scan is served at /api/food-scan for its rate-limit rule).
+        navigateFallbackDenylist: [/^\/\.netlify\//, /^\/api\//],
+        // The barcode reader's WebAssembly (about 1 MB) isn't precached: browsers without a native
+        // BarcodeDetector fetch it the first time Scan opens, and it's kept for offline reading.
+        runtimeCaching: [
+          {
+            urlPattern: ({ sameOrigin, url }) => sameOrigin && url.pathname.endsWith(".wasm"),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "dailyplate-wasm",
+              expiration: { maxEntries: 4 },
+            },
+          },
+        ],
         // A new deploy takes over right away and old precaches are removed.
         skipWaiting: true,
         clientsClaim: true,

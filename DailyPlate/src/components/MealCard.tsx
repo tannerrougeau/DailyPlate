@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BudgetFriendlyTag } from "@/components/BudgetFriendlyTag";
+import { isBudgetFriendly } from "@/utils/recipeFit";
 import { createPortal } from "react-dom";
 import {
   ChefHat,
@@ -530,7 +532,10 @@ function MealCardMainContent({
       >
         {mealDisplayName(meal)}
       </h3>
-      <p className="mt-0.5 line-clamp-1 text-xs capitalize text-slate-400">{tagLine(recipe)}</p>
+      <p className="mt-0.5 line-clamp-1 text-xs capitalize text-slate-400">
+        {tagLine(recipe)}
+        {isBudgetFriendly(recipe, effectiveVariationId(meal)) && <BudgetFriendlyTag />}
+      </p>
       <MealMacroLine
         compact
         kcal={kcal}

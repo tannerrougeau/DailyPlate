@@ -12,6 +12,18 @@ export type KitchenEquipmentId =
   | "blender"
   | "toaster_oven";
 
+/** How a recipe is cooked. */
+export type CookMethod = "oven" | "stovetop" | "microwave" | "no_cook";
+
+/** Equipment and effort, used by cooking limits. */
+export interface RecipeEffort {
+  /** Ways to make it; each way lists everything it needs (any one way is enough). */
+  methods: CookMethod[][];
+  chopping: "little" | "moderate";
+  /** Hands-on minutes (oven and simmer time are hands-off). */
+  activeMinutes: number;
+}
+
 /** Lower-calorie swap for white rice in rice-based recipes. */
 export type CarbVariationId = "white-rice" | "riced-cauliflower" | "riced-broccoli";
 
@@ -104,7 +116,16 @@ export interface Recipe {
   cookStyle?: "mixed" | "assembled";
   /** Saved by the current user; included in generation and the Recipes list. */
   isUserRecipe?: boolean;
+  /** Equipment and effort (built-ins get theirs from recipeEffort.ts). */
+  effort?: RecipeEffort;
 }
+
+/**
+ * A built-in recipe as authored: nutrition is computed from ingredients.json at load, so only
+ * packaged items (label values) carry calories and macros.
+ */
+export type RecipeSource = Omit<Recipe, "calories" | "protein" | "carbs" | "fat"> &
+  Partial<Pick<Recipe, "calories" | "protein" | "carbs" | "fat">>;
 
 /** Links meals cooked in one batch across multiple days. */
 export type MealPrepSource = "weekly_prep" | "low_complexity" | "manual";
@@ -186,7 +207,8 @@ export type MealTrackingStatus = "all" | "half" | "extra" | "skipped" | "custom"
  * also stored on the entry so a flat export stays readable.
  *
  * source: "recipe" (planned or chosen recipe), "manual" (typed kcal/protein),
- *         "scan" (reserved; this app does not write scans yet).
+ *         "scan" (logged from a photo, barcode or label scan; numbers still come from
+ *         the recipe, USDA/Open Food Facts or the label, never from the AI).
  * recipeId + variationId: set when source is "recipe".
  * portionMultiplier: 0 skipped, 0.5 half, 1 eaten, 1.5 extra. Manual and scan use 1.
  * calories/protein/carbs/fat/fiber: logged amounts, already multiplied.

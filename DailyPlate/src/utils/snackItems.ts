@@ -87,7 +87,13 @@ export function snackItemFromSaved(s: SavedSnack): SnackItem {
 }
 
 /** A snack log entry for `servings` of an item (existing MealTrackingEntry fields only). */
-export function snackLogEntry(date: string, item: SnackItem, servings: number): MealTrackingEntry {
+/** source: "scan" when the snack came from a photo scan; otherwise the item's own source. */
+export function snackLogEntry(
+  date: string,
+  item: SnackItem,
+  servings: number,
+  source?: MealTrackingEntry["source"],
+): MealTrackingEntry {
   const n = item.nutrition;
   return {
     status: statusForServings(servings) === "skipped" ? "skipped" : "custom",
@@ -95,7 +101,7 @@ export function snackLogEntry(date: string, item: SnackItem, servings: number): 
     loggedAt: new Date().toISOString(),
     date,
     slot: "snack",
-    source: item.source,
+    source: source ?? item.source,
     recipeId: item.recipeId,
     portionMultiplier: servings,
     calories: Math.round(n.calories * servings),

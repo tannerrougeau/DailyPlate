@@ -30,6 +30,7 @@ import { notableMicronutrients } from "@/utils/micronutrients";
 import { variationIsMealPrep } from "@/utils/mealPrep";
 import { profileAvoidLists, visibleVariationLabels } from "@/utils/variationPrefs";
 import { useAppStore } from "@/store/useAppStore";
+import { batchPrepFor } from "@/utils/batchPrep";
 import { resolveBeverage } from "@/utils/beverages";
 import type { CarbVariationId, FatVariationId, PlannedMeal, Recipe } from "@/types";
 import type { DailyTargets } from "@/types";
@@ -84,6 +85,10 @@ export function RecipeDetailsBody({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [openTip, setOpenTip] = useState<string | null>(null);
+  const [showBatch, setShowBatch] = useState(false);
+  const todayDateKey = useAppStore((s) => s.todayDateKey);
+  const dailyPlans = useAppStore((s) => s.dailyPlans);
+  const todayHouseholdOverride = useAppStore((s) => s.todayHouseholdOverride);
   const avoids = profileAvoidLists(profile);
   const labels = visibleVariationLabels(recipe, avoids.chips, avoids.custom);
   const selectedId =
@@ -103,9 +108,22 @@ export function RecipeDetailsBody({
         selectedFatVariationId: selectedFatId,
       }
     : null;
-  const servings = previewMeal ? batchServings(previewMeal, householdMult) : householdMult;
-  const batchLines = previewMeal ? mealPortionLines(previewMeal, servings) : null;
-  const yourLines = previewMeal && servings > 1.05 ? mealPortionLines(previewMeal, 1) : null;
+  // What's being made: servings, who and which days, whole-batch amounts, and the split.
+  const batch =
+    previewMeal && dateKey
+      ? batchPrepFor({
+          meal: previewMeal,
+          dateKey,
+          todayKey: todayDateKey,
+          dailyPlans,
+          profile,
+          todayOverride: todayHouseholdOverride,
+        })
+      : null;
+  const servings = batch ? batch.servings : previewMeal ? batchServings(previewMeal, householdMult) : householdMult;
+  const batchLines = batch ? batch.lines : previewMeal ? mealPortionLines(previewMeal, servings) : null;
+  // A leftover day shows the no-cooking note; the original batch opens on request.
+  const hideCooking = batch?.isLeftoverDay === true && !showBatch;
   const previewIngredients = batchLines
     ? null
     : scaledIngredientsForMeal(recipe, selectedId, mealScale, householdMult, selectedCarbId, selectedFatId);
@@ -149,11 +167,15 @@ export function RecipeDetailsBody({
       ? Math.round(estimatedBatchCookedGrams(previewMeal, householdMult) / 10) * 10
       : null;
   const servingsLabel = formatServings(servings);
-  const listHeading = batchLines
-    ? servings > 1.05
-      ? `Ingredients — batch for ${servingsLabel} servings${serveLine ? ` (${serveLine.replace(/^Serves\s+/i, "")})` : ""}`
+  const listHeading = batch
+    ? batch.servings > 1
+      ? "Ingredients — whole batch"
       : "Ingredients — your serving"
-    : "Ingredients";
+    : batchLines
+      ? servings > 1.05
+        ? `Ingredients — batch for ${servingsLabel} servings${serveLine ? ` (${serveLine.replace(/^Serves\s+/i, "")})` : ""}`
+        : "Ingredients — your serving"
+      : "Ingredients";
 
   return (
     <>
@@ -291,6 +313,30 @@ export function RecipeDetailsBody({
         </label>
       )}
 
+      {batch?.isLeftoverDay && (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <p className="text-sm font-semibold text-slate-900">{batch.leftoverText}</p>
+          {batch.leftoverServing && <p className="mt-0.5 text-sm text-slate-700">{batch.leftoverServing}</p>}
+          <button
+            type="button"
+            onClick={() => setShowBatch((v) => !v)}
+            aria-expanded={showBatch}
+            className="mt-1 text-sm font-semibold text-[#2563EB]"
+          >
+            {showBatch ? "Hide the original batch" : "Show the original batch"}
+          </button>
+        </div>
+      )}
+
+      {batch && !hideCooking && (
+        <div className="mt-3">
+          <p className="text-base font-bold text-slate-900">{batch.title}</p>
+          <p className="text-sm text-slate-600">{batch.breakdown}</p>
+        </div>
+      )}
+
+      {!hideCooking && (
+      <>
       <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{listHeading}</p>
       <ul className="mt-1.5 list-disc space-y-1.5 pl-5 text-sm text-slate-700">
         {batchLines
@@ -301,21 +347,6 @@ export function RecipeDetailsBody({
               </li>
             ))}
       </ul>
-
-      {yourLines && (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Your portion (1 of {servingsLabel} servings)
-          </p>
-          <ul className="mt-1 space-y-1 text-sm text-slate-700">
-            {yourLines
-              .filter((line) => line.role !== "flavor")
-              .map((line) => (
-                <li key={portionLineKey(line)}>{formatPortionLine(line)}</li>
-              ))}
-          </ul>
-        </div>
-      )}
 
       {meal?.sides?.length ? (
         <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
@@ -347,6 +378,15 @@ export function RecipeDetailsBody({
           <li key={idx}>{step}</li>
         ))}
       </ol>
+
+      {batch && batch.servings > 1 && (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Split the batch</p>
+          <p className="mt-1 text-sm text-slate-700">{batch.split}</p>
+        </div>
+      )}
+      </>
+      )}
 
       {display.prepTips && tips.length > 0 && (
         <ul className="mt-3 space-y-1.5">

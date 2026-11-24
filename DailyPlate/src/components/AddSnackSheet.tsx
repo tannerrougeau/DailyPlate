@@ -3,6 +3,8 @@ import { X } from "lucide-react";
 import { AdjustServingsSheet } from "@/components/AdjustServingsSheet";
 import { FoodPickConfirm } from "@/components/FoodPickConfirm";
 import { FoodSearchPanel } from "@/components/FoodSearchPanel";
+import { ScanButton } from "@/components/ScanButton";
+import { ScanPanel } from "@/components/ScanPanel";
 import type { FoodItem } from "@/utils/foodTypes";
 import { foodToSnackItem } from "@/utils/foodSearch";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
@@ -39,6 +41,7 @@ export function AddSnackSheet({
   const saveSnack = useAppStore((s) => s.saveSnack);
   const saveMyFood = useAppStore((s) => s.saveMyFood);
   const [picked, setPicked] = useState<FoodItem | null>(null);
+  const [scanFile, setScanFile] = useState<File | null>(null);
   const [adjusting, setAdjusting] = useState<SnackItem | null>(null);
   const [name, setName] = useState("");
   const [kcal, setKcal] = useState("");
@@ -114,7 +117,22 @@ export function AddSnackSheet({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           <div className="mt-3">
-            {picked ? (
+            {scanFile ? (
+              <ScanPanel
+                file={scanFile}
+                dateKey={dateKey}
+                slot="snack"
+                mode="snack"
+                plannedMeal={null}
+                target={remaining ?? null}
+                forLabel="for what's left today"
+                onLog={(entry) => {
+                  onLogged(entry);
+                  onClose();
+                }}
+                onDone={() => setScanFile(null)}
+              />
+            ) : picked ? (
               <FoodPickConfirm
                 food={picked}
                 target={remaining ?? null}
@@ -126,10 +144,16 @@ export function AddSnackSheet({
                 }}
               />
             ) : (
-              <FoodSearchPanel onPick={setPicked} />
+              <>
+                <ScanButton onPhoto={setScanFile} />
+                <div className="mt-3">
+                  <FoodSearchPanel onPick={setPicked} />
+                </div>
+              </>
             )}
           </div>
-          {sections
+          {!scanFile &&
+            sections
             .filter(([, items]) => items.length > 0)
             .map(([title, items]) => (
               <div key={title} className="mt-3">
@@ -161,6 +185,7 @@ export function AddSnackSheet({
               </div>
             ))}
 
+          {!scanFile && (
           <div className="mt-4 rounded-2xl border border-slate-200 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom</p>
             <input
@@ -188,6 +213,7 @@ export function AddSnackSheet({
               Log snack
             </button>
           </div>
+          )}
         </div>
       </section>
 

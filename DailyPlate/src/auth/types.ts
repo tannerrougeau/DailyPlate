@@ -28,6 +28,7 @@ export interface SavedAccountState {
   snackLogs?: Record<string, import("@/types").MealTrackingEntry[]>;
   savedSnacks?: import("@/utils/snackItems").SavedSnack[];
   swapLog?: import("@/utils/personalizationEngine").SwapLogEntry[];
+  slotSourceOverrides?: import("@/utils/boughtMeals").SlotSourceOverrides;
   displayPrefs?: Partial<import("@/utils/displayPrefs").DisplayPrefs> | null;
   checkpoints?: import("@/utils/displayPrefs").Checkpoint[];
   myFoods?: import("@/utils/foodTypes").FoodItem[];

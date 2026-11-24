@@ -3,7 +3,7 @@ import { Plus, X } from "lucide-react";
 import { AddSnackSheet } from "@/components/AddSnackSheet";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import type { MealSlotId, MealTrackingEntry, Recipe } from "@/types";
-import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
+import { CHECK_IN_OPTIONAL_NOTE, FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { SettingsSheet } from "@/components/SettingsSheet";
 import { SmartAdjustmentBadge } from "@/components/SmartAdjustmentBadge";
@@ -25,7 +25,7 @@ import { mealsForDateKey, sumTrackedMacros, trackingLabel } from "@/utils/mealTr
 import { remainingToday } from "@/utils/snackItems";
 import { QuestionCard } from "@/components/QuestionCard";
 import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
-import { canAskOnOpen, MAX_ON_OPEN, nextQuestions, type Question } from "@/utils/questionQueue";
+import { canAskOnOpen, MAX_ON_OPEN, nextQuestions, questionsAllowed, type Question } from "@/utils/questionQueue";
 
 const fallbackOrder: MealSlotId[] = ["breakfast", "lunch", "dinner", "snack", "snack_2", "snack_3"];
 
@@ -113,14 +113,17 @@ export function TodayScreen() {
   const resolvedExpanded: MealSlotId | null =
     expandedSlot === "init" ? nextUnlogged : expandedSlot;
   const checkInRecent = isRecentCheckIn(userProfile?.lastCheckInAt);
-  const checkInDue = !checkInRecent;
+  // Basic mode and paused questions: no suggestions and no check-in reminder.
+  const suggestionsOn = userProfile ? questionsAllowed(userProfile, new Date()) : false;
+  const checkInDue = !checkInRecent && suggestionsOn;
 
   // App open: count the meal cards shown, then maybe ask one question (3-day spacing).
   useEffect(() => {
     recordUsage("cards", mealsForViewDate.length);
     refreshQuestions();
     const s = useAppStore.getState();
-    if (!canAskOnOpen(s.lastQuestionAskedAt, new Date())) return;
+    if (!s.questionsAllowedNow()) return;
+    if (!canAskOnOpen(s.lastQuestionAskedAt, new Date(), s.questionSkipStreak)) return;
     setQuestion(nextQuestions(s.questionQueue, s.questionLog, new Date(), MAX_ON_OPEN)[0] ?? null);
     // Once per visit to Today.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +141,8 @@ export function TodayScreen() {
   function handleAnswer(q: Question, answer: Parameters<typeof answerQuestion>[1]) {
     setQuestion(null);
     const cp = answerQuestion(q.id, answer);
+    // "Open a check-in?" changes nothing by itself; Yes opens the check-in.
+    if (answer === "yes" && q.change.kind === "openCheckIn") setFeedbackOpen(true);
     if (cp) {
       showUndo({ message: `${cp.what}.`, undo: () => restoreCheckpoint(cp.id) }, 10000);
     }
@@ -225,11 +230,15 @@ export function TodayScreen() {
 
       {question && (
         <div className="section-gap">
-          <QuestionCard question={question} onAnswer={(a) => handleAnswer(question, a)} />
+          <QuestionCard
+            question={question}
+            onAnswer={(a) => handleAnswer(question, a)}
+            onPaused={() => setQuestion(null)}
+          />
         </div>
       )}
 
-      {display.insightBanners && checkInRecent && (
+      {display.insightBanners && suggestionsOn && checkInRecent && (
         <div className="section-gap flex justify-center">
           <SmartAdjustmentBadge variant="success">
             Adjusted based on your recent check-in
@@ -237,7 +246,7 @@ export function TodayScreen() {
         </div>
       )}
 
-      {display.insightBanners && personalizationInsight && (
+      {display.insightBanners && suggestionsOn && personalizationInsight && (
         <PersonalizationInsightBanner
           message={personalizationInsight.message}
           onDismiss={dismissPersonalizationInsight}
@@ -284,8 +293,9 @@ export function TodayScreen() {
             Add snack
           </button>
         </div>
-        <div className="section-gap flex justify-center">
+        <div className="section-gap flex flex-col items-center gap-1">
           <FeedbackCheckInButton due={checkInDue} onOpen={() => setFeedbackOpen(true)} />
+          <p className="max-w-xs text-center text-[11px] leading-snug text-slate-400">{CHECK_IN_OPTIONAL_NOTE}</p>
         </div>
       </aside>
 

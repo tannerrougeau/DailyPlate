@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { BudgetFriendlyTag } from "@/components/BudgetFriendlyTag";
+import { isBudgetFriendly } from "@/utils/recipeFit";
 import { ChefHat, Heart, Plus, Search, X } from "lucide-react";
 import { AddRecipeSheet } from "@/components/AddRecipeSheet";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
@@ -274,6 +276,7 @@ export function RecipesScreen() {
                   </p>
                   <p className="mt-2 text-xs tabular-nums text-slate-500">
                     {recipe.calories} kcal · P {recipe.protein}g
+                    {isBudgetFriendly(recipe) && <BudgetFriendlyTag />}
                   </p>
                 </div>
               </button>

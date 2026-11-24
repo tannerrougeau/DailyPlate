@@ -11,6 +11,9 @@ export type FoodItem = {
   protein: number;
   carbs?: number;
   fat?: number;
+  /** From a scanned label, when printed. */
+  fiber?: number;
+  sodiumMg?: number;
   source: "usda" | "off" | "manual";
   sourceId: string;
   /** Shown with Open Food Facts results. */

@@ -1,5 +1,8 @@
 import { MessageCircle } from "lucide-react";
 
+export const CHECK_IN_OPTIONAL_NOTE =
+  "Check-ins are optional. Without them, your targets stay based on your profile.";
+
 export function FeedbackCheckInButton({
   onOpen,
   variant = "subtle",
@@ -7,6 +10,7 @@ export function FeedbackCheckInButton({
 }: {
   onOpen: () => void;
   variant?: "subtle" | "card";
+  /** Shows the reminder dot (hidden in Basic mode and while questions are paused). */
   due?: boolean;
 }) {
   if (variant === "card") {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { X } from "lucide-react";
 import { AccountSignupSection } from "@/components/AccountSignupSection";
@@ -25,6 +25,10 @@ import {
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import { DisplaySettings } from "@/components/DisplaySettings";
+import { HowIEatSettings } from "@/components/HowIEatSettings";
+import { PersonalizationSettings } from "@/components/PersonalizationSettings";
+import { ScanSettings } from "@/components/ScanSettings";
+import { withMealSourcePlan } from "@/utils/fitYourLife";
 import { DevPanel } from "@/components/DevPanel";
 import { BUILD_INFO } from "@/utils/buildInfo";
 import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
@@ -98,8 +102,12 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   });
   useOverlayBack(userProfile != null, onClose);
 
+  // Load the form once when the sheet opens; sections that apply right away (Personalization,
+  // How I eat) must not wipe unsaved edits here.
+  const loaded = useRef(false);
   useEffect(() => {
-    if (!userProfile) return;
+    if (!userProfile || loaded.current) return;
+    loaded.current = true;
     const counts = resolveHouseholdCounts(userProfile);
     setAdults(counts.adults);
     setChildrenCount(counts.children);
@@ -194,7 +202,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
               heightCm: userProfile.heightCm,
             }),
     };
-    setUserProfile(next);
+    setUserProfile(withMealSourcePlan(next));
     // Keep current targets (e.g. an applied recommendation) unless a target input changed.
     setTargets(targetsAfterProfileChange(userProfile, useAppStore.getState().userProfile ?? next, targets));
     void syncAccountSnapshot();
@@ -339,7 +347,23 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
           <CuisinePreferenceSection selected={preferredCuisines} onChange={setPreferredCuisines} />
         </section>
 
+        <PersonalizationSettings />
+
+        <HowIEatSettings
+          onApplied={(p) =>
+            setPlanningPrefs((prev) => ({
+              ...prev,
+              cookingEventsPerWeek: p.cookingEventsPerWeek ?? prev.cookingEventsPerWeek,
+              maxPrepMinutes: p.maxPrepMinutes === undefined ? prev.maxPrepMinutes : p.maxPrepMinutes,
+              maxLeftoverStreakDays: p.maxLeftoverStreakDays ?? prev.maxLeftoverStreakDays,
+              weeklyMealPrepSlot: p.weeklyMealPrepSlot ?? prev.weeklyMealPrepSlot,
+            }))
+          }
+        />
+
         <DisplaySettings />
+
+        <ScanSettings />
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">Check-in</h3>

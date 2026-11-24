@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
+import { BudgetFriendlyTag } from "@/components/BudgetFriendlyTag";
+import { isBudgetFriendly } from "@/utils/recipeFit";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, ChefHat, Heart, MoreHorizontal, ThumbsDown, X } from "lucide-react";
 import { AdjustServingsSheet } from "@/components/AdjustServingsSheet";
+import { BoughtMealCard } from "@/components/BoughtMealCard";
+import { isBoughtMeal, isSourceSlot } from "@/utils/boughtMeals";
 import { LogSomethingElseSheet } from "@/components/LogSomethingElseSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
 import { RecipeImage } from "@/components/RecipeImage";
@@ -101,6 +105,15 @@ export function TodayMealRow({
   const addMealSides = useAppStore((s) => s.addMealSides);
   const replaceMealSlot = useAppStore((s) => s.replaceMealSlot);
   const dayMeals = useAppStore((s) => s.dailyPlans[dateKey]);
+  const slotSourceOverrides = useAppStore((s) => s.slotSourceOverrides);
+  const setSlotSourceOverride = useAppStore((s) => s.setSlotSourceOverride);
+  const usualSource = isSourceSlot(slot) ? (userProfile?.mealSources?.[slot] ?? "cook") : "cook";
+  const bought = isBoughtMeal(userProfile, slotSourceOverrides, dateKey, slot);
+  /** One-day change; clears the override when it matches the usual setting. */
+  const setSourceToday = (source: "buy" | "cook") => {
+    if (!isSourceSlot(slot)) return;
+    setSlotSourceOverride(dateKey, slot, source === usualSource ? null : source);
+  };
 
   const householdCounts =
     dateKey === todayDateKey
@@ -118,6 +131,20 @@ export function TodayMealRow({
   const servingLine = formatHouseholdServesLine(userProfile, householdCounts);
   const skipped = trackingEntry?.status === "skipped";
   const checked = Boolean(trackingEntry) && !skipped;
+
+  if (bought && isSourceSlot(slot)) {
+    return (
+      <BoughtMealCard
+        meal={meal}
+        slot={slot}
+        dateKey={dateKey}
+        target={meal.portion?.target ?? { calories: macros.calories, protein: macros.protein }}
+        trackingEntry={trackingEntry}
+        onLog={onLog}
+        onCookInstead={() => setSourceToday("cook")}
+      />
+    );
+  }
 
   function handleCircle() {
     if (trackingEntry?.status === "all") {
@@ -187,6 +214,7 @@ export function TodayMealRow({
             </span>
             <span className="mt-0.5 block text-xs tabular-nums text-slate-500">
               {kcal} kcal · {protein}g protein
+              {isBudgetFriendly(recipe, effectiveVariationId(meal)) && <BudgetFriendlyTag />}
             </span>
           </span>
         </button>
@@ -396,6 +424,7 @@ export function TodayMealRow({
             onSkip={() => onLog(foodLogForServings(dateKey, meal, 0))}
             onAdjust={() => setAdjustOpen(true)}
             onSomethingElse={() => setElseOpen(true)}
+            onBuyToday={isSourceSlot(slot) ? () => setSourceToday("buy") : undefined}
           />,
           document.body,
         )}
@@ -441,12 +470,15 @@ function TodayLogMenu({
   onSkip,
   onAdjust,
   onSomethingElse,
+  onBuyToday,
 }: {
   mealName: string;
   onClose: () => void;
   onSkip: () => void;
   onAdjust: () => void;
   onSomethingElse: () => void;
+  /** "Buy today": this meal is bought for one day; its usual setting doesn't change. */
+  onBuyToday?: () => void;
 }) {
   useOverlayBack(true, onClose);
   function run(action: () => void) {
@@ -492,6 +524,13 @@ function TodayLogMenu({
             hint="Pick another recipe or enter kcal and protein"
             onClick={() => run(onSomethingElse)}
           />
+          {onBuyToday && (
+            <LogAction
+              label="Buy today"
+              hint="Show a target to buy for, just for today"
+              onClick={() => run(onBuyToday)}
+            />
+          )}
         </div>
         <button
           type="button"
