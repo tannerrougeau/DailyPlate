@@ -12,6 +12,7 @@ import {
   confidencesOf,
   FOOD_ITEM_MIN_CONFIDENCE,
   itemQuery,
+  LABEL_MISMATCH_MIN_KCAL,
   LABEL_MISMATCH_WARNING,
   labelDoesntAddUp,
   labelFood,
@@ -27,6 +28,7 @@ import {
   sizeFood,
   suggestionsFor,
   unitFor,
+  unsureNotIncluded,
   WHOLE_DEFAULT_SERVINGS,
   wholePortion,
   wholeQuestion,
@@ -119,6 +121,12 @@ describe("low confidence or unknown: no guessing", () => {
     // Exactly at the threshold counts as confident.
     const edge = item("croutons", FOOD_ITEM_MIN_CONFIDENCE, 15);
     expect(scanView({ ...base, items: [salad, edge] }, { hasPlannedMeal: false })).toMatchObject({ unsure: [] });
+  });
+
+  it("unanswered unsure items are counted next to Log", () => {
+    expect(unsureNotIncluded(0)).toBeNull();
+    expect(unsureNotIncluded(1)).toBe("1 unsure item not included");
+    expect(unsureNotIncluded(3)).toBe("3 unsure items not included");
   });
 
   it("the main (first) item unsure, or nothing confident, shows up to 3 suggestions instead", () => {
@@ -258,6 +266,20 @@ describe("label check: calories vs 4×protein + 4×carbs + 9×fat", () => {
     expect(labelDoesntAddUp(values(95, 10, 20, 0))).toBe(true);
     expect(labelDoesntAddUp(values(400, 3, 37, 8))).toBe(true);
     expect(LABEL_MISMATCH_WARNING).toBe("These numbers don't add up. Check them before logging.");
+  });
+
+  it("must also be more than 20 kcal off, so rounded low-calorie labels don't trigger it", () => {
+    // Sugar-free gum: 5 kcal, 2 g carbs → 8 (37% off, but only 3 kcal).
+    expect(labelDoesntAddUp(values(5, 0, 2, 0))).toBe(false);
+    // 4×3 = 12: 30 kcal is 150% off but 18 kcal; 35 kcal is 23 kcal off.
+    expect(labelDoesntAddUp(values(30, 0, 3, 0))).toBe(false);
+    expect(labelDoesntAddUp(values(35, 0, 3, 0))).toBe(true);
+    // 4×20 = 80: 97 kcal is 21% off but 17 kcal.
+    expect(labelDoesntAddUp(values(97, 0, 20, 0))).toBe(false);
+    // Exactly 20 kcal off isn't enough; with no macros at all, 21 kcal is.
+    expect(labelDoesntAddUp(values(20, 0, 0, 0))).toBe(false);
+    expect(labelDoesntAddUp(values(21, 0, 0, 0))).toBe(true);
+    expect(LABEL_MISMATCH_MIN_KCAL).toBe(20);
   });
 
   it("is a warning only: a label that doesn't add up still logs", () => {

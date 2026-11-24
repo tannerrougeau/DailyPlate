@@ -25,8 +25,12 @@ export const STILL_WORKING_AFTER_MS = 8000;
 export const MULTIPLE_LABELS_MESSAGE =
   "This photo shows more than one Nutrition Facts label. Take a photo of just one label so the right numbers are logged.";
 export const LABEL_MISMATCH_WARNING = "These numbers don't add up. Check them before logging.";
-/** How far printed calories may be from 4×protein + 4×carbs + 9×fat before the warning shows. */
+/**
+ * How far printed calories may be from 4×protein + 4×carbs + 9×fat before the warning shows: both
+ * more than 20% and more than 20 kcal, so heavily rounded low-calorie labels don't trigger it.
+ */
 export const LABEL_MISMATCH_TOLERANCE = 0.2;
+export const LABEL_MISMATCH_MIN_KCAL = 20;
 /** Default "how many slices did you have?" for a whole or shared dish. */
 export const WHOLE_DEFAULT_SERVINGS = 2;
 
@@ -219,7 +223,8 @@ export function labelForm(label: ScanLabel, dateKey: string): LabelForm {
 }
 
 /**
- * true when the printed calories are more than 20% away from 4×protein + 4×carbs + 9×fat. A warning
+ * true when the printed calories are more than 20% and more than 20 kcal away from
+ * 4×protein + 4×carbs + 9×fat. A warning
  * only, never a block. Not checked until calories, protein, carbs and fat are all filled in.
  */
 export function labelDoesntAddUp(form: Pick<LabelForm, "calories" | "protein" | "carbs" | "fat">): boolean {
@@ -227,8 +232,15 @@ export function labelDoesntAddUp(form: Pick<LabelForm, "calories" | "protein" | 
   if (vals.some((v) => !Number.isFinite(v) || v < 0)) return false;
   const [calories, protein, carbs, fat] = vals as [number, number, number, number];
   const fromMacros = 4 * protein + 4 * carbs + 9 * fat;
-  if (fromMacros === 0) return calories > 0;
-  return Math.abs(calories - fromMacros) / fromMacros > LABEL_MISMATCH_TOLERANCE;
+  const off = Math.abs(calories - fromMacros);
+  if (off <= LABEL_MISMATCH_MIN_KCAL) return false;
+  return fromMacros === 0 || off / fromMacros > LABEL_MISMATCH_TOLERANCE;
+}
+
+/** "1 unsure item not included" next to Log, so leaving unanswered "Not sure" items out is visible. */
+export function unsureNotIncluded(count: number): string | null {
+  if (count <= 0) return null;
+  return count === 1 ? "1 unsure item not included" : `${count} unsure items not included`;
 }
 
 /** The edited label as a food for My foods (per serving), or null until name, calories and protein are set. */

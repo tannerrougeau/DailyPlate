@@ -12,6 +12,7 @@ import {
   pickMatch,
   portionLabel,
   sizeFood,
+  unsureNotIncluded,
   WHOLE_DEFAULT_SERVINGS,
   wholePortion,
   wholeQuestion,
@@ -124,6 +125,7 @@ export function ScanFoodsReview({
   const sized = rows.map((r) => ({ row: r, food: sizedFor(r) }));
   const ready = rows.length > 0 && sized.every((s) => s.food) && rows.every((r) => r.results !== null);
   const combined = ready ? combineFoods(sized.map((s) => s.food!)) : null;
+  const notIncluded = unsureNotIncluded(unsureChoices.filter((c) => c.choice === "unanswered").length);
   const topUp = combined && target ? proteinTopUp(Math.round(target.protein - combined.protein)) : null;
 
   return (
@@ -257,7 +259,7 @@ export function ScanFoodsReview({
 
       {combined && target && <p className="text-sm leading-relaxed text-slate-700">{fitLine(combined, target, forLabel)}</p>}
       {topUp && <p className="text-sm leading-relaxed text-slate-700">{topUp}</p>}
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2">
         <button
           type="button"
           disabled={!combined}
@@ -268,6 +270,11 @@ export function ScanFoodsReview({
         >
           Log it
         </button>
+        {notIncluded && (
+          <span role="status" className="max-w-[7.5rem] text-xs leading-tight text-amber-800">
+            {notIncluded}
+          </span>
+        )}
         <button type="button" onClick={onSearchInstead} className="min-h-[44px] px-2 text-sm font-semibold text-slate-500">
           Search instead
         </button>
