@@ -3,10 +3,8 @@ import { HouseholdPicker } from "@/components/HouseholdPicker";
 import { MealPatternSection } from "@/components/MealPatternSection";
 import { ProteinPreferenceSection } from "@/components/ProteinPreferenceSection";
 import {
-  ProfileRefineCards,
   defaultRefineValues,
   profilePatchFromRefine,
-  type HouseholdCardValue,
   type RefineCardValues,
 } from "@/components/ProfileRefineCards";
 import { applyProfileToTargets, useAppStore } from "@/store/useAppStore";
@@ -16,6 +14,7 @@ import type {
   BiologicalSex,
   HouseholdMember,
   MainGoal,
+  MealSizes,
   ProteinPreference,
   UserProfile,
 } from "@/types/profile";
@@ -36,7 +35,19 @@ import {
 } from "@/utils/planningPrefs";
 import { goalLinkedProteinGrams } from "@/utils/proteinMinimum";
 import { applyFitAnswers, type FitAnswers } from "@/utils/fitYourLife";
-import { FitYourLifeSteps } from "@/onboarding/FitYourLifeSteps";
+import {
+  ChoiceScreen,
+  PersonalizeQuestions,
+  TopicBody,
+  type TopicContext,
+} from "@/onboarding/PersonalizeQuestions";
+import {
+  TOPIC_TITLE,
+  topicsFor,
+  unansweredTopics,
+  type PersonalizeDraft,
+  type PersonalizeTopic,
+} from "@/utils/personalizeTopics";
 import {
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
@@ -48,15 +59,17 @@ import {
   type WeightUnit,
 } from "@/utils/bodyMeasurements";
 
-type Step = "welcome" | "household" | "stats" | "goal" | "meals" | "fit" | "summary";
+type Step = "welcome" | "household" | "stats" | "goal" | "meals" | "avoid" | "summary" | "choice" | "personalize";
 
-const BASIC_STEPS: Exclude<Step, "welcome">[] = [
+/** Steps everyone sees; Personalized questions follow "choice" with their own counter. */
+const BASIC_STEPS: Exclude<Step, "welcome" | "personalize">[] = [
   "household",
   "stats",
   "goal",
   "meals",
-  "fit",
+  "avoid",
   "summary",
+  "choice",
 ];
 
 export const QUESTIONS_OPTIONAL_LINE = "Questions are always optional. Skip or pause them anytime.";
@@ -118,16 +131,19 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
   const [refine, setRefine] = useState<RefineCardValues>(() => defaultRefineValues());
   const [householdAvoidChips, setHouseholdAvoidChips] = useState<string[]>([]);
   const [householdAvoidCustom, setHouseholdAvoidCustom] = useState("");
-  // "Fit your life": optional answers and "Keep it simple" (Basic mode).
+  // Personalized answers ("fit your life" and meal sizes); Basic leaves them unset.
   const [fitAnswers, setFitAnswers] = useState<FitAnswers>({});
-  const [basicMode, setBasicMode] = useState(false);
+  const [mealSizes, setMealSizes] = useState<MealSizes>({});
+  // "Save your account" on the summary: open Settings once onboarding finishes.
+  const [openSettingsAfter, setOpenSettingsAfter] = useState(false);
 
   const setUserProfile = useAppStore((s) => s.setUserProfile);
   const setTargets = useAppStore((s) => s.setTargets);
   const finishOnboarding = useAppStore((s) => s.finishOnboarding);
   const requestOpenSettings = useAppStore((s) => s.requestOpenSettings);
+  const queueTopicQuestions = useAppStore((s) => s.queueTopicQuestions);
 
-  const progressIndex = BASIC_STEPS.indexOf(step as Exclude<Step, "welcome">);
+  const progressIndex = BASIC_STEPS.indexOf(step as (typeof BASIC_STEPS)[number]);
   const progress = progressIndex >= 0 ? (progressIndex + 1) / BASIC_STEPS.length : 0;
 
   const resolvedHeightCm = heightCmFromFeetInches(heightFeet, heightInches);
@@ -203,13 +219,17 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
       ),
       householdFoodAvoidChips: householdAvoidChips,
       householdFoodAvoidCustom: householdAvoidCustom,
-      basicMode,
     };
   }
 
-  /** The built profile with the "fit your life" answers applied (cooking fields, meal-prep slot). */
-  function buildFinalProfile(goalId: MainGoal): UserProfile {
-    return applyFitAnswers(buildProfile(goalId), fitAnswers);
+  /** The built profile with the "fit your life" answers and meal sizes applied, and the mode chosen. */
+  function buildFinalProfile(goalId: MainGoal, basic: boolean): UserProfile {
+    const withFit = applyFitAnswers(buildProfile(goalId), fitAnswers);
+    return {
+      ...withFit,
+      basicMode: basic,
+      ...(Object.keys(mealSizes).length > 0 ? { mealSizes } : {}),
+    };
   }
 
   const canFinish = Boolean(goal && eatenMeals.length >= 1 && householdAdults >= 1 && canContinueStats);
@@ -221,22 +241,58 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
 
   const setStartingDisplay = useAppStore((st) => st.setStartingDisplay);
 
-  function persistAndFinish(openSettings: boolean) {
+  const householdPeople = householdAdults + householdChildren;
+  const personalizeTopics = topicsFor(householdPeople);
+  const draft: PersonalizeDraft = {
+    refine,
+    fit: fitAnswers,
+    mealSizes,
+    household: {
+      adults: householdAdults,
+      children: householdChildren,
+      members: householdMembers,
+      avoidChips: householdAvoidChips,
+      avoidCustom: householdAvoidCustom,
+    },
+  };
+  function setDraft(next: PersonalizeDraft) {
+    setRefine(next.refine);
+    setFitAnswers(next.fit);
+    setMealSizes(next.mealSizes);
+    if (next.household) {
+      setHouseholdMembers(next.household.members);
+      setHouseholdAvoidChips(next.household.avoidChips);
+      setHouseholdAvoidCustom(next.household.avoidCustom);
+    }
+  }
+  const topicCtx: TopicContext = {
+    eatenMeals,
+    weightKg: bodyStats?.weightKg ?? 0,
+    heightCm: bodyStats?.heightCm ?? 0,
+    goal,
+    preference: proteinPreference,
+    derivedProteinGrams,
+  };
+
+  /**
+   * Basic: Basic mode on, done. Personalized: questions answered so far are saved; the ones skipped
+   * or not reached go to the question queue for later.
+   */
+  function finish(basic: boolean, answered: Set<PersonalizeTopic> = new Set()) {
     if (!canFinish || !goal) return;
-    const profile = buildFinalProfile(goal);
+    const profile = buildFinalProfile(goal, basic);
     setUserProfile(profile);
     setTargets(applyProfileToTargets(profile));
-    // Starting display: detailed if any refine card was changed, basic if they went straight through.
-    const refined = JSON.stringify(refine) !== JSON.stringify(defaultRefineValues());
-    setStartingDisplay(refined ? "detailed" : "basic");
+    setStartingDisplay(!basic && answered.size > 0 ? "detailed" : "basic");
     finishOnboarding();
-    if (openSettings) requestOpenSettings();
+    if (!basic) queueTopicQuestions(unansweredTopics(personalizeTopics, answered));
+    if (openSettingsAfter) requestOpenSettings();
   }
 
   return (
     <div className="min-h-dvh bg-[#f5f5f4] px-4 pb-10 pt-8">
       <div className="mx-auto max-w-lg">
-        {step !== "welcome" && (
+        {progressIndex >= 0 && (
           <div className="mb-6">
             <div className="mb-2 flex justify-between text-xs font-medium text-slate-500">
               <span>
@@ -375,23 +431,21 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
             />
             <StickyNav
               onBack={() => setStep("goal")}
-              onNext={() => setStep("fit")}
+              onNext={() => setStep("avoid")}
               nextDisabled={eatenMeals.length === 0}
             />
           </div>
         )}
 
-        {step === "fit" && (
-          <FitYourLifeSteps
-            value={fitAnswers}
-            onChange={setFitAnswers}
-            onDone={() => setStep("summary")}
-            onKeepSimple={() => {
-              setBasicMode(true);
-              setStep("summary");
-            }}
-            onBack={() => setStep("meals")}
-          />
+        {step === "avoid" && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">{TOPIC_TITLE.avoid}</h2>
+              <p className="mt-1 text-sm text-slate-500">Optional. Skip if there&apos;s nothing.</p>
+            </div>
+            <TopicBody topic="avoid" draft={draft} onChange={setDraft} ctx={topicCtx} />
+            <StickyNav onBack={() => setStep("meals")} onNext={() => setStep("summary")} />
+          </div>
         )}
 
         {step === "summary" && previewTargets && goal && bodyStats && (
@@ -419,44 +473,44 @@ export function OnboardingFlow({ onLogin }: { onLogin?: () => void }) {
               <button
                 type="button"
                 disabled={!canFinish}
-                onClick={() => persistAndFinish(false)}
+                onClick={() => setStep("choice")}
                 className="mt-5 min-h-[56px] w-full rounded-2xl bg-[#2563EB] py-3 text-lg font-semibold text-white disabled:opacity-40"
               >
                 Looks good
               </button>
               <button
                 type="button"
-                onClick={() => persistAndFinish(true)}
+                onClick={() => {
+                  setOpenSettingsAfter(true);
+                  setStep("choice");
+                }}
                 className="mt-3 w-full text-sm font-semibold text-[#2563EB] underline-offset-2 hover:underline"
               >
                 Save your account
               </button>
             </section>
 
-            <ProfileRefineCards
-              value={refine}
-              onChange={setRefine}
-              weightKg={bodyStats.weightKg}
-              heightCm={bodyStats.heightCm}
-              goal={goal}
-              preference={proteinPreference}
-              derivedProteinGrams={derivedProteinGrams}
-              household={{
-                adults: householdAdults,
-                children: householdChildren,
-                members: householdMembers,
-                avoidChips: householdAvoidChips,
-                avoidCustom: householdAvoidCustom,
-              }}
-              onHouseholdChange={(next: HouseholdCardValue) => {
-                setHouseholdMembers(next.members);
-                setHouseholdAvoidChips(next.avoidChips);
-                setHouseholdAvoidCustom(next.avoidCustom);
-              }}
-            />
-
-            <StickyNav onBack={() => setStep("fit")} />
+            <StickyNav onBack={() => setStep("avoid")} />
           </div>
+        )}
+
+        {step === "choice" && (
+          <ChoiceScreen
+            onBasic={() => finish(true)}
+            onPersonalized={() => setStep("personalize")}
+            onBack={() => setStep("summary")}
+          />
+        )}
+
+        {step === "personalize" && (
+          <PersonalizeQuestions
+            topics={personalizeTopics}
+            draft={draft}
+            onChange={setDraft}
+            ctx={topicCtx}
+            onFinish={(answered) => finish(false, answered)}
+            onBack={() => setStep("choice")}
+          />
         )}
       </div>
     </div>

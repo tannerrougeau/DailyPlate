@@ -1,3 +1,4 @@
+import { effectiveMealSizes } from "@/utils/mealTargets";
 import type { DayMealTracking, MealSlotId, PlannedMeal, Recipe } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import type { CheckInEntry } from "@/types/tdeeFeedback";
@@ -174,12 +175,10 @@ export function recipePersonalizationBoost(
     boost += 10;
   }
 
-  if (profile.mealTiming === "bigger_dinner" && slot === "dinner" && recipe.calories > 480) {
-    boost += 8;
-  }
-  if (profile.mealTiming === "light_breakfast" && slot === "breakfast" && recipe.calories < 380) {
-    boost += 8;
-  }
+  const sizes = effectiveMealSizes(profile);
+  const size = slot === "breakfast" || slot === "lunch" || slot === "dinner" ? sizes[slot] : undefined;
+  if (size === "large" && recipe.calories > 480) boost += 8;
+  if (size === "light" && recipe.calories < 380) boost += 8;
 
   return boost;
 }

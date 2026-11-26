@@ -36,6 +36,7 @@ import type { CarbVariationId, FatVariationId, PlannedMeal, Recipe } from "@/typ
 import type { DailyTargets } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import { useEffect, useState } from "react";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 export function RecipeDetailsBody({
   recipe,
@@ -319,7 +320,7 @@ export function RecipeDetailsBody({
           {batch.leftoverServing && <p className="mt-0.5 text-sm text-slate-700">{batch.leftoverServing}</p>}
           <button
             type="button"
-            onClick={() => setShowBatch((v) => !v)}
+            onClick={(e) => keepInPlace(e.currentTarget, () => setShowBatch((v) => !v))}
             aria-expanded={showBatch}
             className="mt-1 text-sm font-semibold text-[#2563EB]"
           >
@@ -395,7 +396,7 @@ export function RecipeDetailsBody({
               <button
                 type="button"
                 aria-expanded={openTip === tip.id}
-                onClick={() => setOpenTip((cur) => (cur === tip.id ? null : tip.id))}
+                onClick={(e) => keepInPlace(e.currentTarget, () => setOpenTip((cur) => (cur === tip.id ? null : tip.id)))}
                 className="flex w-full items-center justify-between px-3 py-2 text-left font-medium text-slate-800"
               >
                 <span>{tip.title}</span>

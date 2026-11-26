@@ -171,7 +171,11 @@ export interface PlannedMeal {
   sides?: RecipeIngredient[];
   /** Set by plan generation until goal portions (and any automatic side) are applied. */
   generated?: boolean;
+  /** "Size today" for this day only (1/2 or 3/4 of its normal target). Omitted = normal. */
+  daySize?: DaySize;
 }
+
+export type DaySize = 0.5 | 0.75;
 
 export interface RoleMultipliers {
   protein: number;

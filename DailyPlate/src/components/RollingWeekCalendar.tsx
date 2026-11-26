@@ -12,6 +12,7 @@ const DEFAULT_FUTURE_WEEKS = 5;
 export function RollingWeekCalendar({
   todayDateKey,
   selectedDateKeys,
+  viewedDateKey = null,
   selectMode = false,
   onDayClick,
   onSelectWeek,
@@ -21,6 +22,8 @@ export function RollingWeekCalendar({
 }: {
   todayDateKey: string;
   selectedDateKeys: ReadonlySet<string>;
+  /** The day whose meals are shown (filled light accent; separate from today's border and selection). */
+  viewedDateKey?: string | null;
   selectMode?: boolean;
   onDayClick: (dateKey: string, date: Date) => void;
   onSelectWeek?: (week: Date[]) => void;
@@ -83,35 +86,49 @@ export function RollingWeekCalendar({
                     const key = toDateKey(date);
                     const selected = selectMode && selectedDateKeys.has(key);
                     const isToday = key === todayDateKey;
+                    const isViewed = key === viewedDateKey;
                     const hasMeals = dayHasMeals?.(key) === true;
                     const dateLabel = date.toLocaleDateString("en-US", {
                       weekday: "short",
                       month: "short",
                       day: "numeric",
                     });
+                    const fill = selected
+                      ? "bg-[#2563EB] text-white"
+                      : isViewed
+                        ? "bg-blue-100"
+                        : "bg-white";
+                    const border = isToday
+                      ? selected
+                        ? "ring-2 ring-slate-900 ring-offset-1"
+                        : "border-2 border-slate-900"
+                      : selected
+                        ? ""
+                        : isViewed
+                          ? "border border-blue-300"
+                          : "border border-slate-200";
                     return (
                       <button
                         key={key}
                         type="button"
                         onClick={() => onDayClick(key, date)}
                         aria-pressed={selectMode ? selected : undefined}
-                        aria-current={isToday ? "date" : undefined}
-                        aria-label={`${hasMeals ? "Meals on" : "Open"} ${dateLabel}`}
-                        className={`relative min-h-[52px] rounded-lg px-0.5 py-1 text-left ${
-                          selected
-                            ? `bg-[#2563EB] text-white ${isToday ? "ring-2 ring-slate-900 ring-offset-1" : ""}`
-                            : isToday
-                              ? "border-2 border-slate-900 bg-white"
-                              : "border border-slate-200 bg-white"
-                        } ${isPrevWeek && !selected ? "opacity-60" : ""}`}
+                        aria-current={isToday ? "date" : isViewed ? "true" : undefined}
+                        aria-label={`${hasMeals ? "Meals on" : "Open"} ${dateLabel}${isToday ? ", today" : ""}${isViewed ? ", showing" : ""}`}
+                        className={`relative min-h-[52px] rounded-lg px-0.5 py-1 text-left ${fill} ${border} ${
+                          isPrevWeek && !selected && !isViewed ? "opacity-60" : ""
+                        }`}
                       >
                         <span
                           className={`text-xs font-semibold ${
-                            selected ? "text-white" : "text-slate-800"
+                            selected ? "text-white" : isViewed ? "text-[#1D4ED8]" : "text-slate-800"
                           }`}
                         >
                           {date.getDate()}
                         </span>
+                        {isViewed && selected && (
+                          <span className="absolute left-1 right-1 top-6 h-0.5 rounded-full bg-white" aria-hidden />
+                        )}
                         {hasMeals && (
                           <span
                             className={`absolute bottom-1.5 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full ${

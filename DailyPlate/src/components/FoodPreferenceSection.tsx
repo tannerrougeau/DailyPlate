@@ -19,6 +19,9 @@ type FoodPreferenceSectionProps = {
   onDislikedChipsChange: (chips: string[]) => void;
   onFavoriteCustomChange: (value: string) => void;
   onDislikedCustomChange: (value: string) => void;
+  /** Both lists (default), or just one (onboarding asks them as separate questions). */
+  show?: "both" | "love" | "avoid";
+  hideTitles?: boolean;
 };
 
 export function FoodPreferenceSection({
@@ -30,11 +33,14 @@ export function FoodPreferenceSection({
   onDislikedChipsChange,
   onFavoriteCustomChange,
   onDislikedCustomChange,
+  show = "both",
+  hideTitles = false,
 }: FoodPreferenceSectionProps) {
   return (
     <>
+      {show !== "avoid" && (
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-slate-900">Foods you love</h3>
+        {!hideTitles && <h3 className="text-lg font-semibold text-slate-900">Foods you love</h3>}
         <p className="text-sm text-slate-500">
           Whole foods and common recipe ingredients — tap all that apply.
         </p>
@@ -69,9 +75,11 @@ export function FoodPreferenceSection({
           />
         </label>
       </section>
+      )}
 
+      {show !== "love" && (
       <section className="space-y-3">
-        <h3 className="text-lg font-semibold text-slate-900">Strongly disliked</h3>
+        {!hideTitles && <h3 className="text-lg font-semibold text-slate-900">Strongly disliked</h3>}
         <p className="text-sm text-slate-500">
           We avoid recipes that match these ingredients or additives.
         </p>
@@ -106,6 +114,7 @@ export function FoodPreferenceSection({
           />
         </label>
       </section>
+      )}
     </>
   );
 }

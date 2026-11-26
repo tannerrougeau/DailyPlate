@@ -10,6 +10,7 @@ import {
   type FoodSearchOutcome,
 } from "@/utils/foodSearch";
 import { recentSnacks } from "@/utils/snackItems";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 /**
  * Find a food by name: saved and recent foods first, then USDA and Open Food Facts (searched only
@@ -91,7 +92,7 @@ export function FoodSearchPanel({
 
       <button
         type="button"
-        onClick={() => setManualOpen((o) => !o)}
+        onClick={(e) => keepInPlace(e.currentTarget, () => setManualOpen((o) => !o))}
         className="mt-3 text-xs font-semibold text-[#2563EB]"
         aria-expanded={manualOpen}
       >

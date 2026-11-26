@@ -18,6 +18,7 @@ import {
   wholeQuestion,
   wholeSummary,
 } from "@/utils/scan/scanFlow";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 type Row = {
   key: string;
@@ -214,7 +215,7 @@ export function ScanFoodsReview({
           {r.results !== null && (
             <button
               type="button"
-              onClick={() => update(r.key, { changing: !r.changing })}
+              onClick={(e) => keepInPlace(e.currentTarget, () => update(r.key, { changing: !r.changing }))}
               className="mt-2 text-xs font-semibold text-[#2563EB]"
               aria-expanded={r.changing}
             >

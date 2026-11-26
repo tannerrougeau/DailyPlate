@@ -188,3 +188,40 @@ export function suggestSides(
       current.protein + best.c.n.protein >= target.protein - 2,
   };
 }
+
+/** Whole foods a snack can be paired with when it can't reach its target alone. */
+const SNACK_PAIRS: SideOption[] = [APPLE, BANANA, BERRIES, YOGURT];
+export const SNACK_PAIR_NAMES = new Set(SNACK_PAIRS.map((o) => o.name));
+/** A paired snack never goes past this. */
+const SNACK_PAIR_MAX_KCAL = 400;
+
+/**
+ * One whole-food item that brings a snack closest to its calorie target (e.g. string cheese + apple),
+ * staying at or under 400 kcal. Null when nothing gets closer.
+ */
+export function snackPairing(
+  current: Pick<NutrientVector, "calories">,
+  target: Pick<DailyTargets, "calories">,
+): SideSuggestion | null {
+  const gap = target.calories - current.calories;
+  if (!(gap > 0)) return null;
+  const cap = Math.max(SNACK_PAIR_MAX_KCAL, target.calories);
+  let best: { side: RecipeIngredient; label: string; n: NutrientVector; err: number } | null = null;
+  for (const opt of SNACK_PAIRS) {
+    for (const qty of opt.amounts) {
+      const side: RecipeIngredient = { name: opt.name, quantity: qty, unit: opt.unit, category: opt.category };
+      const n = sidesNutrition([side]);
+      const after = current.calories + n.calories;
+      if (n.calories <= 0 || after > cap) continue;
+      const err = Math.abs(target.calories - after);
+      if (!best || err < best.err) best = { side, label: opt.label(qty), n, err };
+    }
+  }
+  if (!best || best.err >= gap) return null;
+  return {
+    sides: [best.side],
+    label: best.label,
+    nutrition: best.n,
+    fits: best.err <= fitKcalTolerance(target as DailyTargets),
+  };
+}

@@ -11,7 +11,7 @@ import { ClearDatesButton } from "@/components/ClearDatesButton";
 import { cookedMeals } from "@/utils/boughtMeals";
 import { batchPrepFor } from "@/utils/batchPrep";
 import { useAppStore } from "@/store/useAppStore";
-import { formatQty, groceriesFromMeals, groceryVolumeLabel, mergeGroceryLists, simplifyGroceryList } from "@/utils/grocery";
+import { batchAlreadyCooked, formatQty, groceriesFromMeals, groceryMealsForDay, groceryVolumeLabel, mergeGroceryLists, simplifyGroceryList } from "@/utils/grocery";
 import {
   fromDateKey,
   isDateKeyOnOrAfter,
@@ -27,6 +27,7 @@ import { mealsForDateKey } from "@/utils/mealTracking";
 import { PantrySheet } from "@/components/PantrySheet";
 import { useIsWide } from "@/hooks/useIsWide";
 import type { GroceryItem, IngredientCategory } from "@/types";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 const CATEGORY_ORDER: IngredientCategory[] = [
   "Produce",
@@ -58,6 +59,7 @@ export function GroceryScreen() {
   const dailyPlans = useAppStore((s) => s.dailyPlans);
   const plannedMeals = useAppStore((s) => s.plannedMeals);
   const todayDateKey = useAppStore((s) => s.todayDateKey);
+  const mealTracking = useAppStore((s) => s.mealTracking);
   const userProfile = useAppStore((s) => s.userProfile);
   const slotSourceOverrides = useAppStore((s) => s.slotSourceOverrides);
   const purchasedKeys = useAppStore((s) => s.groceryCheckedKeys);
@@ -116,10 +118,12 @@ export function GroceryScreen() {
   );
 
   const items = useMemo(() => {
+    const countedBatches = new Set<string>();
     const lists = groceryDateKeys.map((key) => {
       // Bought meals (usual setting or "Buy today") add nothing to the list.
+      // No past days; today only counts meals not yet marked eaten.
       const meals = cookedMeals(
-        mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey),
+        groceryMealsForDay(key, todayDateKey, mealsForDateKey(key, dailyPlans, plannedMeals, todayDateKey), mealTracking[key]),
         userProfile,
         slotSourceOverrides,
         key,
@@ -129,15 +133,24 @@ export function GroceryScreen() {
       return groceriesFromMeals(
         meals,
         mult,
-        (meal) =>
-          batchPrepFor({
+        (meal) => {
+          const prep = batchPrepFor({
             meal,
             dateKey: key,
             todayKey: todayDateKey,
             dailyPlans,
             profile: userProfile,
             todayOverride: todayHouseholdOverride,
-          })?.lines ?? null,
+          });
+          if (!prep) return null;
+          // A batch cooked on a past day, or today and already eaten, needs nothing more.
+          const cook = prep.days[0]!;
+          if (meal.mealPrep && batchAlreadyCooked({ dateKey: cook.dateKey, slot: cook.meal.slot }, todayDateKey, mealTracking[todayDateKey])) {
+            return [];
+          }
+          return prep.lines;
+        },
+        countedBatches,
       );
     });
     return simplifyGroceryList(mergeGroceryLists(lists));
@@ -149,6 +162,7 @@ export function GroceryScreen() {
     plannedMeals,
     todayDateKey,
     groceryDateKeys,
+    mealTracking,
     profileMult,
     todayMult,
     userProfile?.prioritizeMinProtein,
@@ -446,7 +460,7 @@ function CollapsibleGrocerySection({
     <section className={`card-surface overflow-hidden border ${borderTone}`}>
       <button
         type="button"
-        onClick={onToggleOpen}
+        onClick={(e) => keepInPlace(e.currentTarget, onToggleOpen)}
         aria-expanded={open}
         className={`flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors ${headerTone}`}
       >

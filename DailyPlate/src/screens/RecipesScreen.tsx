@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { BudgetFriendlyTag } from "@/components/BudgetFriendlyTag";
 import { isBudgetFriendly } from "@/utils/recipeFit";
-import { ChefHat, Heart, Plus, Search, X } from "lucide-react";
+import { ChefHat, Heart, Plus, Search, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import { AddRecipeSheet } from "@/components/AddRecipeSheet";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
@@ -9,7 +9,7 @@ import { RecipeImage } from "@/components/RecipeImage";
 import { RecipePreferencesSheet } from "@/components/RecipePreferencesSheet";
 import { UsageNote } from "@/components/UsageNote";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
-import { useAppStore } from "@/store/useAppStore";
+import { upcomingRecipeMeals, useAppStore } from "@/store/useAppStore";
 import { allRecipes } from "@/recipes/recipePool";
 import type { CarbVariationId, FatVariationId, Recipe } from "@/types";
 import { isMealPrepFriendly } from "@/utils/mealPrep";
@@ -40,7 +40,23 @@ export function RecipesScreen() {
   const favoriteIds = useAppStore((s) => s.favoriteIds);
   const dislikedIds = useAppStore((s) => s.dislikedIds);
   const userRecipes = useAppStore((s) => s.userRecipes);
+  const toggleFavorite = useAppStore((s) => s.toggleFavorite);
+  const toggleDislike = useAppStore((s) => s.toggleDislike);
+  const replaceRecipeUpcoming = useAppStore((s) => s.replaceRecipeUpcoming);
   const library = useMemo(() => allRecipes(userRecipes), [userRecipes]);
+  const [replacePrompt, setReplacePrompt] = useState<{ recipeId: string; days: number } | null>(null);
+
+  /** Dislike from a card; when it's still planned on upcoming days, offer to replace it there. */
+  function handleDislike(recipeId: string) {
+    const adding = !dislikedIds.includes(recipeId);
+    toggleDislike(recipeId);
+    if (!adding) {
+      setReplacePrompt(null);
+      return;
+    }
+    const days = new Set(upcomingRecipeMeals(useAppStore.getState(), recipeId).map((m) => m.dateKey)).size;
+    setReplacePrompt(days > 0 ? { recipeId, days } : null);
+  }
 
   useOverlayBack(selected != null, () => setSelected(null));
 
@@ -241,8 +257,10 @@ export function RecipesScreen() {
         )}
         {filtered.map((recipe) => {
           const protein = getProteinSource(recipe);
+          const liked = favoriteIds.includes(recipe.id);
+          const disliked = dislikedIds.includes(recipe.id);
           return (
-            <li key={recipe.id}>
+            <li key={recipe.id} className="relative">
               <button
                 type="button"
                 onClick={() => setSelected(recipe)}
@@ -280,10 +298,67 @@ export function RecipesScreen() {
                   </p>
                 </div>
               </button>
+              {/* Like / dislike sit over the photo, outside the card's open button. */}
+              <div className="absolute right-1.5 top-1.5 flex gap-1">
+                <button
+                  type="button"
+                  aria-pressed={liked}
+                  aria-label={liked ? `Remove like for ${recipe.name}` : `Like ${recipe.name}`}
+                  onClick={() => toggleFavorite(recipe.id)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full shadow-sm ${
+                    liked ? "bg-[#2563EB] text-white" : "bg-white/90 text-slate-600"
+                  }`}
+                >
+                  <ThumbsUp className="h-4 w-4" aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={disliked}
+                  aria-label={disliked ? `Remove dislike for ${recipe.name}` : `Dislike ${recipe.name}`}
+                  onClick={() => handleDislike(recipe.id)}
+                  className={`flex h-8 w-8 items-center justify-center rounded-full shadow-sm ${
+                    disliked ? "bg-slate-800 text-white" : "bg-white/90 text-slate-600"
+                  }`}
+                >
+                  <ThumbsDown className="h-4 w-4" aria-hidden />
+                </button>
+              </div>
             </li>
           );
         })}
       </ul>
+
+      {replacePrompt && (
+        <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] left-0 right-0 z-50 px-4 lg:bottom-6 lg:pl-60" role="status">
+          <div className="mx-auto flex max-w-lg flex-wrap items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm text-white shadow-lg">
+            <p className="min-w-0 flex-1 font-medium">
+              Replace it in your upcoming plan? ({replacePrompt.days} {replacePrompt.days === 1 ? "day" : "days"})
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const changed = replaceRecipeUpcoming(replacePrompt.recipeId);
+                setReplacePrompt(null);
+                setSaveNotice(
+                  changed > 0
+                    ? `Replaced on ${changed} ${changed === 1 ? "day" : "days"}. Your grocery list is updated.`
+                    : "Nothing could be replaced (those meals are eaten, kept or locked).",
+                );
+              }}
+              className="min-h-[36px] rounded-xl bg-white px-3 font-semibold text-slate-900"
+            >
+              Replace
+            </button>
+            <button
+              type="button"
+              onClick={() => setReplacePrompt(null)}
+              className="min-h-[36px] rounded-xl px-2 font-semibold text-slate-300"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {prefsOpen && <RecipePreferencesSheet onClose={() => setPrefsOpen(false)} />}
       {addOpen && (

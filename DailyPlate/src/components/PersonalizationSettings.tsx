@@ -1,9 +1,10 @@
 import { useAppStore } from "@/store/useAppStore";
 import { PAUSE_CHOICES } from "@/components/PauseQuestionsLink";
 import { isPaused, pauseLabel } from "@/utils/questionQueue";
+import { BASIC_TEXT, PERSONALIZED_TEXT } from "@/onboarding/PersonalizeQuestions";
 
 export const BASIC_MODE_COPY =
-  "Straightforward plans sized to your targets. No questions or suggestions. Your likes, dislikes and swaps still count.";
+  "No questions or suggestions. Your likes, dislikes and swaps still count.";
 
 /** Settings → Personalization: Basic mode and pausing questions. Changes apply right away. */
 export function PersonalizationSettings() {
@@ -17,18 +18,27 @@ export function PersonalizationSettings() {
   return (
     <section className="space-y-3 border-b border-slate-100 pb-5">
       <h3 className="text-base font-semibold text-slate-900">Personalization</h3>
-      <label className="flex items-start justify-between gap-3">
-        <span>
-          <span className="block text-sm font-semibold text-slate-800">Basic mode</span>
-          <span className="block text-xs leading-relaxed text-slate-500">{BASIC_MODE_COPY}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={basic}
-          onChange={(e) => setBasicMode(e.target.checked)}
-          className="mt-1 h-5 w-5 shrink-0 accent-[#2563EB]"
-        />
-      </label>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="How DailyPlate works for you">
+        {[
+          { basic: true, label: "Basic", text: BASIC_TEXT },
+          { basic: false, label: "Personalized", text: PERSONALIZED_TEXT },
+        ].map((o) => (
+          <button
+            key={o.label}
+            type="button"
+            role="radio"
+            aria-checked={basic === o.basic}
+            onClick={() => setBasicMode(o.basic)}
+            className={`rounded-2xl border-2 px-3 py-2.5 text-left ${
+              basic === o.basic ? "border-[#2563EB] bg-blue-50" : "border-slate-200 bg-white"
+            }`}
+          >
+            <span className="block text-sm font-semibold text-slate-900">{o.label}</span>
+            <span className="mt-0.5 block text-[11px] leading-snug text-slate-500">{o.text}</span>
+          </button>
+        ))}
+      </div>
+      {basic && <p className="text-xs leading-relaxed text-slate-500">{BASIC_MODE_COPY}</p>}
       {!basic && (
         <div>
           <p className="text-sm font-semibold text-slate-800">Pause questions</p>

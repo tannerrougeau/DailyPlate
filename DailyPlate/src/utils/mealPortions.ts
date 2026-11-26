@@ -1,5 +1,5 @@
 import type { DailyTargets, MealSlotId, PlannedMeal, Recipe, RecipeIngredient, RoleMultipliers } from "@/types";
-import type { MealTimingPreference } from "@/types/profile";
+import type { MealSizes, MealTimingPreference } from "@/types/profile";
 import { resolveBeverage } from "@/utils/beverages";
 import {
   cookedGramsOfLine,
@@ -15,7 +15,7 @@ import {
 import { addNutrients, gramsForIngredient, type NutrientVector } from "@/utils/ingredientNutrition";
 import { hasLabelNutrition } from "@/utils/labelNutrition";
 import { ADD_ON_NAMES, withSlotAddOns } from "@/utils/slotAddOns";
-import { sidesNutrition, suggestSides, type SideSuggestion } from "@/utils/mealSides";
+import { SNACK_PAIR_NAMES, sidesNutrition, snackPairing, suggestSides, type SideSuggestion } from "@/utils/mealSides";
 import { isSnackPlanSlot } from "@/utils/planningPrefs";
 import { splitMealTargets, type MealTargetSlot } from "@/utils/mealTargets";
 import {
@@ -100,9 +100,19 @@ export function mealPortionLines(meal: PlannedMeal, servings = 1): PortionLine[]
   return portionLines(mealIngredients(meal), mealMultipliers(meal), servings);
 }
 
+/**
+ * Household servings for one day in units of the user's serving. "Size today" shrinks only the
+ * user's own serving, so everyone else's share is scaled back up to their normal amount.
+ */
+export function dayHouseholdServings(meal: Pick<PlannedMeal, "daySize">, householdMult: number): number {
+  const d = meal.daySize;
+  if (!d || householdMult <= 1) return householdMult;
+  return 1 + (householdMult - 1) / d;
+}
+
 /** Servings the batch covers: household × planned leftover/batch portions. */
-export function batchServings(meal: Pick<PlannedMeal, "mealPrep">, householdMult: number): number {
-  return Math.max(1, householdMult) * Math.max(1, meal.mealPrep?.portionsCooked ?? 1);
+export function batchServings(meal: Pick<PlannedMeal, "mealPrep" | "daySize">, householdMult: number): number {
+  return Math.max(1, dayHouseholdServings(meal, householdMult)) * Math.max(1, meal.mealPrep?.portionsCooked ?? 1);
 }
 
 /**
@@ -112,10 +122,13 @@ export function batchServings(meal: Pick<PlannedMeal, "mealPrep">, householdMult
 export function sizeMealToTarget(
   meal: PlannedMeal,
   target: DailyTargets,
-  opts: { autoSide?: boolean } = {},
+  opts: { autoSide?: boolean; /** Size a packaged snack to this target (whole units, maybe a pairing). */ packagedSnackTarget?: DailyTargets } = {},
 ): PlannedMeal {
   const { generated: _generated, ...rest } = meal;
   if (isPackagedRecipe(meal.recipe)) {
+    if (isSnackPlanSlot(meal.slot) && opts.packagedSnackTarget) {
+      return sizePackagedSnack(rest, opts.packagedSnackTarget);
+    }
     const n = mealFoodNutrition({ ...rest, portion: undefined, scale: 1 });
     return {
       ...rest,
@@ -136,6 +149,18 @@ export function sizeMealToTarget(
     portion: { multipliers: r.multipliers, target, kcalGap: r.kcalGap, fits: r.fits },
   };
   if (!opts.autoSide || r.fits || meal.sides?.length) return sized;
+  if (caloriesOnly) {
+    // A snack that can't reach its target on its own gets a simple pairing (e.g. + apple).
+    const pair = snackPairing(r.nutrition, target);
+    if (!pair) return sized;
+    const withPair = sizePortion(ingredients, target, stored, { extra: pair.nutrition, caloriesOnly });
+    if (Math.abs(withPair.kcalGap) >= Math.abs(r.kcalGap)) return sized;
+    return {
+      ...sized,
+      sides: pair.sides,
+      portion: { multipliers: withPair.multipliers, target, kcalGap: withPair.kcalGap, fits: withPair.fits },
+    };
+  }
   const side = suggestSides(r.nutrition, target, meal.slot);
   if (!side?.fits) return sized;
   const withSide = sizePortion(ingredients, target, stored, { extra: side.nutrition, caloriesOnly });
@@ -144,6 +169,44 @@ export function sizeMealToTarget(
     ...sized,
     sides: side.sides,
     portion: { multipliers: withSide.multipliers, target, kcalGap: withSide.kcalGap, fits: true },
+  };
+}
+
+/** Most units of one packaged snack in a serving; past that, a pairing is added instead. */
+export const MAX_PACKAGED_UNITS = 2;
+/** A packaged snack under this share of its target gets a pairing. */
+const PACKAGED_PAIR_BELOW = 0.75;
+
+/**
+ * Packaged snack sized to its target: 1 or 2 units of the item, and when that's still under 75%
+ * of the target, a whole-food pairing (e.g. 2 string cheese + apple). Recomputed from scratch each
+ * time, so earlier pairings are replaced; next-best-step add-ons are kept.
+ */
+function sizePackagedSnack(meal: PlannedMeal, target: DailyTargets): PlannedMeal {
+  const keptSides = (meal.sides ?? []).filter((s) => ADD_ON_NAMES.has(s.name) || !SNACK_PAIR_NAMES.has(s.name));
+  const unit = mealFoodNutrition({ ...meal, sides: undefined, portion: undefined, scale: 1 });
+  const extra = sidesNutrition(keptSides);
+  const units =
+    unit.calories > 0
+      ? Math.min(MAX_PACKAGED_UNITS, Math.max(1, Math.round((target.calories - extra.calories) / unit.calories)))
+      : 1;
+  const base = addNutrients(scaleNutrients(unit, units), extra);
+  let sides = keptSides;
+  let total = base;
+  if (base.calories < target.calories * PACKAGED_PAIR_BELOW) {
+    const pair = snackPairing(base, target);
+    if (pair) {
+      sides = [...keptSides, ...pair.sides];
+      total = addNutrients(base, pair.nutrition);
+    }
+  }
+  const multipliers = { protein: units, carb: units, fat: units, vegetable: units };
+  const kcalGap = Math.round(total.calories - target.calories);
+  return {
+    ...meal,
+    scale: 1,
+    sides: sides.length > 0 ? sides : undefined,
+    portion: { multipliers, target, kcalGap, fits: Math.abs(kcalGap) <= fitKcalTolerance(target) },
   };
 }
 
@@ -184,6 +247,8 @@ export function applyGoalPortions(
   daily: DailyTargets,
   opts: {
     timing?: MealTimingPreference | null;
+    /** Light / Normal / Large per meal (overrides timing). */
+    sizes?: MealSizes;
     lockedSlots?: Set<MealSlotId>;
     fixedSlots?: Set<MealSlotId>;
     /** Fixed add-ons per meal from a "next best step" Yes, sized in like sides. */
@@ -203,17 +268,26 @@ export function applyGoalPortions(
     opts.fixedSlots?.has(m.slot) ||
     (m.kept === true && m.portion != null);
   const drinks = drinkTotals(meals);
-  const packaged = new Map<MealSlotId, PlannedMeal>();
-  for (const m of meals) {
-    if (isPackagedRecipe(m.recipe) && !isFixed(m)) packaged.set(m.slot, sizeMealToTarget(m, daily));
-  }
-  const slots = meals.map((m): MealTargetSlot => {
-    if (isFixed(m) || packaged.has(m.slot)) {
-      return { slot: m.slot, kind: "fixed", nutrition: toTargets(mealFoodNutrition(packaged.get(m.slot) ?? m)) };
+  const split = { daily, drinks, timing: opts.timing, sizes: opts.sizes };
+  const slotFor = (m: PlannedMeal, packaged?: Map<MealSlotId, PlannedMeal>): MealTargetSlot => {
+    const pkg = packaged?.get(m.slot);
+    if (isFixed(m) || pkg) {
+      return { slot: m.slot, kind: "fixed", nutrition: toTargets(mealFoodNutrition(pkg ?? m)) };
     }
-    return { slot: m.slot, kind: "cooked" };
-  });
-  const targets = splitMealTargets({ daily, slots, drinks, timing: opts.timing });
+    return { slot: m.slot, kind: "cooked", daySize: m.daySize };
+  };
+  // Pass 1: packaged items share the day like cooked meals, then are sized to their share
+  // (whole units, maybe a pairing). Pass 2 counts them at what they came to.
+  const packaged = new Map<MealSlotId, PlannedMeal>();
+  if (meals.some((m) => isPackagedRecipe(m.recipe) && !isFixed(m))) {
+    const first = splitMealTargets({ ...split, slots: meals.map((m) => slotFor(m)) });
+    for (const m of meals) {
+      if (!isPackagedRecipe(m.recipe) || isFixed(m)) continue;
+      const t = first[m.slot];
+      packaged.set(m.slot, sizeMealToTarget(m, t ?? daily, { packagedSnackTarget: t }));
+    }
+  }
+  const targets = splitMealTargets({ ...split, slots: meals.map((m) => slotFor(m, packaged)) });
   return meals.map((m) => {
     if (isFixed(m)) return m;
     const pkg = packaged.get(m.slot);
@@ -231,6 +305,7 @@ export function samePortions(a: PlannedMeal[], b: PlannedMeal[]): boolean {
     if (m.slot !== o.slot || m.recipe.id !== o.recipe.id || m.scale !== o.scale) return false;
     return (
       m.generated === o.generated &&
+      m.daySize === o.daySize &&
       JSON.stringify(m.portion ?? null) === JSON.stringify(o.portion ?? null) &&
       JSON.stringify(m.sides ?? null) === JSON.stringify(o.sides ?? null)
     );

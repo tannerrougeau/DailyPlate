@@ -35,6 +35,7 @@ import {
   FAVORITE_FOOD_CHIPS,
   DISLIKED_FOOD_CHIPS,
 } from "@/utils/chipMatching";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 export type RefineCardValues = {
   favoriteChips: string[];
@@ -125,7 +126,7 @@ function CollapseCard({
     <section className="rounded-2xl border border-slate-200 bg-white">
       <button
         type="button"
-        onClick={onToggle}
+        onClick={(e) => keepInPlace(e.currentTarget, onToggle)}
         aria-expanded={open}
         className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left"
       >

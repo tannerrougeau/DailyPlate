@@ -17,6 +17,7 @@ import {
 import {
   isPackagedRecipe,
   mealIngredients,
+  dayHouseholdServings,
   mealMultipliers,
   mixedServingGrams,
   servingParts,
@@ -105,7 +106,7 @@ export function batchLines(days: Pick<BatchDay, "meal" | "householdMult">[]): Po
     const m = mealMultipliers(day.meal);
     for (const ing of mealIngredients(day.meal)) {
       const key = `${ing.name}::${ing.unit}`;
-      const raw = ing.quantity * multiplierForRole(m, ingredientRole(ing)) * day.householdMult;
+      const raw = ing.quantity * multiplierForRole(m, ingredientRole(ing)) * dayHouseholdServings(day.meal, day.householdMult);
       const hit = totals.get(key);
       if (hit) hit.raw += raw;
       else totals.set(key, { ing, raw });
@@ -169,11 +170,18 @@ function personServing(meal: PlannedMeal, multiplier: number): string {
   return servingParts(meal, multiplier).join(", ");
 }
 
+const isYou = (p: PersonPortion) => p.kind === "adult" && p.index === 1;
+
+/** "Size today" shrinks only your serving; everyone else keeps their normal amount. */
+function personMultiplier(meal: PlannedMeal, p: PersonPortion): number {
+  return !isYou(p) && meal.daySize ? p.multiplier / meal.daySize : p.multiplier;
+}
+
 function splitText(days: BatchDay[]): string {
   if (days.length === 1) {
     const d = days[0]!;
     return d.people
-      .map((p) => `${p.kind === "adult" && p.index === 1 ? "Your portion" : cap(personName(p, d.people))}: ${personServing(d.meal, p.multiplier)}`)
+      .map((p) => `${isYou(p) ? "Your portion" : cap(personName(p, d.people))}: ${personServing(d.meal, personMultiplier(d.meal, p))}`)
       .join(" · ");
   }
   // Several days: one container per person per day, grouped when the amount is the same.
@@ -181,7 +189,7 @@ function splitText(days: BatchDay[]): string {
   for (const d of days) {
     for (const p of d.people) {
       const who = personName(p, d.people);
-      const serving = personServing(d.meal, p.multiplier);
+      const serving = personServing(d.meal, personMultiplier(d.meal, p));
       const key = `${who}::${serving}`;
       const g = groups.get(key);
       if (g) g.count += 1;

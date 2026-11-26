@@ -59,6 +59,9 @@ export type MealSourceSlot = "breakfast" | "lunch" | "dinner";
 export type CookingAmount = "little" | "some" | "most";
 export type BudgetPreference = "tight" | "moderate" | "flexible";
 export type CookingLimit = "microwave_only" | "no_oven" | "short_time" | "little_chopping";
+/** Per-meal size: Light is about 0.6x the default share, Large about 1.4x. */
+export type MealSize = "light" | "normal" | "large";
+export type MealSizes = Partial<Record<MealSourceSlot, MealSize>>;
 
 export interface UserProfile {
   age: number;
@@ -88,6 +91,8 @@ export interface UserProfile {
   avoidedProteinSources?: string[];
   kitchenEquipment?: KitchenEquipmentId[];
   mealTiming: MealTimingPreference | null;
+  /** Light / Normal / Large per meal. Older saves use mealTiming (see effectiveMealSizes). */
+  mealSizes?: MealSizes;
   favoriteFoodChips: string[];
   dislikedFoodChips: string[];
   /** Comma-separated extra favorites matched against recipe text. */

@@ -32,7 +32,7 @@ import {
   passesEffortLimits,
   passesEquipmentLimits,
 } from "@/utils/recipeFit";
-import type { BudgetPreference, CookingLimit } from "@/types/profile";
+import type { BudgetPreference, CookingLimit, MealSizes } from "@/types/profile";
 import { isBeverageRecipe, mealMacrosWithBeverage } from "@/utils/beverages";
 
 export { isBeverageRecipe } from "@/utils/beverages";
@@ -49,7 +49,11 @@ function timingBoost(
   recipe: Recipe,
   slot: MealSlotId,
   timing: MealTimingPreference | null,
+  sizes: MealSizes | undefined,
 ): number {
+  const size = slot === "breakfast" || slot === "lunch" || slot === "dinner" ? sizes?.[slot] : undefined;
+  if (size === "light") return recipe.calories < 360 ? 22 : -8;
+  if (size === "large") return recipe.calories > 500 ? 22 : 4;
   if (!timing) return 0;
   if (timing === "light_breakfast" && slot === "breakfast") {
     return recipe.calories < 360 ? 22 : -8;
@@ -70,7 +74,7 @@ function recipeWeight(
   if (options.favoriteIds.includes(recipe.id)) w += 38;
   if (preppedBreakfast(recipe, slot, options)) w += 40;
   w += recipeFavoriteBoost(recipe, options.favoriteChips, options.favoriteCustom);
-  w += timingBoost(recipe, slot, options.mealTiming);
+  w += timingBoost(recipe, slot, options.mealTiming, options.mealSizes);
   if (options.prioritizeMinProtein) {
     w += proteinDensity(recipe) * 140;
     if (recipe.tags.includes("high_protein")) w += 24;
@@ -176,6 +180,8 @@ export interface GenerateOptions {
   favoriteCustom: string;
   slots: MealSlotId[];
   mealTiming: MealTimingPreference | null;
+  /** Light / Normal / Large per meal; Light prefers smaller recipes, Large bigger ones. */
+  mealSizes?: MealSizes;
   prioritizeMinProtein: boolean;
   minimumProteinGrams: number | null;
   /** When true, prefer simpler recipes and plan leftovers across the week. */

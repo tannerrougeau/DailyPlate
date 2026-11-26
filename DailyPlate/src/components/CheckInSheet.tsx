@@ -36,6 +36,7 @@ import {
   withPlanningDefaults,
 } from "@/utils/planningPrefs";
 import { goalLinkedProteinGrams, migrateProteinPreference } from "@/utils/proteinMinimum";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 type Screen = 1 | 2 | 3 | 4;
 type Phase = "form" | "results";
@@ -173,7 +174,14 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
     // Two at most; plan changes first, the rest stay queued. None in Basic mode or while paused.
     setQuestions(
       after.questionsAllowedNow()
-        ? nextQuestions(after.questionQueue, after.questionLog, now, MAX_IN_CHECK_IN, { planFirst: true })
+        ? nextQuestions(
+            // Setup questions open their own sheet on Today, so they aren't asked here.
+            after.questionQueue.filter((q) => q.change.kind !== "askTopic"),
+            after.questionLog,
+            now,
+            MAX_IN_CHECK_IN,
+            { planFirst: true },
+          )
         : [],
     );
     setPhase("results");
@@ -330,7 +338,7 @@ export function CheckInSheet({ onClose }: { onClose: () => void }) {
               <div className="rounded-2xl border border-slate-200 bg-white">
                 <button
                   type="button"
-                  onClick={() => setMoreOpen((o) => !o)}
+                  onClick={(e) => keepInPlace(e.currentTarget, () => setMoreOpen((o) => !o))}
                   aria-expanded={moreOpen}
                   className="flex w-full items-center justify-between px-4 py-3 text-left"
                 >

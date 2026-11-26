@@ -29,7 +29,9 @@ export type QuestionChange =
   | { kind: "favoriteFood"; food: string }
   | { kind: "unavoid"; chip?: string; token?: string; label: string }
   | { kind: "profile"; set: NextStepProfileFields; what: string }
-  | { kind: "openCheckIn" };
+  | { kind: "openCheckIn" }
+  /** A personalization question skipped in onboarding; Yes opens it on Today. */
+  | { kind: "askTopic"; topic: import("@/utils/personalizeTopics").PersonalizeTopic };
 
 export type Question = {
   /** Stable id: the same question is never queued twice. */
@@ -37,7 +39,7 @@ export type Question = {
   text: string;
   /** Saved with the checkpoint when answered Yes. */
   why: string;
-  source: "usage" | "check-in" | "taste" | "next-step";
+  source: "usage" | "check-in" | "taste" | "next-step" | "onboarding";
   change: QuestionChange;
   addedAt: string;
 };
@@ -432,6 +434,7 @@ export function applyChange(
     return { before: { profile: before }, after: { profile: { ...change.set } }, what: change.what };
   }
   if (change.kind === "openCheckIn") return { before: {}, after: {}, what: "Opened a check-in" };
+  if (change.kind === "askTopic") return { before: {}, after: {}, what: "Opened a question" };
   if (change.kind === "preferCuisine") {
     const was = current.preferredCuisines ?? [];
     return {

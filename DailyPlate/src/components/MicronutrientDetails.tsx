@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { MicronutrientHit } from "@/utils/micronutrients";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 export function MicronutrientDetails({ items }: { items: MicronutrientHit[] }) {
   const [open, setOpen] = useState(false);
@@ -9,7 +10,7 @@ export function MicronutrientDetails({ items }: { items: MicronutrientHit[] }) {
     <div className="mt-2">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => keepInPlace(e.currentTarget, () => setOpen((v) => !v))}
         aria-expanded={open}
         className="flex min-h-[36px] w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-left"
       >

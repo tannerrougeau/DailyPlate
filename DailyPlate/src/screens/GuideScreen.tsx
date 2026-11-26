@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown, Heart, Leaf, ShoppingBasket } from "lucide-react";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 function GuideAccordion({
   title,
@@ -16,7 +17,7 @@ function GuideAccordion({
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={(e) => keepInPlace(e.currentTarget, () => setOpen((o) => !o))}
         aria-expanded={open}
         className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left"
       >

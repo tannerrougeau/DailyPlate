@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { BeverageId, DailyTargets, DayMealTracking, MealSlotId, MealTrackingEntry, PlannedMeal, Recipe, RecipeIngredient, RecipeMealSlotId } from "@/types";
+import type { BeverageId, DailyTargets, DayMealTracking, DaySize, MealSlotId, MealTrackingEntry, PlannedMeal, Recipe, RecipeIngredient, RecipeMealSlotId } from "@/types";
 import type { UserProfile } from "@/types/profile";
 import { allRecipes, findRecipe } from "@/recipes/recipePool";
 import {
@@ -38,7 +38,14 @@ import {
   applyLowComplexityToPlans,
 } from "@/utils/lowComplexityPlan";
 import { applyGoalPortions, samePortions } from "@/utils/mealPortions";
-import { splitMealTargets } from "@/utils/mealTargets";
+import { effectiveMealSizes, splitMealTargets } from "@/utils/mealTargets";
+import {
+  applyTopic,
+  topicQuestions,
+  type PersonalizeDraft,
+  type PersonalizeTopic,
+  type TopicId,
+} from "@/utils/personalizeTopics";
 import { createPlannedMeal, resolveVariationId } from "@/utils/recipeDisplay";
 import {
   applySlotBeverageDefaults,
@@ -120,6 +127,59 @@ function mealsForDate(
 ): PlannedMeal[] {
   const raw = s.dailyPlans[dateKey] ?? (dateKey === s.todayDateKey ? s.plannedMeals : []);
   return raw.filter((m) => !m.recipe.tags.includes("beverage") && !m.recipe.id.startsWith("bev-"));
+}
+
+/** Entries in the Favorites lists that can be removed one by one. */
+export type PreferenceKind = "favoriteChip" | "favoriteCustom" | "avoidChip" | "avoidCustom" | "avoidProtein" | "cuisine";
+
+/**
+ * Meals still to come that use this recipe: today and later, not logged, not kept, and not on a
+ * locked meal or day. Used by "Replace it in your upcoming plan? (N days)".
+ */
+export function upcomingRecipeMeals(
+  s: Pick<AppState, "dailyPlans" | "plannedMeals" | "todayDateKey" | "mealTracking" | "lockedMeals" | "lockedDays">,
+  recipeId: string,
+): { dateKey: string; slot: MealSlotId }[] {
+  const keys = new Set(Object.keys(s.dailyPlans).filter((k) => k >= s.todayDateKey));
+  keys.add(s.todayDateKey);
+  const out: { dateKey: string; slot: MealSlotId }[] = [];
+  for (const dateKey of [...keys].sort()) {
+    if (s.lockedDays.includes(dateKey)) continue;
+    for (const m of mealsForDate(s, dateKey)) {
+      if (m.recipe.id !== recipeId || m.kept) continue;
+      if (s.mealTracking[dateKey]?.[m.slot]) continue;
+      if (isMealLocked(s.lockedMeals, dateKey, m.slot)) continue;
+      out.push({ dateKey, slot: m.slot });
+    }
+  }
+  return out;
+}
+
+function withoutToken(list: string | undefined, token: string): string {
+  const t = token.trim().toLowerCase();
+  return (list ?? "")
+    .split(/[,;\n]+/)
+    .map((x) => x.trim())
+    .filter((x) => x.length > 0 && x.toLowerCase() !== t)
+    .join(", ");
+}
+
+/** Profile with one Favorites-list entry removed. */
+export function profileWithoutPreference(p: UserProfile, kind: PreferenceKind, value: string): UserProfile {
+  switch (kind) {
+    case "favoriteChip":
+      return { ...p, favoriteFoodChips: p.favoriteFoodChips.filter((c) => c !== value) };
+    case "favoriteCustom":
+      return { ...p, favoriteFoodCustom: withoutToken(p.favoriteFoodCustom, value) };
+    case "avoidChip":
+      return { ...p, dislikedFoodChips: p.dislikedFoodChips.filter((c) => c !== value) };
+    case "avoidCustom":
+      return { ...p, dislikedFoodCustom: withoutToken(p.dislikedFoodCustom, value) };
+    case "avoidProtein":
+      return { ...p, avoidedProteinSources: (p.avoidedProteinSources ?? []).filter((c) => c !== value) };
+    case "cuisine":
+      return { ...p, preferredCuisines: (p.preferredCuisines ?? []).filter((c) => c !== value) };
+  }
 }
 
 function recipesFor(s: Pick<AppState, "userRecipes">): Recipe[] {
@@ -433,6 +493,7 @@ function buildGenerateOptions(
     favoriteCustom: s.userProfile.favoriteFoodCustom ?? "",
     slots: slotsForMealsPerDay(s.userProfile),
     mealTiming: s.userProfile.mealTiming,
+    mealSizes: effectiveMealSizes(s.userProfile),
     prioritizeMinProtein: s.userProfile.prioritizeMinProtein !== false,
     minimumProteinGrams,
     lowComplexity,
@@ -451,7 +512,7 @@ function buildGenerateOptions(
     slotTargets: splitMealTargets({
       daily: s.targets,
       slots: slotsForMealsPerDay(s.userProfile).map((slot) => ({ slot, kind: "cooked" as const })),
-      timing: s.userProfile.mealTiming,
+      sizes: effectiveMealSizes(s.userProfile),
     }),
   };
 }
@@ -587,6 +648,14 @@ export interface AppState {
   addUserRecipe: (recipe: Recipe) => void;
   toggleFavorite: (recipeId: string) => void;
   toggleDislike: (recipeId: string) => void;
+  /** Replace a recipe on today (if not eaten, kept or locked) and upcoming days. Returns days changed. */
+  replaceRecipeUpcoming: (recipeId: string) => number;
+  /** Queue onboarding questions that were skipped or not reached (none in Basic mode). */
+  queueTopicQuestions: (topics: PersonalizeTopic[]) => void;
+  /** Save one personalization answer (from a queued question on Today). */
+  applyTopicAnswer: (topic: TopicId, draft: PersonalizeDraft) => void;
+  /** Remove one entry from the Favorites lists; the next plan uses the change. */
+  removePreference: (kind: PreferenceKind, value: string) => void;
   regenerateSlot: (slot: PlannedMeal["slot"], dateKey?: string) => void;
   replaceMealSlot: (dateKey: string, slot: MealSlotId, recipeId: string) => void;
   removeMealSlot: (dateKey: string, slot: MealSlotId) => void;
@@ -603,6 +672,11 @@ export interface AppState {
   setMealBeverage: (dateKey: string, slot: PlannedMeal["slot"], beverageId: BeverageId) => void;
   /** Keep a meal that cannot fit its target: use the closest fit and stop showing the notice. */
   keepMeal: (dateKey: string, slot: MealSlotId) => void;
+  /**
+   * "Size today": this day's serving at 1/2 or 3/4 (null = normal). The removed calories move to the
+   * day's other open meals. Returns the previous size (for Undo), or undefined if there's no meal.
+   */
+  setMealDaySize: (dateKey: string, slot: MealSlotId, size: DaySize | null) => DaySize | null | undefined;
   addSnackLog: (dateKey: string, entry: MealTrackingEntry) => void;
   /** Count a usage event (details opened, Adjust used, meal cards shown). */
   recordUsage: (kind: UsageEvent["kind"], n?: number) => void;
@@ -1376,6 +1450,46 @@ export const useAppStore = create<AppState>()(
         void get().syncAccountSnapshot();
       },
 
+      replaceRecipeUpcoming: (recipeId) => {
+        const targets = upcomingRecipeMeals(get(), recipeId);
+        const changed = new Set<string>();
+        for (const { dateKey, slot } of targets) {
+          const before = mealsForDate(get(), dateKey).find((m) => m.slot === slot)?.recipe.id;
+          get().regenerateSlot(slot, dateKey);
+          const after = mealsForDate(get(), dateKey).find((m) => m.slot === slot)?.recipe.id;
+          if (before !== after) changed.add(dateKey);
+        }
+        return changed.size;
+      },
+
+      queueTopicQuestions: (topics) => {
+        const s = get();
+        if (topics.length === 0 || s.userProfile?.basicMode) return;
+        const now = new Date();
+        let queue = s.questionQueue;
+        for (const q of topicQuestions(topics, now)) queue = enqueue(queue, s.questionLog, q, now);
+        // Count setup as the last time questions were asked, so the first card waits the usual spacing.
+        set({ questionQueue: queue, lastQuestionAskedAt: now.toISOString() });
+      },
+
+      applyTopicAnswer: (topic, draft) => {
+        const profile = get().userProfile;
+        if (!profile) return;
+        const next = applyTopic(profile, topic, draft);
+        set({
+          userProfile: next,
+          ...(topic === "targets" ? { targets: applyProfileToTargets(next) } : {}),
+        });
+        void get().syncAccountSnapshot();
+      },
+
+      removePreference: (kind, value) => {
+        const profile = get().userProfile;
+        if (!profile) return;
+        set({ userProfile: profileWithoutPreference(profile, kind, value) });
+        void get().syncAccountSnapshot();
+      },
+
       setMealVariation: (dateKey, slot, variationId) => {
         const state = get();
         const meal = mealsForDate(state, dateKey).find((m) => m.slot === slot);
@@ -1557,7 +1671,7 @@ export const useAppStore = create<AppState>()(
         });
         if (answer !== "yes" || !question || !s.userProfile) return null;
         // "Open a check-in" changes nothing; the screen opens the check-in.
-        if (question.change.kind === "openCheckIn") return null;
+        if (question.change.kind === "openCheckIn" || question.change.kind === "askTopic") return null;
         const change = applyChange(
           {
             displayPrefs: resolveDisplayPrefs(s.displayPrefs),
@@ -1788,6 +1902,15 @@ export const useAppStore = create<AppState>()(
       keepMeal: (dateKey, slot) => {
         patchMealInDay(set, get, dateKey, slot, { kept: true });
         void get().syncAccountSnapshot();
+      },
+
+      setMealDaySize: (dateKey, slot, size) => {
+        const meal = mealsForDate(get(), dateKey).find((m) => m.slot === slot);
+        if (!meal) return undefined;
+        const previous = meal.daySize ?? null;
+        patchMealInDay(set, get, dateKey, slot, { daySize: size ?? undefined });
+        void get().syncAccountSnapshot();
+        return previous;
       },
 
       setWeighedBatch: (dateKey, slot, grams) => {
@@ -2278,7 +2401,7 @@ function portionedPlans(
   s: AppState,
 ): Pick<AppState, "dailyPlans" | "plannedMeals"> | null {
   if (!s.userProfile || !(s.targets.calories > 0)) return null;
-  const timing = s.userProfile.mealTiming;
+  const sizes = effectiveMealSizes(s.userProfile);
   const resize = (dateKey: string, meals: PlannedMeal[]) => {
     const lockedSlots = new Set(
       meals.filter((m) => isMealLocked(s.lockedMeals, dateKey, m.slot)).map((m) => m.slot),
@@ -2293,7 +2416,7 @@ function portionedPlans(
         })
         .map((m) => m.slot),
     );
-    return applyGoalPortions(meals, s.targets, { timing, lockedSlots, fixedSlots, addOns: s.userProfile?.slotAddOns });
+    return applyGoalPortions(meals, s.targets, { sizes, lockedSlots, fixedSlots, addOns: s.userProfile?.slotAddOns });
   };
   let dailyChanged = false;
   let todayChanged = false;

@@ -12,6 +12,7 @@ import { RecipeImage } from "@/components/RecipeImage";
 import { ReplaceMealSheet } from "@/components/ReplaceMealSheet";
 import type {
   BeverageId,
+  DaySize,
   CarbVariationId,
   FatVariationId,
   MealTrackingEntry,
@@ -40,6 +41,9 @@ import {
   mealDisplayName,
 } from "@/utils/recipeDisplay";
 import { useAppStore } from "@/store/useAppStore";
+import { isMealLocked } from "@/utils/mealLocks";
+import { keepInPlace } from "@/utils/scrollAnchor";
+import { DaySizeRow, daySizeText } from "@/components/DaySizeRow";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
 
@@ -52,6 +56,7 @@ export function TodayMealRow({
   onToggleExpand,
   onLog,
   onMealPrep,
+  onSized,
 }: {
   meal: PlannedMeal;
   dateKey: string;
@@ -61,6 +66,8 @@ export function TodayMealRow({
   onToggleExpand: () => void;
   onLog: (entry: MealTrackingEntry | null) => void;
   onMealPrep?: (recipe: PlannedMeal["recipe"], variationId?: string) => void;
+  /** After "Size today" changes: a message and how to undo it. */
+  onSized?: (message: string, undo: () => void) => void;
 }) {
   const { recipe, slot } = meal;
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,6 +107,19 @@ export function TodayMealRow({
   const setMealFatVariation = useAppStore((s) => s.setMealFatVariation);
   const setMealBeverage = useAppStore((s) => s.setMealBeverage);
   const keepMeal = useAppStore((s) => s.keepMeal);
+  const setMealDaySize = useAppStore((s) => s.setMealDaySize);
+  const mealLocked = useAppStore((s) => isMealLocked(s.lockedMeals, dateKey, slot));
+  // Eaten, kept or locked meals keep their amounts, so there's nothing to resize.
+  const canSizeToday = !trackingEntry && !meal.kept && !mealLocked;
+  function chooseDaySize(size: DaySize | null) {
+    const previous = setMealDaySize(dateKey, slot, size);
+    if (previous === undefined || previous === size) return;
+    const name = mealDisplayName(meal);
+    onSized?.(
+      size ? `${name}: ${daySizeText(size)} size today` : `${name}: normal size today`,
+      () => setMealDaySize(dateKey, slot, previous),
+    );
+  }
   const display = useDisplayPrefs();
   const recordUsage = useAppStore((s) => s.recordUsage);
   const addMealSides = useAppStore((s) => s.addMealSides);
@@ -185,7 +205,7 @@ export function TodayMealRow({
 
         <button
           type="button"
-          onClick={onToggleExpand}
+          onClick={(e) => keepInPlace(e.currentTarget, onToggleExpand)}
           className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
         >
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
@@ -276,6 +296,9 @@ export function TodayMealRow({
               With {meal.sides.map(sideLabel).join(" + ")}
             </p>
           ) : null}
+          {meal.daySize && (
+            <p className="mt-0.5 text-[11px] font-semibold text-[#2563EB]">{daySizeText(meal.daySize)} size today</p>
+          )}
           {servingLine && (
             <p className="mt-1.5 text-[11px] leading-snug text-slate-500">{servingLine}</p>
           )}
@@ -365,9 +388,9 @@ export function TodayMealRow({
           <button
             type="button"
             aria-expanded={detailsOpen}
-            onClick={() => {
+            onClick={(e) => {
               if (!detailsOpen) recordUsage("details");
-              setDetailsOpen((open) => !open);
+              keepInPlace(e.currentTarget, () => setDetailsOpen((open) => !open));
             }}
             className="mt-2 flex min-h-[40px] w-full items-center justify-between rounded-lg px-1 text-sm font-semibold text-primary"
           >
@@ -425,6 +448,8 @@ export function TodayMealRow({
             onAdjust={() => setAdjustOpen(true)}
             onSomethingElse={() => setElseOpen(true)}
             onBuyToday={isSourceSlot(slot) ? () => setSourceToday("buy") : undefined}
+            daySize={meal.daySize}
+            onDaySize={canSizeToday ? chooseDaySize : undefined}
           />,
           document.body,
         )}
@@ -471,8 +496,13 @@ function TodayLogMenu({
   onAdjust,
   onSomethingElse,
   onBuyToday,
+  daySize,
+  onDaySize,
 }: {
   mealName: string;
+  daySize?: DaySize;
+  /** Omitted when the meal is eaten, kept or locked. */
+  onDaySize?: (size: DaySize | null) => void;
   onClose: () => void;
   onSkip: () => void;
   onAdjust: () => void;
@@ -531,6 +561,7 @@ function TodayLogMenu({
               onClick={() => run(onBuyToday)}
             />
           )}
+          {onDaySize && <DaySizeRow value={daySize} onChoose={(size) => run(() => onDaySize(size))} />}
         </div>
         <button
           type="button"
