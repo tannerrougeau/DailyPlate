@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import type { FoodItem } from "@/utils/foodTypes";
@@ -10,28 +10,44 @@ import {
   type FoodSearchOutcome,
 } from "@/utils/foodSearch";
 import { recentSnacks } from "@/utils/snackItems";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 /**
  * Find a food by name: saved and recent foods first, then USDA and Open Food Facts (searched only
  * on submit), with manual entry from a label always available.
  */
-export function FoodSearchPanel({ onPick }: { onPick: (food: FoodItem) => void }) {
+export function FoodSearchPanel({
+  onPick,
+  initialQuery,
+  startWithManual,
+}: {
+  onPick: (food: FoodItem) => void;
+  /** Search this right away (scan suggestions, "Search instead"). */
+  initialQuery?: string;
+  /** Open "Enter from a label" right away. */
+  startWithManual?: boolean;
+}) {
   const myFoods = useAppStore((s) => s.myFoods);
   const snackLogs = useAppStore((s) => s.snackLogs);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [busy, setBusy] = useState(false);
   const [outcome, setOutcome] = useState<FoodSearchOutcome | null>(null);
-  const [manualOpen, setManualOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(Boolean(startWithManual));
 
-  async function submit() {
-    if (!query.trim()) return;
+  async function submit(q = query) {
+    if (!q.trim()) return;
     setBusy(true);
     try {
-      setOutcome(await searchFoods(query, { myFoods, recent: recentSnacks(snackLogs, 20) }));
+      setOutcome(await searchFoods(q, { myFoods, recent: recentSnacks(snackLogs, 20) }));
     } finally {
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (initialQuery?.trim()) void submit(initialQuery);
+    // Run once for the query the panel opened with.
+  }, []);
 
   const usda = outcome?.remote.filter((f) => f.source === "usda") ?? [];
   const off = outcome?.remote.filter((f) => f.source === "off") ?? [];
@@ -76,7 +92,7 @@ export function FoodSearchPanel({ onPick }: { onPick: (food: FoodItem) => void }
 
       <button
         type="button"
-        onClick={() => setManualOpen((o) => !o)}
+        onClick={(e) => keepInPlace(e.currentTarget, () => setManualOpen((o) => !o))}
         className="mt-3 text-xs font-semibold text-[#2563EB]"
         aria-expanded={manualOpen}
       >

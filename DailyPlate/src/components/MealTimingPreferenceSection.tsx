@@ -1,53 +1,75 @@
-import { useEffect } from "react";
 import type { RecipeMealSlotId } from "@/types";
-import type { MealTimingPreference } from "@/types/profile";
-import { isMealTimingAllowed } from "@/utils/planningPrefs";
+import type { MealSize, MealSizes, MealSourceSlot } from "@/types/profile";
 
-export const MEAL_TIMING_OPTIONS: { id: MealTimingPreference; label: string; hint: string }[] = [
-  { id: "light_breakfast", label: "Light breakfast", hint: "Smaller AM meals, calories later" },
-  { id: "balanced", label: "Balanced", hint: "Even distribution across the day" },
-  { id: "bigger_dinner", label: "Bigger dinner", hint: "More calories in the evening" },
+const SIZE_OPTIONS: { id: MealSize; label: string }[] = [
+  { id: "light", label: "Light" },
+  { id: "normal", label: "Normal" },
+  { id: "large", label: "Large" },
 ];
 
-export function MealTimingPreferenceSection({
+const MEALS: MealSourceSlot[] = ["breakfast", "lunch", "dinner"];
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Normal is the default, so it isn't stored. */
+export function setMealSize(sizes: MealSizes, slot: MealSourceSlot, size: MealSize): MealSizes {
+  const next = { ...sizes };
+  if (size === "normal") delete next[slot];
+  else next[slot] = size;
+  return next;
+}
+
+/**
+ * Light / Normal / Large for each meal you eat. Light is about 0.6x the usual share and Large about
+ * 1.4x; the difference moves to your other meals (and snacks, when a meal is skipped).
+ */
+export function MealSizesSection({
   value,
   onChange,
   eatenMeals,
+  hideTitle = false,
 }: {
-  value: MealTimingPreference | null;
-  onChange: (value: MealTimingPreference | null) => void;
+  value: MealSizes;
+  onChange: (value: MealSizes) => void;
   eatenMeals: RecipeMealSlotId[];
+  hideTitle?: boolean;
 }) {
-  const options = MEAL_TIMING_OPTIONS.filter((o) => isMealTimingAllowed(o.id, eatenMeals));
-
-  useEffect(() => {
-    if (!isMealTimingAllowed(value, eatenMeals)) onChange(null);
-  }, [value, eatenMeals, onChange]);
-
+  const meals = MEALS.filter((m) => eatenMeals.includes(m));
   return (
     <section className="space-y-3">
-      <div>
-        <h3 className="text-base font-semibold text-slate-900">Meal timing</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Where you prefer calories across the meals you eat.
-        </p>
-      </div>
-      <div className="flex flex-col gap-2">
-        {options.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChange(value === o.id ? null : o.id)}
-            className={`rounded-2xl border-2 px-4 py-3 text-left transition-colors ${
-              value === o.id
-                ? "border-primary bg-primary/5 text-primary"
-                : "border-slate-200 bg-white text-slate-800 hover:border-slate-300"
-            }`}
-          >
-            <span className="block text-sm font-semibold">{o.label}</span>
-            <span className="mt-0.5 block text-xs text-slate-500">{o.hint}</span>
-          </button>
-        ))}
+      {!hideTitle && (
+        <div>
+          <h3 className="text-base font-semibold text-slate-900">Meal sizes</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Light meals are smaller; the rest of the day moves to your other meals.
+          </p>
+        </div>
+      )}
+      <div className="space-y-2.5">
+        {meals.map((slot) => {
+          const current = value[slot] ?? "normal";
+          return (
+            <div key={slot} className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold text-slate-800">{cap(slot)}</span>
+              <div className="flex gap-1.5" role="group" aria-label={`${cap(slot)} size`}>
+                {SIZE_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    aria-pressed={current === o.id}
+                    onClick={() => onChange(setMealSize(value, slot, o.id))}
+                    className={`min-h-[40px] rounded-xl border-2 px-3 text-sm font-semibold ${
+                      current === o.id
+                        ? "border-[#2563EB] bg-blue-50 text-blue-900"
+                        : "border-slate-200 bg-white text-slate-700"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </section>
   );

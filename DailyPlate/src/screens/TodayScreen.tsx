@@ -3,8 +3,10 @@ import { Plus, X } from "lucide-react";
 import { AddSnackSheet } from "@/components/AddSnackSheet";
 import { MealPrepSheet } from "@/components/MealPrepSheet";
 import type { MealSlotId, MealTrackingEntry, Recipe } from "@/types";
-import { FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
+import { CHECK_IN_OPTIONAL_NOTE, FeedbackCheckInButton } from "@/components/FeedbackCheckIn";
 import { CheckInSheet } from "@/components/CheckInSheet";
+import { PersonalizeTopicSheet } from "@/components/PersonalizeTopicSheet";
+import type { PersonalizeTopic } from "@/utils/personalizeTopics";
 import { SettingsSheet } from "@/components/SettingsSheet";
 import { SmartAdjustmentBadge } from "@/components/SmartAdjustmentBadge";
 import { TodayHeader } from "@/components/TodayHeader";
@@ -15,6 +17,7 @@ import { UsageNote } from "@/components/UsageNote";
 import { PersonalizationInsightBanner } from "@/components/PersonalizationInsightBanner";
 import { useAppStore } from "@/store/useAppStore";
 import { slotsForMealsPerDay } from "@/utils/generateDayPlan";
+import { effectiveMealSizes, mealShareNote } from "@/utils/mealTargets";
 import { fromDateKey } from "@/utils/date";
 import {
   countsFromOverride,
@@ -25,7 +28,7 @@ import { mealsForDateKey, sumTrackedMacros, trackingLabel } from "@/utils/mealTr
 import { remainingToday } from "@/utils/snackItems";
 import { QuestionCard } from "@/components/QuestionCard";
 import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
-import { canAskOnOpen, MAX_ON_OPEN, nextQuestions, type Question } from "@/utils/questionQueue";
+import { canAskOnOpen, MAX_ON_OPEN, nextQuestions, questionsAllowed, type Question } from "@/utils/questionQueue";
 
 const fallbackOrder: MealSlotId[] = ["breakfast", "lunch", "dinner", "snack", "snack_2", "snack_3"];
 
@@ -42,7 +45,7 @@ type UndoState = {
 };
 
 const REGENERATE_CONFIRM =
-  "Replace today's meals? This also updates today on your plan, calendar and grocery list. Meals you kept or marked eaten won't change.";
+  "Regenerate today's meals? This changes today's plan and your grocery list. Meals you kept or marked eaten stay the same.";
 
 export function TodayScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -53,6 +56,7 @@ export function TodayScreen() {
     null,
   );
   const [snackOpen, setSnackOpen] = useState(false);
+  const [topicOpen, setTopicOpen] = useState<PersonalizeTopic | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
   const display = useDisplayPrefs();
   const recordUsage = useAppStore((s) => s.recordUsage);
@@ -84,6 +88,10 @@ export function TodayScreen() {
   const personalizationInsight = useAppStore((s) => s.personalizationInsight);
   const dismissPersonalizationInsight = useAppStore((s) => s.dismissPersonalizationInsight);
 
+  const shareNote = userProfile
+    ? mealShareNote(slotsForMealsPerDay(userProfile), effectiveMealSizes(userProfile))
+    : null;
+
   const slotOrder = userProfile
     ? slotsForMealsPerDay(userProfile)
     : [...fallbackOrder];
@@ -113,14 +121,17 @@ export function TodayScreen() {
   const resolvedExpanded: MealSlotId | null =
     expandedSlot === "init" ? nextUnlogged : expandedSlot;
   const checkInRecent = isRecentCheckIn(userProfile?.lastCheckInAt);
-  const checkInDue = !checkInRecent;
+  // Basic mode and paused questions: no suggestions and no check-in reminder.
+  const suggestionsOn = userProfile ? questionsAllowed(userProfile, new Date()) : false;
+  const checkInDue = !checkInRecent && suggestionsOn;
 
   // App open: count the meal cards shown, then maybe ask one question (3-day spacing).
   useEffect(() => {
     recordUsage("cards", mealsForViewDate.length);
     refreshQuestions();
     const s = useAppStore.getState();
-    if (!canAskOnOpen(s.lastQuestionAskedAt, new Date())) return;
+    if (!s.questionsAllowedNow()) return;
+    if (!canAskOnOpen(s.lastQuestionAskedAt, new Date(), s.questionSkipStreak)) return;
     setQuestion(nextQuestions(s.questionQueue, s.questionLog, new Date(), MAX_ON_OPEN)[0] ?? null);
     // Once per visit to Today.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +149,10 @@ export function TodayScreen() {
   function handleAnswer(q: Question, answer: Parameters<typeof answerQuestion>[1]) {
     setQuestion(null);
     const cp = answerQuestion(q.id, answer);
+    // "Open a check-in?" changes nothing by itself; Yes opens the check-in.
+    if (answer === "yes" && q.change.kind === "openCheckIn") setFeedbackOpen(true);
+    // A question skipped in onboarding: Yes opens that question here.
+    if (answer === "yes" && q.change.kind === "askTopic") setTopicOpen(q.change.topic);
     if (cp) {
       showUndo({ message: `${cp.what}.`, undo: () => restoreCheckpoint(cp.id) }, 10000);
     }
@@ -211,7 +226,6 @@ export function TodayScreen() {
         householdChip={householdChip}
         onHousehold={() => setHouseholdSheetOpen(true)}
         onSettings={() => setSettingsOpen(true)}
-        onRegenerate={() => setConfirmRegenerate(true)}
       />
 
       {!todayNoteDismissed && (
@@ -225,11 +239,15 @@ export function TodayScreen() {
 
       {question && (
         <div className="section-gap">
-          <QuestionCard question={question} onAnswer={(a) => handleAnswer(question, a)} />
+          <QuestionCard
+            question={question}
+            onAnswer={(a) => handleAnswer(question, a)}
+            onPaused={() => setQuestion(null)}
+          />
         </div>
       )}
 
-      {display.insightBanners && checkInRecent && (
+      {display.insightBanners && suggestionsOn && checkInRecent && (
         <div className="section-gap flex justify-center">
           <SmartAdjustmentBadge variant="success">
             Adjusted based on your recent check-in
@@ -237,15 +255,94 @@ export function TodayScreen() {
         </div>
       )}
 
-      {display.insightBanners && personalizationInsight && (
+      {display.insightBanners && suggestionsOn && personalizationInsight && (
         <PersonalizationInsightBanner
           message={personalizationInsight.message}
           onDismiss={dismissPersonalizationInsight}
         />
       )}
 
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
+      <aside className="lg:sticky lg:top-4 lg:order-2">
+        <div className="section-gap">
+          <TodayProgressCard targets={targets} eaten={eaten} />
+        </div>
+        <div className="section-gap flex flex-col items-center gap-1">
+          <FeedbackCheckInButton due={checkInDue} onOpen={() => setFeedbackOpen(true)} />
+          <p className="max-w-xs text-center text-[11px] leading-snug text-slate-400">{CHECK_IN_OPTIONAL_NOTE}</p>
+        </div>
+      </aside>
+
+      <div className="lg:order-1">
+      <section aria-label="Today's meals" className="section-gap space-y-3">
+        <div className="flex items-baseline justify-between gap-2 px-1">
+          <h2 className="text-lg font-bold text-slate-900">Meals</h2>
+          {sortedMeals.length > 0 && (
+            <p className="text-xs text-slate-400">
+              {loggedCount > 0
+                ? `${loggedCount}/${sortedMeals.length} logged`
+                : "Tap the circle to log"}
+            </p>
+          )}
+        </div>
+
+        {shareNote && sortedMeals.length > 0 && (
+          <p className="px-1 text-xs leading-snug text-slate-500">{shareNote}</p>
+        )}
+
+        {sortedMeals.length === 0 ? (
+          <div className="card-surface px-6 py-14 text-center">
+            <p className="text-base leading-relaxed text-slate-500">
+              No meals yet. Tap Regenerate today below.
+            </p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {sortedMeals.map((meal) => (
+              <li key={meal.slot}>
+                <TodayMealRow
+                  meal={meal}
+                  dateKey={todayDateKey}
+                  expanded={resolvedExpanded === meal.slot}
+                  upNext={nextUnlogged === meal.slot}
+                  trackingEntry={dayTracking?.[meal.slot]}
+                  onToggleExpand={() =>
+                    setExpandedSlot((current) => {
+                      const open = current === "init" ? nextUnlogged : current;
+                      return open === meal.slot ? null : meal.slot;
+                    })
+                  }
+                  onLog={(entry) => handleLog(meal.slot, entry, entry?.status === "all")}
+                  onMealPrep={(recipe, variationId) => setMealPrep({ recipe, variationId })}
+                  onSized={(message, undoSize) => showUndo({ message, undo: undoSize }, 8000)}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Under the meals so both are visible on a phone without scrolling past the day. */}
+        <button
+          type="button"
+          onClick={() => setSnackOpen(true)}
+          className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-[#2563EB] shadow-sm"
+        >
+          <Plus className="h-4 w-4" aria-hidden />
+          Add snack
+        </button>
+        {!confirmRegenerate && (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setConfirmRegenerate(true)}
+              className="min-h-[36px] px-2 text-sm font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
+            >
+              ↻ Regenerate today
+            </button>
+          </div>
+        )}
       {confirmRegenerate && (
-        <div className="section-gap rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
           <p className="text-sm font-medium leading-relaxed text-slate-800">{REGENERATE_CONFIRM}</p>
           <div className="mt-3 flex justify-end gap-2">
             <button
@@ -268,70 +365,6 @@ export function TodayScreen() {
           </div>
         </div>
       )}
-
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
-      <aside className="lg:sticky lg:top-4 lg:order-2">
-        <div className="section-gap">
-          <TodayProgressCard targets={targets} eaten={eaten} />
-        </div>
-        <div className="section-gap">
-          <button
-            type="button"
-            onClick={() => setSnackOpen(true)}
-            className="flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white text-sm font-semibold text-[#2563EB] shadow-sm"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            Add snack
-          </button>
-        </div>
-        <div className="section-gap flex justify-center">
-          <FeedbackCheckInButton due={checkInDue} onOpen={() => setFeedbackOpen(true)} />
-        </div>
-      </aside>
-
-      <div className="lg:order-1">
-      <section aria-label="Today's meals" className="section-gap space-y-3">
-        <div className="flex items-baseline justify-between gap-2 px-1">
-          <h2 className="text-lg font-bold text-slate-900">Meals</h2>
-          {sortedMeals.length > 0 && (
-            <p className="text-xs text-slate-400">
-              {loggedCount > 0
-                ? `${loggedCount}/${sortedMeals.length} logged`
-                : "Tap the circle to log"}
-            </p>
-          )}
-        </div>
-
-        {sortedMeals.length === 0 ? (
-          <div className="card-surface px-6 py-14 text-center">
-            <p className="text-base leading-relaxed text-slate-500">
-              No meals yet — open{" "}
-              <span className="font-semibold text-primary">⋯</span> and tap Regenerate today.
-            </p>
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {sortedMeals.map((meal) => (
-              <li key={meal.slot}>
-                <TodayMealRow
-                  meal={meal}
-                  dateKey={todayDateKey}
-                  expanded={resolvedExpanded === meal.slot}
-                  upNext={nextUnlogged === meal.slot}
-                  trackingEntry={dayTracking?.[meal.slot]}
-                  onToggleExpand={() =>
-                    setExpandedSlot((current) => {
-                      const open = current === "init" ? nextUnlogged : current;
-                      return open === meal.slot ? null : meal.slot;
-                    })
-                  }
-                  onLog={(entry) => handleLog(meal.slot, entry, entry?.status === "all")}
-                  onMealPrep={(recipe, variationId) => setMealPrep({ recipe, variationId })}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       {todaySnacks.length > 0 && (
@@ -364,6 +397,7 @@ export function TodayScreen() {
 
       {settingsOpen && <SettingsSheet onClose={() => setSettingsOpen(false)} />}
       {feedbackOpen && <CheckInSheet onClose={() => setFeedbackOpen(false)} />}
+      {topicOpen && <PersonalizeTopicSheet topic={topicOpen} onClose={() => setTopicOpen(null)} />}
       {householdSheetOpen && (
         <TodayHouseholdSheet
           profile={userProfile}

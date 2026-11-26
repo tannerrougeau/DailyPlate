@@ -1,4 +1,4 @@
-import type { Recipe, RecipeVariationDetail } from "@/types";
+import type { RecipeSource, RecipeVariationDetail } from "@/types";
 
 const overnightOatsVariations: RecipeVariationDetail[] = [
   {
@@ -15,7 +15,6 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Top with extra blueberries when serving if desired.",
     ],
     servingWeightGrams: 420,
-    fiber: 11,
   },
   {
     id: "chocolate-banana-nut",
@@ -35,7 +34,6 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Stir before eating so chocolate melts slightly into the oats.",
     ],
     servingWeightGrams: 435,
-    fiber: 12,
   },
   {
     id: "cinnamon-maple",
@@ -51,7 +49,6 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Stir well before eating.",
     ],
     servingWeightGrams: 415,
-    fiber: 10,
   },
   {
     id: "apple-pecan",
@@ -67,7 +64,6 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Best after chilling overnight so apples soften slightly.",
     ],
     servingWeightGrams: 425,
-    fiber: 13,
   },
   {
     id: "strawberry",
@@ -86,7 +82,6 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Top with extra strawberry pieces when serving if desired.",
     ],
     servingWeightGrams: 415,
-    fiber: 11,
   },
   {
     id: "coconut-chocolate-banana",
@@ -102,7 +97,6 @@ const overnightOatsVariations: RecipeVariationDetail[] = [
       "Stir before eating so coconut and chocolate distribute evenly.",
     ],
     servingWeightGrams: 430,
-    fiber: 13,
   },
 ];
 
@@ -126,11 +120,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Add 1 scoop whey protein powder to a shaker or glass.",
       "Pour in 1 cup cold water and shake or stir until dissolved.",
     ],
-    calories: 118,
-    protein: 23,
-    carbs: 3,
-    fat: 2,
-    fiber: 0,
     servingWeightGrams: 270,
     mealSlots: ["breakfast", "snack"],
     mealPrep: false,
@@ -162,11 +151,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Blend until completely smooth (60–90 seconds).",
       "Pour and drink, or freeze as a pack (see meal prep).",
     ],
-    calories: 266,
-    protein: 36,
-    carbs: 20,
-    fat: 6,
-    fiber: 2,
     servingWeightGrams: 350,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
@@ -184,11 +168,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Blend the banana base with strawberries and the extra whey until smooth and pink.",
       "Top with fresh strawberry slices if serving immediately.",
     ],
-    calories: 351,
-    protein: 47,
-    carbs: 28,
-    fat: 7,
-    fiber: 3,
     servingWeightGrams: 355,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
@@ -205,11 +184,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Blend the banana base with blueberries until smooth and lavender-purple.",
       "Top with whole blueberries if serving immediately.",
     ],
-    calories: 310,
-    protein: 36,
-    carbs: 31,
-    fat: 6,
-    fiber: 3,
     servingWeightGrams: 350,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
@@ -230,11 +204,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Stir in chocolate chips after blending (or pulse once) so they stay chunky.",
     ],
     servingWeightGrams: 365,
-    calories: 491,
-    protein: 52,
-    carbs: 34,
-    fat: 20,
-    fiber: 3,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
   },
@@ -250,11 +219,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Blend the banana base with cherries or mixed berries until completely smooth.",
       "Top with extra cherries if serving immediately.",
     ],
-    calories: 301,
-    protein: 36,
-    carbs: 28,
-    fat: 6,
-    fiber: 3,
     servingWeightGrams: 350,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
@@ -273,11 +237,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Add pineapple if using for extra sweetness without added sugar.",
     ],
     servingWeightGrams: 345,
-    calories: 294,
-    protein: 37,
-    carbs: 26,
-    fat: 6,
-    fiber: 3,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
   },
@@ -294,11 +253,6 @@ const smoothieVariations: RecipeVariationDetail[] = [
       "Blend the banana base with mango and lime until bright yellow-orange and silky.",
       "Top with fresh mango cubes if serving immediately.",
     ],
-    calories: 318,
-    protein: 37,
-    carbs: 33,
-    fat: 6,
-    fiber: 3,
     servingWeightGrams: 355,
     mealSlots: ["breakfast", "snack"],
     mealPrep: true,
@@ -389,7 +343,7 @@ const eggBiteVariations: RecipeVariationDetail[] = [
   },
 ];
 
-export const highProteinOvernightOats: Recipe = {
+export const highProteinOvernightOats: RecipeSource = {
   id: "high-protein-overnight-oats-54",
   number: 28,
   name: "High Protein Overnight Oats",
@@ -397,11 +351,6 @@ export const highProteinOvernightOats: Recipe = {
   cuisine: "american",
   tags: ["high_protein", "meal_prep", "breakfast_friendly", "batch_friendly"],
   mealSlots: ["breakfast", "snack"],
-  calories: 385,
-  protein: 32,
-  carbs: 42,
-  fat: 10,
-  fiber: 10,
   prepMinutes: 10,
   cookMinutes: 0,
   servingWeightGrams: 415,
@@ -427,7 +376,7 @@ export const highProteinOvernightOats: Recipe = {
     "Keeps 4 days refrigerated in sealed jars. Do not freeze (texture breaks). Stir and add fresh fruit when serving if desired.",
 };
 
-export const highProteinSmoothie: Recipe = {
+export const highProteinSmoothie: RecipeSource = {
   id: "high-protein-smoothie-55",
   number: 29,
   name: "Protein Drink",
@@ -437,11 +386,6 @@ export const highProteinSmoothie: Recipe = {
   tags: ["high_protein", "quick", "breakfast_friendly"],
   // Snack or drink alongside a meal (see BEVERAGES), not a main meal by itself.
   mealSlots: ["snack"],
-  calories: 118,
-  protein: 23,
-  carbs: 3,
-  fat: 2,
-  fiber: 0,
   prepMinutes: 2,
   cookMinutes: 0,
   servingWeightGrams: 270,

@@ -1,15 +1,20 @@
 import type { MealSlotId, Recipe, RecipeMealSlotId, RecipeVariationDetail } from "@/types";
 import { customTokens, DISLIKE_MATCHERS, mergeFoodAvoidLists } from "@/utils/chipMatching";
 import { isSnackPlanSlot, recipeSlotForPlanSlot } from "@/utils/planningPrefs";
-import type { UserProfile } from "@/types/profile";
+import type { BudgetPreference, UserProfile } from "@/types/profile";
+import { resolveRecipeMacros } from "@/utils/recipeDisplay";
+import { buildCost } from "@/utils/recipeFit";
 
 function defaultVariationId(recipe: Recipe): string | undefined {
   return recipe.variationDetails?.[0]?.id;
 }
 
 function variationCalories(recipe: Recipe, variation: RecipeVariationDetail): number {
-  return variation.calories ?? recipe.calories;
+  return resolveRecipeMacros(recipe, variation.id).calories;
 }
+
+/** With a Tight or Moderate budget, keep builds within this multiple of the cheapest one. */
+const BUDGET_SPREAD: Record<BudgetPreference, number> = { tight: 1.5, moderate: 2.5, flexible: Infinity };
 
 const PEANUT_RE = /\bpeanuts?\b|peanut butter/i;
 const TREE_NUT_RE =
@@ -130,6 +135,7 @@ export function pickPreferredVariationId(
   chips: string[],
   custom = "",
   snackStyle?: "packaged" | "whole_food" | "both" | null,
+  budget?: BudgetPreference | null,
 ): string | undefined {
   const details = recipe.variationDetails ?? [];
   if (details.length === 0) return undefined;
@@ -148,6 +154,13 @@ export function pickPreferredVariationId(
   } else if (snackStyle === "whole_food") {
     const homemade = pool.filter((v) => !isPackagedVariation(v));
     if (homemade.length) pool = homemade;
+  }
+
+  // Each variation is scored by its own cost: a budget keeps the cheaper builds.
+  if (budget && budget !== "flexible" && pool.length > 1) {
+    const cheapest = Math.min(...pool.map((v) => buildCost(recipe, v.id)));
+    const affordable = pool.filter((v) => buildCost(recipe, v.id) <= cheapest * BUDGET_SPREAD[budget]);
+    if (affordable.length) pool = affordable;
   }
 
   if (isSnackPlanSlot(slot) && pool.length > 1) {

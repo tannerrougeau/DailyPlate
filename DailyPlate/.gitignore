@@ -5,3 +5,6 @@ dist
 .env
 .env.*
 !.env.example
+
+# Sample photos for npm run scan:smoke (kept local)
+scripts/scan-samples/

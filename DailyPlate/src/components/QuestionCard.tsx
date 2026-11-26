@@ -1,12 +1,16 @@
+import { PauseQuestionsLink } from "@/components/PauseQuestionsLink";
 import type { Question, QuestionAnswer } from "@/utils/questionQueue";
 
 /** One short question: Yes / Not now / No. Nothing changes without a Yes. */
 export function QuestionCard({
   question,
   onAnswer,
+  onPaused,
 }: {
   question: Question;
   onAnswer: (answer: QuestionAnswer) => void;
+  /** Called after the user pauses questions from this card. */
+  onPaused?: () => void;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm" role="group" aria-label="Quick question">
@@ -35,6 +39,7 @@ export function QuestionCard({
           No
         </button>
       </div>
+      <PauseQuestionsLink onPaused={onPaused} />
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { useAppStore } from "@/store/useAppStore";
 import { BUILD_INFO } from "@/utils/buildInfo";
+import { countCorrections, downloadCorrections } from "@/utils/scan/corrections";
 
 /** Clear the service worker and its caches, then reload so the newest build loads. */
 async function forceAppUpdate() {
@@ -29,6 +30,11 @@ export function DevPanel({ onClose }: { onClose: () => void }) {
   const devResetQuestionTimers = useAppStore((s) => s.devResetQuestionTimers);
   const refreshQuestions = useAppStore((s) => s.refreshQuestions);
   const [note, setNote] = useState<string | null>(null);
+  const [scanCount, setScanCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    void countCorrections().then(setScanCount);
+  }, []);
 
   const button = "min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3 text-left text-sm font-semibold text-slate-800";
 
@@ -89,6 +95,18 @@ export function DevPanel({ onClose }: { onClose: () => void }) {
           </button>
           <button type="button" className={button} onClick={() => void forceAppUpdate()}>
             Force an app update
+          </button>
+          <button
+            type="button"
+            className={button}
+            disabled={!scanCount}
+            onClick={() =>
+              void downloadCorrections()
+                .then((n) => setNote(`Exported ${n} scan correction${n === 1 ? "" : "s"} (photos + scan-corrections.json).`))
+                .catch(() => setNote("Export failed."))
+            }
+          >
+            Export scan corrections ({scanCount ?? "…"})
           </button>
         </div>
         {note && <p className="mt-2 text-xs text-slate-600">{note}</p>}

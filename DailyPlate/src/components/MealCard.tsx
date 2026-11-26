@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { BudgetFriendlyTag } from "@/components/BudgetFriendlyTag";
+import { isBudgetFriendly } from "@/utils/recipeFit";
 import { createPortal } from "react-dom";
 import {
   ChefHat,
@@ -10,6 +12,8 @@ import {
   ThumbsDown,
 } from "lucide-react";
 import { MealActionsMenu } from "@/components/MealActionsMenu";
+import { daySizeText } from "@/components/DaySizeRow";
+import { UndoToast } from "@/components/TodayMealRow";
 import { ReplaceMealSheet } from "@/components/ReplaceMealSheet";
 import { RecipeDetailsBody } from "@/components/RecipeDetailsBody";
 import { RecipeImage } from "@/components/RecipeImage";
@@ -44,6 +48,7 @@ import { variationIsMealPrep } from "@/utils/mealPrep";
 import { isLowComplexityLeftover, isMealPrepBatchBadge } from "@/utils/mealPrepDisplay";
 
 import { SLOT_LABELS } from "@/utils/planningPrefs";
+import { keepInPlace } from "@/utils/scrollAnchor";
 
 const slotLabel = SLOT_LABELS;
 
@@ -94,6 +99,13 @@ export function MealCard({
   const { recipe, slot } = meal;
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sizeUndo, setSizeUndo] = useState<{ message: string; undo: () => void } | null>(null);
+  const setMealDaySize = useAppStore((s) => s.setMealDaySize);
+  useEffect(() => {
+    if (!sizeUndo) return;
+    const t = window.setTimeout(() => setSizeUndo(null), 8000);
+    return () => window.clearTimeout(t);
+  }, [sizeUndo]);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [swapFromNotice, setSwapFromNotice] = useState(false);
   const [variationId, setVariationId] = useState(() => effectiveVariationId(meal));
@@ -205,7 +217,14 @@ export function MealCard({
         fiber={fiber}
         servingLine={servingLine}
         portionLine={serving?.text ?? null}
-        sidesLine={meal.sides?.length ? `With ${meal.sides.map(sideLabel).join(" + ")}` : null}
+        sidesLine={
+          [
+            meal.sides?.length ? `With ${meal.sides.map(sideLabel).join(" + ")}` : null,
+            meal.daySize ? `${daySizeText(meal.daySize)} size this day` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ") || null
+        }
         onPortionTap={() => setDetailsOpen(true)}
         beverageId={resolveBeverage(meal.beverageId).id}
         onBeverageChange={(id) => setMealBeverage(effectiveDateKey, slot, id)}
@@ -358,7 +377,7 @@ export function MealCard({
             type="button"
             aria-expanded={detailsOpen}
             aria-controls={`meal-details-${slot}`}
-            onClick={() => setDetailsOpen((open) => !open)}
+            onClick={(e) => keepInPlace(e.currentTarget, () => setDetailsOpen((open) => !open))}
             className="flex min-h-[44px] w-full items-center justify-between border-t border-slate-100 px-4 py-2.5 text-left text-sm font-semibold text-primary transition-colors hover:bg-slate-50/80"
           >
             <span>Recipe/Prep details</span>
@@ -432,6 +451,33 @@ export function MealCard({
             onDetails={
               inlineDetailsDropdown ? undefined : () => setDetailsOpen(true)
             }
+            onDaySize={
+              // Eaten, kept or locked meals (and past or locked days) keep their amounts.
+              actionsDisabled || mealLocked || trackingEntry || meal.kept
+                ? undefined
+                : (size) => {
+                    const previous = setMealDaySize(effectiveDateKey, slot, size);
+                    if (previous === undefined || previous === size) return;
+                    const name = mealDisplayName(meal);
+                    setSizeUndo({
+                      message: size ? `${name}: ${daySizeText(size)} size this day` : `${name}: normal size this day`,
+                      undo: () => setMealDaySize(effectiveDateKey, slot, previous),
+                    });
+                  }
+            }
+          />,
+          document.body,
+        )}
+
+      {sizeUndo &&
+        createPortal(
+          <UndoToast
+            message={sizeUndo.message}
+            onUndo={() => {
+              sizeUndo.undo();
+              setSizeUndo(null);
+            }}
+            onDismiss={() => setSizeUndo(null)}
           />,
           document.body,
         )}
@@ -530,7 +576,10 @@ function MealCardMainContent({
       >
         {mealDisplayName(meal)}
       </h3>
-      <p className="mt-0.5 line-clamp-1 text-xs capitalize text-slate-400">{tagLine(recipe)}</p>
+      <p className="mt-0.5 line-clamp-1 text-xs capitalize text-slate-400">
+        {tagLine(recipe)}
+        {isBudgetFriendly(recipe, effectiveVariationId(meal)) && <BudgetFriendlyTag />}
+      </p>
       <MealMacroLine
         compact
         kcal={kcal}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 import { X } from "lucide-react";
 import { AccountSignupSection } from "@/components/AccountSignupSection";
@@ -13,7 +13,7 @@ import { ProteinPreferenceSection } from "@/components/ProteinPreferenceSection"
 import { PlanningPrefsSection, type PlanningPrefsValue } from "@/components/PlanningPrefsSection";
 import { CookingShoppingSection } from "@/components/CookingShoppingSection";
 import type { RecipeMealSlotId } from "@/types";
-import type { HouseholdMember, MacroSplitPreference, MealTimingPreference, ProteinPreference, UserProfile } from "@/types/profile";
+import type { HouseholdMember, MacroSplitPreference, MealSizes, ProteinPreference, UserProfile } from "@/types/profile";
 import {
   clampAdults,
   clampChildren,
@@ -25,10 +25,15 @@ import {
 import { MinimumProteinSettings } from "@/components/MinimumProteinSettings";
 import { MACRO_SPLIT_OPTIONS } from "@/utils/macroSplit";
 import { DisplaySettings } from "@/components/DisplaySettings";
+import { HowIEatSettings } from "@/components/HowIEatSettings";
+import { PersonalizationSettings } from "@/components/PersonalizationSettings";
+import { ScanSettings } from "@/components/ScanSettings";
+import { withMealSourcePlan } from "@/utils/fitYourLife";
 import { DevPanel } from "@/components/DevPanel";
 import { BUILD_INFO } from "@/utils/buildInfo";
 import { useDisplayPrefs } from "@/hooks/useDisplayPrefs";
-import { MealTimingPreferenceSection } from "@/components/MealTimingPreferenceSection";
+import { MealSizesSection } from "@/components/MealTimingPreferenceSection";
+import { effectiveMealSizes } from "@/utils/mealTargets";
 import { CuisinePreferenceSection } from "@/components/CuisinePreferenceSection";
 import {
   DEFAULT_COOKING_EVENTS,
@@ -77,7 +82,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const [minProteinGrams, setMinProteinGrams] = useState("");
   const [macroSplitPreference, setMacroSplitPreference] =
     useState<MacroSplitPreference>("balanced");
-  const [mealTiming, setMealTiming] = useState<MealTimingPreference | null>(null);
+  const [mealSizes, setMealSizes] = useState<MealSizes>({});
   const [preferredCuisines, setPreferredCuisines] = useState<string[]>([]);
   const [proteinPreference, setProteinPreference] =
     useState<ProteinPreference>(DEFAULT_PROTEIN_PREFERENCE);
@@ -98,8 +103,12 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
   });
   useOverlayBack(userProfile != null, onClose);
 
+  // Load the form once when the sheet opens; sections that apply right away (Personalization,
+  // How I eat) must not wipe unsaved edits here.
+  const loaded = useRef(false);
   useEffect(() => {
-    if (!userProfile) return;
+    if (!userProfile || loaded.current) return;
+    loaded.current = true;
     const counts = resolveHouseholdCounts(userProfile);
     setAdults(counts.adults);
     setChildrenCount(counts.children);
@@ -119,7 +128,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         : "",
     );
     setMacroSplitPreference(userProfile.macroSplitPreference ?? "balanced");
-    setMealTiming(userProfile.mealTiming ?? null);
+    setMealSizes(effectiveMealSizes(userProfile));
     setPreferredCuisines(userProfile.preferredCuisines ?? []);
     setProteinPreference(preference);
     setEatenMeals(resolveEatenMeals(userProfile));
@@ -159,7 +168,9 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       householdCustomCount: null,
       prioritizeMinProtein: userProfile.prioritizeMinProtein ?? true,
       macroSplitPreference,
-      mealTiming,
+      // Per-meal sizes replace the older timing preset (read once by effectiveMealSizes).
+      mealSizes,
+      mealTiming: null,
       preferredCuisines,
       ...deriveCookingFlags(planningPrefs),
       proteinPreference,
@@ -194,7 +205,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
               heightCm: userProfile.heightCm,
             }),
     };
-    setUserProfile(next);
+    setUserProfile(withMealSourcePlan(next));
     // Keep current targets (e.g. an applied recommendation) unless a target input changed.
     setTargets(targetsAfterProfileChange(userProfile, useAppStore.getState().userProfile ?? next, targets));
     void syncAccountSnapshot();
@@ -328,18 +339,30 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         )}
 
         <section className="space-y-4 border-b border-slate-100 pb-5">
-          <MealTimingPreferenceSection
-            value={mealTiming}
-            onChange={setMealTiming}
-            eatenMeals={eatenMeals}
-          />
+          <MealSizesSection value={mealSizes} onChange={setMealSizes} eatenMeals={eatenMeals} />
         </section>
 
         <section className="space-y-4 border-b border-slate-100 pb-5">
           <CuisinePreferenceSection selected={preferredCuisines} onChange={setPreferredCuisines} />
         </section>
 
+        <PersonalizationSettings />
+
+        <HowIEatSettings
+          onApplied={(p) =>
+            setPlanningPrefs((prev) => ({
+              ...prev,
+              cookingEventsPerWeek: p.cookingEventsPerWeek ?? prev.cookingEventsPerWeek,
+              maxPrepMinutes: p.maxPrepMinutes === undefined ? prev.maxPrepMinutes : p.maxPrepMinutes,
+              maxLeftoverStreakDays: p.maxLeftoverStreakDays ?? prev.maxLeftoverStreakDays,
+              weeklyMealPrepSlot: p.weeklyMealPrepSlot ?? prev.weeklyMealPrepSlot,
+            }))
+          }
+        />
+
         <DisplaySettings />
+
+        <ScanSettings />
 
         <section className="space-y-3 border-b border-slate-100 pb-5">
           <h3 className="text-base font-semibold text-slate-900">Check-in</h3>

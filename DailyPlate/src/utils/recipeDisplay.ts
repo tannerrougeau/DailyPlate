@@ -9,6 +9,7 @@ import type {
 } from "@/types";
 import { estimateFiberFromIngredients } from "@/utils/fiberEstimate";
 import { nutritionFromIngredients } from "@/utils/ingredientNutrition";
+import { hasLabelNutrition } from "@/utils/labelNutrition";
 import {
   applyCarbSwapToIngredients,
   applyCarbSwapToInstructions,
@@ -151,9 +152,10 @@ export function recipeFiberGrams(
   fatVariationId?: FatVariationId,
 ): number {
   const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
-  const computed = nutritionFromIngredients(ingredients, 1);
-  if (computed) return Math.max(0, computed.fiber);
   const v = getVariationDetail(recipe, variationId);
+  const label = hasLabelNutrition(recipe, v?.id);
+  const computed = label ? null : nutritionFromIngredients(ingredients, 1);
+  if (computed) return Math.max(0, computed.fiber);
   if (typeof v?.fiber === "number" && Number.isFinite(v.fiber)) {
     return Math.max(0, v.fiber);
   }
@@ -175,7 +177,10 @@ export function resolveRecipeMacros(
   fatVariationId?: FatVariationId,
 ): Pick<Recipe, "calories" | "protein" | "carbs" | "fat"> {
   const ingredients = resolveRecipeIngredients(recipe, variationId, carbVariationId, fatVariationId);
-  const computed = nutritionFromIngredients(ingredients, 1);
+  const v = getVariationDetail(recipe, variationId);
+  // Packaged items use their label; everything else comes from ingredients.json.
+  const label = hasLabelNutrition(recipe, v?.id);
+  const computed = label ? null : nutritionFromIngredients(ingredients, 1);
   if (computed) {
     return {
       calories: computed.calories,
@@ -184,7 +189,8 @@ export function resolveRecipeMacros(
       fat: computed.fat,
     };
   }
-  const v = getVariationDetail(recipe, variationId);
+  // Only labels and user recipes get here: built-in recipes always match (nutrition:check) and
+  // carry no stored nutrition of their own.
   const base = {
     calories: v?.calories ?? recipe.calories,
     protein: v?.protein ?? recipe.protein,

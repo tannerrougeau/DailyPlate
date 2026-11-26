@@ -18,6 +18,8 @@ export type IngredientRecord = {
   grams: Record<string, number | null>;
   aliases: string[];
   role?: IngredientRole;
+  /** Typical US grocery price tier (approved list A); used only to rank by budget. */
+  cost?: "low" | "medium" | "high";
   /** How recipe amounts are measured: raw, dry, cooked, or as sold. */
   state?: IngredientState;
   /** cookedPerRaw = cooked weight ÷ measured weight, with its source. */

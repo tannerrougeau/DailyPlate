@@ -22,6 +22,17 @@ import {
 import { getProteinSource } from "@/utils/recipeProteinSource";
 import { createPlannedMeal } from "@/utils/recipeDisplay";
 import { pickPreferredVariationId } from "@/utils/variationPrefs";
+import {
+  budgetWeight,
+  cheapestCost,
+  isEasyMealRecipe,
+  isNoCookRecipe,
+  median,
+  MIN_OPTIONS_PER_SLOT,
+  passesEffortLimits,
+  passesEquipmentLimits,
+} from "@/utils/recipeFit";
+import type { BudgetPreference, CookingLimit, MealSizes } from "@/types/profile";
 import { isBeverageRecipe, mealMacrosWithBeverage } from "@/utils/beverages";
 
 export { isBeverageRecipe } from "@/utils/beverages";
@@ -38,7 +49,11 @@ function timingBoost(
   recipe: Recipe,
   slot: MealSlotId,
   timing: MealTimingPreference | null,
+  sizes: MealSizes | undefined,
 ): number {
+  const size = slot === "breakfast" || slot === "lunch" || slot === "dinner" ? sizes?.[slot] : undefined;
+  if (size === "light") return recipe.calories < 360 ? 22 : -8;
+  if (size === "large") return recipe.calories > 500 ? 22 : 4;
   if (!timing) return 0;
   if (timing === "light_breakfast" && slot === "breakfast") {
     return recipe.calories < 360 ? 22 : -8;
@@ -57,8 +72,9 @@ function recipeWeight(
 ): number {
   let w = 12;
   if (options.favoriteIds.includes(recipe.id)) w += 38;
+  if (preppedBreakfast(recipe, slot, options)) w += 40;
   w += recipeFavoriteBoost(recipe, options.favoriteChips, options.favoriteCustom);
-  w += timingBoost(recipe, slot, options.mealTiming);
+  w += timingBoost(recipe, slot, options.mealTiming, options.mealSizes);
   if (options.prioritizeMinProtein) {
     w += proteinDensity(recipe) * 140;
     if (recipe.tags.includes("high_protein")) w += 24;
@@ -135,6 +151,7 @@ function isRecipeAllowed(
   if (recipeExcludedByDislikeChips(recipe, dislikedChips, dislikedCustom)) return false;
   if (options && recipeAvoidedByProteinSources(recipe, options.avoidedProteinSources)) return false;
   if (options && !recipeMatchesEquipment(recipe, options.kitchenEquipment)) return false;
+  if (options && !passesEquipmentLimits(recipe, options.cookingLimits)) return false;
   if (
     options &&
     slot &&
@@ -163,6 +180,8 @@ export interface GenerateOptions {
   favoriteCustom: string;
   slots: MealSlotId[];
   mealTiming: MealTimingPreference | null;
+  /** Light / Normal / Large per meal; Light prefers smaller recipes, Large bigger ones. */
+  mealSizes?: MealSizes;
   prioritizeMinProtein: boolean;
   minimumProteinGrams: number | null;
   /** When true, prefer simpler recipes and plan leftovers across the week. */
@@ -180,6 +199,10 @@ export interface GenerateOptions {
   };
   /** Per-slot meal targets; picks that can be portioned to fit are preferred. */
   slotTargets?: Partial<Record<MealSlotId, DailyTargets>>;
+  /** "Anything that limits cooking?" Equipment limits are hard; time and chopping can soften. */
+  cookingLimits?: CookingLimit[];
+  /** Tight and Moderate rank by estimated cost per serving (cheapest variation). */
+  budget?: BudgetPreference;
 }
 
 /** Goal portions are applied when the day is saved (see applyGoalPortions), so picks start at scale 1. */
@@ -221,6 +244,7 @@ export function generateDayPlan(
         live.dislikedChips,
         live.dislikedCustom,
         live.snackStyle,
+        live.budget,
       ),
     });
   }
@@ -243,9 +267,24 @@ export function repeatLimitFor(recipeId: string, options: GenerateOptions): numb
   return options.favoriteIds.includes(recipeId) ? base + 1 : base;
 }
 
-function underRepeatLimit(recipe: Recipe, options: GenerateOptions): boolean {
+function easyMeal(slot: MealSlotId, options: GenerateOptions): boolean {
+  const easy = options.personalization?.profile.easyMeals ?? [];
+  return (easy as string[]).includes(slot);
+}
+
+/** Breakfast set to "Meal prep": batch-friendly breakfasts are preferred and repeat across days. */
+function preppedBreakfast(recipe: Recipe, slot: MealSlotId, options: GenerateOptions): boolean {
+  return (
+    slot === "breakfast" &&
+    options.personalization?.profile.mealSources?.breakfast === "prep" &&
+    recipe.tags.includes("batch_friendly")
+  );
+}
+
+function underRepeatLimit(recipe: Recipe, options: GenerateOptions, slot?: MealSlotId): boolean {
   const count = options.personalization?.signals.recentCounts?.get(recipe.id) ?? 0;
-  return count < repeatLimitFor(recipe.id, options);
+  const extra = slot && preppedBreakfast(recipe, slot, options) ? 3 : 0;
+  return count < repeatLimitFor(recipe.id, options) + extra;
 }
 
 function pickSlotRecipe(
@@ -261,7 +300,17 @@ function pickSlotRecipe(
       isRecipeAllowed(r, dislike, options.dislikedChips, options.dislikedCustom, options, slot) &&
       !used.has(r.id),
   );
-  const fresh = pool.filter((r) => underRepeatLimit(r, options));
+  // A meal switched to its easier version: quick no-cook / microwave picks only (when any fit).
+  const easy = easyMeal(slot, options);
+  if (easy) {
+    const quick = pool.filter((r) => isEasyMealRecipe(r));
+    if (quick.length > 0) pool = quick;
+  }
+  // Time and chopping limits filter when enough options remain; otherwise they strongly prefer.
+  const effortOk = pool.filter((r) => passesEffortLimits(r, options.cookingLimits));
+  const softEffort = effortOk.length < MIN_OPTIONS_PER_SLOT;
+  if (!softEffort) pool = effortOk;
+  const fresh = pool.filter((r) => underRepeatLimit(r, options, slot));
   if (fresh.length > 0) pool = fresh;
   if (pool.length === 0) {
     pool = recipes.filter(
@@ -271,9 +320,25 @@ function pickSlotRecipe(
     );
   }
   if (pool.length === 0) {
-    pool = recipes.filter((r) => !dislike.has(r.id) && !used.has(r.id) && !isBeverageRecipe(r));
+    // Last resort still respects equipment limits (never an oven recipe for "No oven").
+    pool = recipes.filter(
+      (r) =>
+        !dislike.has(r.id) &&
+        !used.has(r.id) &&
+        !isBeverageRecipe(r) &&
+        passesEquipmentLimits(r, options.cookingLimits),
+    );
   }
-  return weightedPick(pool, (r) => recipeWeight(r, slot, options));
+  const costs = new Map(options.budget && options.budget !== "flexible" ? pool.map((r) => [r.id, cheapestCost(r)]) : []);
+  const mid = median([...costs.values()]);
+  return weightedPick(pool, (r) => {
+    let w = recipeWeight(r, slot, options);
+    if (softEffort && !passesEffortLimits(r, options.cookingLimits)) w *= 0.15;
+    if (easy && isNoCookRecipe(r)) w *= 3;
+    const c = costs.get(r.id);
+    if (c != null) w *= budgetWeight(c, mid, options.budget);
+    return w;
+  });
 }
 
 /**
@@ -308,6 +373,7 @@ export function generateSlotsPlan(
         live.dislikedChips,
         live.dislikedCustom,
         live.snackStyle,
+        live.budget,
       ),
     });
   }

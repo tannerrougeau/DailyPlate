@@ -10,7 +10,8 @@ import {
   Utensils,
   X,
 } from "lucide-react";
-import type { PlannedMeal } from "@/types";
+import type { DaySize, PlannedMeal } from "@/types";
+import { DaySizeRow } from "@/components/DaySizeRow";
 import { mealDisplayName } from "@/utils/recipeDisplay";
 import { useOverlayBack } from "@/hooks/useOverlayBack";
 
@@ -30,6 +31,8 @@ type MealActionsMenuProps = {
   onToggleLock: () => void;
   onMealPrep?: () => void;
   onDetails?: () => void;
+  /** "Size today" for this day only; omitted when the meal is eaten, kept or locked. */
+  onDaySize?: (size: DaySize | null) => void;
 };
 
 export function MealActionsMenu({
@@ -47,6 +50,7 @@ export function MealActionsMenu({
   onToggleLock,
   onMealPrep,
   onDetails,
+  onDaySize,
 }: MealActionsMenuProps) {
   useOverlayBack(true, onClose);
   function run(action: () => void) {
@@ -150,6 +154,7 @@ export function MealActionsMenu({
               onClick={() => run(onDetails)}
             />
           )}
+          {onDaySize && <DaySizeRow value={meal.daySize} onChoose={(size) => run(() => onDaySize(size))} />}
         </div>
 
         <button

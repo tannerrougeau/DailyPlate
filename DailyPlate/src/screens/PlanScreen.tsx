@@ -166,6 +166,7 @@ export function PlanScreen() {
       <RollingWeekCalendar
         todayDateKey={todayKey}
         selectedDateKeys={selectedDateSet}
+        viewedDateKey={selectedDateKey}
         selectMode={selectMode}
         onDayClick={(key) => handleDayClick(key)}
         onSelectWeek={handleSelectWeek}

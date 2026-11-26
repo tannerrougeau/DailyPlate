@@ -4,11 +4,16 @@ import type { CheckInEntry } from "@/types/tdeeFeedback";
 import { CUISINE_OPTIONS, logPlanPatterns, type PersonalizationSignals } from "@/utils/personalizationEngine";
 import { customTokens, DISLIKE_MATCHERS, DISLIKED_FOOD_CHIPS } from "@/utils/chipMatching";
 import { checkInScale } from "@/utils/checkInScale";
-import type { CheckpointState, DisplayPrefs, PlanSettings } from "@/utils/displayPrefs";
+import type { CheckpointState, DisplayPrefs, NextStepProfileFields, PlanSettings } from "@/utils/displayPrefs";
+import type { NextStep } from "@/utils/nextBestStep";
+import { mealsPerDayFromSelections } from "@/utils/planningPrefs";
 import { ingredientRole } from "@/utils/ingredientNutrition";
 import { shortIngredientName } from "@/utils/recipeDisplay";
 
 export const ASK_SPACING_DAYS = 3;
+/** After this many skips or "Not now" answers in a row, questions are spaced further apart. */
+export const BACKOFF_AFTER_SKIPS = 3;
+export const BACKOFF_SPACING_DAYS = 7;
 export const NO_SNOOZE_DAYS = 30;
 export const MAX_ON_OPEN = 1;
 export const MAX_IN_CHECK_IN = 2;
@@ -22,7 +27,11 @@ export type QuestionChange =
   | { kind: "planSettings"; set: PlanSettings; what: string }
   | { kind: "preferCuisine"; cuisine: string; label: string }
   | { kind: "favoriteFood"; food: string }
-  | { kind: "unavoid"; chip?: string; token?: string; label: string };
+  | { kind: "unavoid"; chip?: string; token?: string; label: string }
+  | { kind: "profile"; set: NextStepProfileFields; what: string }
+  | { kind: "openCheckIn" }
+  /** A personalization question skipped in onboarding; Yes opens it on Today. */
+  | { kind: "askTopic"; topic: import("@/utils/personalizeTopics").PersonalizeTopic };
 
 export type Question = {
   /** Stable id: the same question is never queued twice. */
@@ -30,7 +39,7 @@ export type Question = {
   text: string;
   /** Saved with the checkpoint when answered Yes. */
   why: string;
-  source: "usage" | "check-in" | "taste";
+  source: "usage" | "check-in" | "taste" | "next-step" | "onboarding";
   change: QuestionChange;
   addedAt: string;
 };
@@ -43,9 +52,54 @@ export type UsageEvent = { kind: "details" | "adjust" | "cards"; at: string; n?:
 
 const daysBetween = (a: string, b: Date) => (b.getTime() - new Date(a).getTime()) / DAY_MS;
 
-/** On app open: only if no question was asked in the last 3 days. */
-export function canAskOnOpen(lastAskedAt: string | null | undefined, now: Date): boolean {
-  return !lastAskedAt || daysBetween(lastAskedAt, now) >= ASK_SPACING_DAYS;
+/** Days between questions: 3, or 7 after 3 skips in a row (any answer goes back to 3). */
+export function spacingDays(skipStreak = 0): number {
+  return skipStreak >= BACKOFF_AFTER_SKIPS ? BACKOFF_SPACING_DAYS : ASK_SPACING_DAYS;
+}
+
+/** On app open: only if no question was asked within the current spacing. */
+export function canAskOnOpen(lastAskedAt: string | null | undefined, now: Date, skipStreak = 0): boolean {
+  return !lastAskedAt || daysBetween(lastAskedAt, now) >= spacingDays(skipStreak);
+}
+
+/** Skip streak after an answer: "Not now" counts as a skip; Yes or No resets it. */
+export function nextSkipStreak(streak: number, answer: QuestionAnswer): number {
+  return answer === "not_now" ? streak + 1 : 0;
+}
+
+// ---------- Basic mode and pausing ----------
+
+/** "until I resume" is stored as this value instead of a date. */
+export const PAUSED_INDEFINITELY = "indefinite";
+export type PauseChoice = "week" | "month" | "indefinite";
+
+export type QuestionGate = { basicMode?: boolean; questionsPausedUntil?: string | null };
+
+export function pauseUntil(choice: PauseChoice, now: Date): string {
+  if (choice === "indefinite") return PAUSED_INDEFINITELY;
+  const d = new Date(now);
+  if (choice === "week") d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString();
+}
+
+export function isPaused(pausedUntil: string | null | undefined, now: Date): boolean {
+  if (!pausedUntil) return false;
+  if (pausedUntil === PAUSED_INDEFINITELY) return true;
+  return new Date(pausedUntil).getTime() > now.getTime();
+}
+
+/** Questions and suggestions are off in Basic mode and while paused. */
+export function questionsAllowed(gate: QuestionGate, now: Date): boolean {
+  return !gate.basicMode && !isPaused(gate.questionsPausedUntil, now);
+}
+
+/** "Paused until Dec 1 · Resume" / "Paused · Resume". */
+export function pauseLabel(pausedUntil: string | null | undefined): string {
+  if (!pausedUntil) return "";
+  if (pausedUntil === PAUSED_INDEFINITELY) return "Paused";
+  const d = new Date(pausedUntil);
+  return `Paused until ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
 function blocked(log: QuestionLog, id: string, now: Date): boolean {
@@ -368,9 +422,19 @@ export function applyChange(
     preferredCuisines?: string[];
     favoriteFoodCustom?: string;
     dislikedFoodChips?: string[];
+    profile?: UserProfile | null;
   },
   change: QuestionChange,
 ): { before: CheckpointState; after: CheckpointState; what: string } {
+  if (change.kind === "profile") {
+    const before: NextStepProfileFields = {};
+    for (const key of Object.keys(change.set) as (keyof NextStepProfileFields)[]) {
+      (before as Record<string, unknown>)[key] = current.profile?.[key] ?? null;
+    }
+    return { before: { profile: before }, after: { profile: { ...change.set } }, what: change.what };
+  }
+  if (change.kind === "openCheckIn") return { before: {}, after: {}, what: "Opened a check-in" };
+  if (change.kind === "askTopic") return { before: {}, after: {}, what: "Opened a question" };
   if (change.kind === "preferCuisine") {
     const was = current.preferredCuisines ?? [];
     return {
@@ -546,4 +610,77 @@ function conflict(recipeName: string, label: string, which: { chip?: string; tok
     change: { kind: "unavoid", ...which, label },
     addedAt: at,
   };
+}
+
+const STEP_PLURAL = { breakfast: "breakfasts", lunch: "lunches", dinner: "dinners" } as const;
+
+export function easierMealQuestionId(slot: "breakfast" | "lunch" | "dinner"): string {
+  return `next:easy:${slot}`;
+}
+
+/** The "next best step" as a queued question: one sentence, one concrete action on Yes. */
+export function nextStepQuestion(step: NextStep, profile: UserProfile, now: Date): Question {
+  const base = { text: step.text, why: "From your last 7 logged days", source: "next-step" as const, addedAt: now.toISOString() };
+  const eaten = profile.eatenMeals ?? ["breakfast", "lunch", "dinner"];
+  const snacks = profile.snacksPerDay ?? 0;
+  switch (step.kind) {
+    case "slotAddOn":
+      return {
+        ...base,
+        id: `next:protein:${step.slot}`,
+        change: {
+          kind: "profile",
+          set: { slotAddOns: { ...(profile.slotAddOns ?? {}), [step.slot]: [step.option.item] } },
+          what: `Added ${step.option.label} to your ${STEP_PLURAL[step.slot]}`,
+        },
+      };
+    case "easierMeal":
+      return {
+        ...base,
+        id: easierMealQuestionId(step.slot),
+        change: {
+          kind: "profile",
+          set: { easyMeals: [...new Set([...(profile.easyMeals ?? []), step.slot])] },
+          what: `Quicker, no-cook ${STEP_PLURAL[step.slot]}`,
+        },
+      };
+    case "dropMeal": {
+      const next = eaten.filter((s) => s !== step.slot);
+      return {
+        ...base,
+        id: `next:skip:${step.slot}`,
+        change: {
+          kind: "profile",
+          set: { eatenMeals: next, mealsPerDay: mealsPerDayFromSelections(next, snacks) },
+          what: `Plans without ${step.slot}`,
+        },
+      };
+    }
+    case "addSnack":
+      return {
+        ...base,
+        id: "next:under",
+        change: {
+          kind: "profile",
+          set: { snacksPerDay: snacks + 1, mealsPerDay: mealsPerDayFromSelections(eaten, snacks + 1) },
+          what: "Added a planned snack",
+        },
+      };
+    case "openCheckIn":
+      return { ...base, id: "next:over", change: { kind: "openCheckIn" } };
+    case "prepLunch":
+      return {
+        ...base,
+        id: "next:prep-lunch",
+        change: {
+          kind: "profile",
+          set: {
+            mealSources: { ...(profile.mealSources ?? {}), lunch: "prep" },
+            weeklyMealPrepEnabled: true,
+            weeklyMealPrepSlot: "lunch",
+          },
+          what: "Prep lunches for the week",
+        },
+      };
+  }
 }

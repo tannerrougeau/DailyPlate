@@ -1,6 +1,7 @@
-import type { GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
+import type { DayMealTracking, GroceryItem, PlannedMeal, RecipeIngredient } from "@/types";
 import { groceryItemForBeverage, resolveBeverage } from "@/utils/beverages";
 import { batchServings, mealPortionLines } from "@/utils/mealPortions";
+import type { PortionLine } from "@/utils/goalPortions";
 import { sideLines } from "@/utils/mealSides";
 import {
   formatPracticalQty,
@@ -10,12 +11,47 @@ import {
 const TINY_SEASONING =
   /salt|pepper|paprika|cumin|oregano|chili|herb|zest|garlic powder|onion powder|pinch|seasoning|spice/i;
 
+/**
+ * Meals of one day that still need buying: never past days; for today, only meals not yet logged
+ * (eaten, half, extra, skipped or "something else" all mean there's nothing left to buy). Future
+ * days are unchanged. Bought meals are taken out separately (cookedMeals).
+ */
+export function groceryMealsForDay(
+  dateKey: string,
+  todayKey: string,
+  meals: PlannedMeal[],
+  dayTracking: DayMealTracking | undefined,
+): PlannedMeal[] {
+  if (dateKey < todayKey) return [];
+  if (dateKey > todayKey) return meals;
+  return meals.filter((m) => dayTracking?.[m.slot] == null);
+}
+
+/**
+ * A batch is already cooked (nothing left to buy for its leftover days) when its cook day is past,
+ * or is today and that meal is already logged.
+ */
+export function batchAlreadyCooked(
+  cook: { dateKey: string; slot: PlannedMeal["slot"] },
+  todayKey: string,
+  todayTracking: DayMealTracking | undefined,
+): boolean {
+  if (cook.dateKey < todayKey) return true;
+  return cook.dateKey === todayKey && todayTracking?.[cook.slot] != null;
+}
+
+/**
+ * `batchLinesFor` returns the whole batch a meal belongs to (the same amounts the prep section
+ * shows), so the list matches what gets cooked. Without it, the batch is this meal × household × days.
+ */
 export function groceriesFromMeals(
   meals: PlannedMeal[],
   householdMultiplier = 1,
+  batchLinesFor?: (meal: PlannedMeal) => PortionLine[] | null,
+  /** Share across days so a batch spanning several selected days is bought once. */
+  countedBatches: Set<string> = new Set<string>(),
 ): GroceryItem[] {
   const map = new Map<string, GroceryItem>();
-  const countedBatches = new Set<string>();
 
   for (const meal of meals) {
     const drinkItem = groceryItemForBeverage(
@@ -34,10 +70,8 @@ export function groceriesFromMeals(
     let ingredients: RecipeIngredient[] = sides;
     if (!meal.mealPrep || !countedBatches.has(meal.mealPrep.batchId)) {
       if (meal.mealPrep) countedBatches.add(meal.mealPrep.batchId);
-      ingredients = [
-        ...mealPortionLines(meal, batchServings(meal, householdMultiplier)).map((line) => line.ingredient),
-        ...sides,
-      ];
+      const lines = batchLinesFor?.(meal) ?? mealPortionLines(meal, batchServings(meal, householdMultiplier));
+      ingredients = [...lines.map((line) => line.ingredient), ...sides];
     }
 
     for (const ing of ingredients) {

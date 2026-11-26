@@ -19,6 +19,12 @@
   body {
     @apply min-h-dvh;
   }
+  /* Dropdowns open in place: don't let the browser anchor scrolling to content below them
+     (e.g. the sticky bottom bar), which made the page jump to the bottom. */
+  html,
+  body {
+    overflow-anchor: none;
+  }
 }
 
 @layer utilities {
